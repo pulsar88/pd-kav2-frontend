@@ -1,0 +1,138 @@
+@import 'tailwindcss';
+
+@config '../../../../tailwind.config.cjs';
+
+@layer theme {
+	:root {
+		--primary: #8B8CFF;
+		--primary-deep: #6C6DFF;
+		--primary-mild: #A8A9FF;
+		--primary-subtle: #8B8CFF1A;
+	  
+		--neutral: #1C1C1E;
+	  
+		--error: #FF6B6B;
+		--error-subtle: #FF6B6B1A;
+	  
+		--success: #4ADE80;
+		--success-subtle: #4ADE801A;
+	  
+		--info: #60A5FA;
+		--info-subtle: #60A5FA1A;
+	  
+		--warning: #FBBF24;
+		--warning-subtle: #FBBF241A;
+	  
+		--gray-50: #FAFAF9;
+		--gray-100: #E7E5E4;
+		--gray-200: #D6D3D1;
+		--gray-300: #A8A29E;
+		--gray-400: #78716C;
+		--gray-500: #57534E;
+		--gray-600: #44403C;
+		--gray-700: #292524;
+		--gray-800: #1C1917;
+		--gray-900: #0C0A08;
+		--gray-950: #050403;
+	  }
+
+	.dark {
+		--primary: #E7E5E4;
+		--primary-deep: #D6D3D1;
+		--primary-mild: #F5F5F4;
+		--primary-subtle: #E7E5E41A;
+
+		--neutral: #FAFAF9;
+
+		--error: #F87171;
+		--error-subtle: #F871711A;
+
+		--success: #34D399;
+		--success-subtle: #34D3991A;
+
+		--info: #A8A29E;
+		--info-subtle: #A8A29E1A;
+
+		--warning: #FBBF24;
+		--warning-subtle: #FBBF241A;
+
+		--gray-50: #FAFAFA;
+		--gray-100: #F4F4F5;
+		--gray-200: #E4E4E7;
+		--gray-300: #D4D4D8;
+		--gray-400: #A1A1AA;
+		--gray-500: #71717A;
+		--gray-600: #52525B;
+		--gray-700: #3F3F46;
+		--gray-800: #262626;
+		--gray-900: #171717;
+		--gray-950: #09090B;
+	}
+}
+
+@layer base {
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentColor);
+	}
+
+	button, [role=button] {
+		cursor: pointer;
+	}
+
+	body {
+		@apply text-gray-500 dark:text-gray-400 text-sm bg-gray-100 dark:bg-gray-950 leading-normal font-medium;
+		-webkit-font-smoothing: antialiased;
+	}
+
+	h1,
+	.h1 {
+		@apply text-4xl font-bold text-gray-900 dark:text-gray-100;
+	}
+
+	h2,
+	.h2 {
+		@apply text-3xl font-bold text-gray-900 dark:text-gray-100;
+	}
+
+	h3,
+	.h3 {
+		@apply text-2xl font-bold text-gray-900 dark:text-gray-100;
+	}
+
+	h4,
+	.h4 {
+		@apply text-xl font-bold text-gray-900 dark:text-gray-100;
+	}
+
+	h5,
+	.h5 {
+		@apply text-lg font-bold text-gray-900 dark:text-gray-100;
+	}
+
+	h6,
+	.h6 {
+		@apply text-base font-semibold text-gray-900 dark:text-gray-100;
+	}
+
+	hr {
+		@apply border-gray-200 dark:border-gray-600;
+	}
+}
+
+@layer components {
+	.heading-text {
+		@apply text-gray-900 dark:text-gray-100;
+	}
+}
+
+@layer utilities {
+	@media (width >= 1536px) {
+		.container {
+			max-width: none;
+		}
+	}
+}

@@ -1,0 +1,9 @@
+@layer components {
+	.button {
+		@apply font-bold outline-none whitespace-nowrap content-center transition-[color,background-color,border-color,box-shadow,opacity,transform,ring-color] duration-200 ease-out;
+	}
+	
+	.button-press-feedback {
+		@apply active:scale-[0.98];
+	}	
+}
