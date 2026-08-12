@@ -13,6 +13,10 @@ export default defineConfig({
     },
   },
   server: {
+    // localhost — secure context, webpush/SW работают без HTTPS
+    headers: {
+      'Service-Worker-Allowed': '/',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -20,6 +24,11 @@ export default defineConfig({
         secure: false
       }
     }
+  },
+  preview: {
+    headers: {
+      'Service-Worker-Allowed': '/',
+    },
   },
   build: {
     outDir: 'build'

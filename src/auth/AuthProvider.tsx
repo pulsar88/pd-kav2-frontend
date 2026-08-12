@@ -15,6 +15,8 @@ import {
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
+import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
+import { preparePushPromptAfterAuth } from '@/utils/webPush'
 import type {
     SignInCredential,
     SignUpCredential,
@@ -59,6 +61,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     )
     const { token, setToken } = useToken()
     const [tokenState, setTokenState] = useState(token)
+    const [pushPromptOpen, setPushPromptOpen] = useState(false)
 
     const authenticated = Boolean(tokenState && signedIn)
 
@@ -131,6 +134,18 @@ function AuthProvider({ children }: AuthProviderProps) {
     const finishAuth = (accessToken: string, nextUser?: User) => {
         handleSignIn({ accessToken }, nextUser)
         redirect()
+
+        void preparePushPromptAfterAuth()
+            .then(({ shouldPrompt }) => {
+                if (shouldPrompt) {
+                    // Даём завершиться редиректу, затем спрашиваем
+                    window.setTimeout(() => setPushPromptOpen(true), 500)
+                }
+            })
+            .catch((error) => {
+                console.error('Push prompt prepare failed', error)
+            })
+
         return {
             status: 'success' as const,
             message: '',
@@ -300,6 +315,10 @@ function AuthProvider({ children }: AuthProviderProps) {
         >
             {children}
             <IsolatedNavigator ref={navigatorRef} />
+            <PushSubscriptionPrompt
+                isOpen={pushPromptOpen}
+                onClose={() => setPushPromptOpen(false)}
+            />
         </AuthContext.Provider>
     )
 }

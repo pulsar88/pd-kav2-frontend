@@ -10,6 +10,8 @@ const endpointConfig = {
     authCheck: '/v2/auth/check',
     authForgotPassword: '/v2/auth/forgot_password',
     authResetPassword: '/v2/auth/reset_password',
+    pushSubscribe: '/v2/push/subscribe',
+    pushUnsubscribe: '/v2/push/unsubscribe',
 }
 
 export default endpointConfig
