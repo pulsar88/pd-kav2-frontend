@@ -27,6 +27,8 @@ const endpointConfig = {
         `/v2/realty_objects/${objectId}`,
     realtyObjectChess: (complexId: string | number) =>
         `/v2/realty_objects/${complexId}/chess`,
+    pushSubscribe: '/v2/push/subscribe',
+    pushUnsubscribe: '/v2/push/unsubscribe',
 }
 
 export default endpointConfig

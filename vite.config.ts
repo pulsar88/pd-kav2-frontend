@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
             },
         },
         server: {
+            headers: {
+                'Service-Worker-Allowed': '/',
+            },
             proxy: {
                 '/api': {
                     target: remoteOrigin,
@@ -46,6 +49,11 @@ export default defineConfig(({ mode }) => {
                     secure: true,
                     ws: true,
                 },
+            },
+        },
+        preview: {
+            headers: {
+                'Service-Worker-Allowed': '/',
             },
         },
         build: {
