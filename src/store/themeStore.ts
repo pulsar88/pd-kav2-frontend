@@ -41,13 +41,18 @@ export const useThemeStore = create<ThemeState & ThemeAction>()(
         }),
         {
             name: 'theme',
-            version: 3,
+            version: 4,
             migrate: (persistedState) => {
                 const state = (persistedState ?? {}) as ThemeState
+                const nextSchema =
+                    !state.themeSchema || state.themeSchema === 'slate'
+                        ? 'gray'
+                        : state.themeSchema
+
                 return {
                     ...state,
                     mode: THEME_ENUM.MODE_DARK,
-                    themeSchema: 'slate',
+                    themeSchema: nextSchema,
                 }
             },
         },

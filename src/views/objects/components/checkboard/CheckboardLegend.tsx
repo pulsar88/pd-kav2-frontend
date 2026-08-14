@@ -5,7 +5,6 @@ type StatusItem = {
     name: string
     color: string
     text_color: string
-    accent_color: string
 }
 
 type CheckboardLegendProps = {
@@ -33,20 +32,15 @@ const CheckboardLegend = ({
                         key={status.code}
                         type="button"
                         className={classNames(
-                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-shadow',
+                            'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-shadow',
                             active && 'ring-2 ring-primary ring-offset-1',
                         )}
                         style={{
                             backgroundColor: status.color,
                             color: status.text_color,
-                            borderColor: status.accent_color,
                         }}
                         onClick={() => onStatusClick(status.code)}
                     >
-                        <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: status.accent_color }}
-                        />
                         {status.name}
                     </button>
                 )

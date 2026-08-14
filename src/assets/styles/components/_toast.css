@@ -2,4 +2,32 @@
   .toast {
     @apply fixed z-40;
   }
+
+  .toast-wrapper {
+    @apply max-w-full;
+  }
+
+  .toast .notification {
+    @apply max-w-full;
+  }
+
+  @media (max-width: 767px) {
+    .toast {
+      left: 16px !important;
+      right: 16px !important;
+      width: auto !important;
+      max-width: calc(100vw - 32px);
+      display: flex;
+      justify-content: center;
+      transform: none !important;
+    }
+
+    .toast-wrapper {
+      @apply w-full;
+    }
+
+    .toast .notification {
+      width: 100% !important;
+    }
+  }
 }

@@ -5,6 +5,7 @@ import {
     PiBuildingsDuotone,
     PiQuestionDuotone,
     PiWrenchDuotone,
+    PiHeartDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
 
@@ -14,6 +15,7 @@ const navigationIcon: NavigationIcons = {
     home: <PiHouseLineDuotone />,
     fixations: <PiClipboardTextDuotone />,
     objects: <PiBuildingsDuotone />,
+    favoritePremises: <PiHeartDuotone />,
     profile: <PiUserDuotone />,
     tools: <PiWrenchDuotone />,
     help: <PiQuestionDuotone />,

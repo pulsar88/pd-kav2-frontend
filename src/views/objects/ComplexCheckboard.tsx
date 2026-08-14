@@ -18,14 +18,14 @@ import Loading from '@/components/shared/Loading'
 
 import {
     apiGetCheckboard,
-    apiGetComplexes,
-    apiSearchPremises,
+    apiGetRealtyObject,
+    apiGetRealtyProperty,
 } from '@/services/ObjectsService'
 
 import { TbArrowLeft } from 'react-icons/tb'
 
 import type { CheckboardCellLabel } from './checkboard.types'
-import type { ObjectsSearchFilters } from './types'
+import type { Complex, ObjectsSearchFilters } from './types'
 
 import {
 
@@ -33,6 +33,7 @@ import {
 
     findBuildingPropertyById,
     flattenBuildingProperties,
+    matchesObjectsSearchFilters,
 
 } from './checkboardUtils'
 
@@ -43,11 +44,15 @@ import CheckboardLegend from './components/checkboard/CheckboardLegend'
 import CheckboardPlus from './components/checkboard/CheckboardPlus'
 
 import CheckboardPropertyDrawer from './components/checkboard/CheckboardPropertyDrawer'
+import ComplexAboutTab from './components/checkboard/ComplexAboutTab'
 import ObjectsSearchForm from './components/ObjectsSearchForm'
 import {
     createEmptyObjectsSearchFilters,
+    hasActiveObjectsSearchFilters,
     parseObjectsSearchFilters,
+    preserveObjectsCatalogTab,
     serializeObjectsSearchFilters,
+    withoutComplexFilters,
 } from './filtersQuery'
 
 
@@ -65,6 +70,8 @@ const syncSearchStateInUrl = (
         params.set('property_id', String(propertyId))
     }
 
+    preserveObjectsCatalogTab(params, url.search)
+
     url.search = params.toString()
     const next = `${url.pathname}${url.search}${url.hash}`
     window.history.replaceState(window.history.state, '', next)
@@ -76,8 +83,8 @@ const ComplexCheckboard = () => {
 
     const navigate = useNavigate()
     const initialFilters = useMemo(
-        () => createEmptyObjectsSearchFilters(id || ''),
-        [id],
+        () => createEmptyObjectsSearchFilters(),
+        [],
     )
 
     const [view, setView] = useState('classic')
@@ -90,10 +97,6 @@ const ComplexCheckboard = () => {
     const [appliedFilters, setAppliedFilters] =
         useState<ObjectsSearchFilters>(initialFilters)
     const [activeStatusCode, setActiveStatusCode] = useState('')
-    const [isSearching, setIsSearching] = useState(false)
-    const [matchingPropertyIds, setMatchingPropertyIds] = useState<Set<number> | null>(
-        null,
-    )
 
     const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(
         null,
@@ -104,7 +107,7 @@ const ComplexCheckboard = () => {
 
     const { data, isLoading } = useSWR(
 
-        id ? ['/api/objects/checkboard', id] : null,
+        id ? ['/api/v2/realty_objects/chess', id] : null,
 
         () => apiGetCheckboard(id || ''),
 
@@ -120,17 +123,15 @@ const ComplexCheckboard = () => {
 
     )
 
-    const { data: complexes = [] } = useSWR(
-        '/api/objects/complexes',
-        () => apiGetComplexes(),
+    const { data: complexInfo, isLoading: isComplexInfoLoading } = useSWR(
+        id ? ['/api/v2/realty_objects', id] : null,
+        () => apiGetRealtyObject(id || ''),
         {
             revalidateOnFocus: false,
             revalidateIfStale: false,
             revalidateOnReconnect: false,
         },
     )
-
-
 
     const selectedProperty = useMemo(() => {
 
@@ -139,6 +140,18 @@ const ComplexCheckboard = () => {
         return findBuildingPropertyById(data, selectedPropertyId) ?? null
 
     }, [data, selectedPropertyId])
+
+    const { data: propertyDetails, isLoading: isPropertyDetailsLoading } = useSWR(
+        selectedPropertyId != null
+            ? ['/api/v2/realty_properties', selectedPropertyId]
+            : null,
+        () => apiGetRealtyProperty(selectedPropertyId!),
+        {
+            revalidateOnFocus: false,
+            revalidateIfStale: false,
+            revalidateOnReconnect: false,
+        },
+    )
 
     useEffect(() => {
         if (selectedPropertyId == null) return
@@ -176,9 +189,8 @@ const ComplexCheckboard = () => {
     useEffect(() => {
         if (!data) return
 
-        const nextFilters = parseObjectsSearchFilters(
-            window.location.search,
-            id || '',
+        const nextFilters = withoutComplexFilters(
+            parseObjectsSearchFilters(window.location.search),
         )
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
@@ -188,76 +200,86 @@ const ComplexCheckboard = () => {
 
         const parsed = Number(param)
         if (!Number.isFinite(parsed)) return
-        if (findBuildingPropertyById(data, parsed)) {
-            setSelectedPropertyId(parsed)
+
+        const property = findBuildingPropertyById(data, parsed)
+        if (property) {
+            setSelectedPropertyId(property.id)
             setDetailsPanelOpen(true)
         }
     }, [data, id])
 
 
 
-    const currentComplex = useMemo(
-        () => complexes.find((item) => item.id === id) ?? null,
-        [complexes, id],
-    )
+    const currentComplex = useMemo((): Complex | null => {
+        if (complexInfo) return complexInfo
+        if (!data || !id) return null
 
-    useEffect(() => {
-        let cancelled = false
-
-        const loadMatches = async () => {
-            if (!id) return
-
-            setIsSearching(true)
-
-            try {
-                const results = await apiSearchPremises({
-                    ...appliedFilters,
-                    complexId: id,
-                })
-
-                if (!cancelled) {
-                    setMatchingPropertyIds(
-                        new Set(
-                            results.map((item) => item.checkboardPropertyId),
-                        ),
-                    )
-                }
-            } finally {
-                if (!cancelled) {
-                    setIsSearching(false)
-                }
-            }
-        }
-
-        void loadMatches()
-
-        return () => {
-            cancelled = true
-        }
-    }, [appliedFilters, id])
+        return { id, name: data.name }
+    }, [complexInfo, data, id])
 
     const allProperties = useMemo(
         () => (data ? flattenBuildingProperties(data) : []),
         [data],
     )
 
+    const hasSearchFilters = hasActiveObjectsSearchFilters(appliedFilters)
+
+    const matchingPropertyIds = useMemo(() => {
+        if (!hasSearchFilters) return null
+
+        return new Set(
+            allProperties
+                .filter((property) =>
+                    matchesObjectsSearchFilters(property, appliedFilters),
+                )
+                .map((property) => property.id),
+        )
+    }, [allProperties, appliedFilters, hasSearchFilters])
+
     const activePropertyIds = useMemo(() => {
-        if (!data || !matchingPropertyIds) return null
+        if (!data) return null
+
+        if (!hasSearchFilters && !activeStatusCode) {
+            return null
+        }
 
         const visible = new Set<number>()
 
         allProperties.forEach((property) => {
-            if (!matchingPropertyIds.has(property.id)) return
-            if (activeStatusCode && property.status.code !== activeStatusCode) return
+            if (
+                hasSearchFilters &&
+                matchingPropertyIds &&
+                !matchingPropertyIds.has(property.id)
+            ) {
+                return
+            }
+            if (activeStatusCode && property.status.code !== activeStatusCode) {
+                return
+            }
             visible.add(property.id)
         })
 
         return visible
-    }, [activeStatusCode, allProperties, data, matchingPropertyIds])
+    }, [
+        activeStatusCode,
+        allProperties,
+        data,
+        hasSearchFilters,
+        matchingPropertyIds,
+    ])
 
     const stats = useMemo(() => {
-        if (!data || !activePropertyIds) {
+        if (!data) {
             return { total: 0, available: 0 }
+        }
+
+        if (!activePropertyIds) {
+            return {
+                total: allProperties.length,
+                available: allProperties.filter(
+                    (property) => property.status.is_available,
+                ).length,
+            }
         }
 
         let total = 0
@@ -281,20 +303,32 @@ const ComplexCheckboard = () => {
 
 
     const handleApplyFilters = () => {
-        const nextFilters = {
-            ...draftFilters,
-            complexId: id || '',
-        }
+        const nextFilters = withoutComplexFilters(draftFilters)
 
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
         syncSearchStateInUrl(nextFilters, selectedPropertyId)
     }
 
+    const handleDraftFiltersChange = (nextFilters: ObjectsSearchFilters) => {
+        const normalized = withoutComplexFilters(nextFilters)
+        setDraftFilters(normalized)
 
+        if (!hasActiveObjectsSearchFilters(normalized)) {
+            const empty = createEmptyObjectsSearchFilters()
+            setAppliedFilters(empty)
+            syncSearchStateInUrl(empty, selectedPropertyId)
+            return
+        }
+
+        if (hasActiveObjectsSearchFilters(appliedFilters)) {
+            setAppliedFilters(normalized)
+            syncSearchStateInUrl(normalized, selectedPropertyId)
+        }
+    }
 
     const handleResetFilters = () => {
-        const nextFilters = createEmptyObjectsSearchFilters(id || '')
+        const nextFilters = createEmptyObjectsSearchFilters()
 
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
@@ -353,6 +387,10 @@ const ComplexCheckboard = () => {
                                                     complexId: '',
                                                 })
                                             params.delete('property_id')
+                                            preserveObjectsCatalogTab(
+                                                params,
+                                                window.location.search,
+                                            )
                                             const query = params.toString()
                                             navigate(
                                                 query
@@ -362,7 +400,7 @@ const ComplexCheckboard = () => {
                                         }}
                                     >
 
-                                        К списку ЖК
+                                        К списку домов
 
                                     </Button>
 
@@ -381,13 +419,15 @@ const ComplexCheckboard = () => {
 
 
                             <ObjectsSearchForm
-                                complexes={currentComplex ? [currentComplex] : []}
                                 filters={draftFilters}
-                                isSearching={isSearching}
+                                isSearching={false}
+                                hasAppliedFilters={hasActiveObjectsSearchFilters(
+                                    appliedFilters,
+                                )}
                                 desktopActionsInGrid
                                 onCollapsedChange={() => {}}
-                                onChange={setDraftFilters}
-                                onSearch={() => void handleApplyFilters()}
+                                onChange={handleDraftFiltersChange}
+                                onSearch={handleApplyFilters}
                                 onReset={handleResetFilters}
                             />
 
@@ -456,6 +496,18 @@ const ComplexCheckboard = () => {
 
                                         </TabNav>
 
+                                        <TabNav
+
+                                            value="about"
+
+                                            className="!px-2.5 sm:!px-5 text-center"
+
+                                        >
+
+                                            О Жилом комплексе
+
+                                        </TabNav>
+
                                     </TabList>
 
 
@@ -506,7 +558,7 @@ const ComplexCheckboard = () => {
 
                                                         labelMode === item.value
 
-                                                            ? 'bg-primary text-white'
+                                                            ? 'bg-primary text-neutral'
 
                                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200',
 
@@ -586,6 +638,14 @@ const ComplexCheckboard = () => {
 
                                     </TabContent>
 
+                                    <TabContent value="about">
+                                        <ComplexAboutTab
+                                            complex={currentComplex}
+                                            fallbackName={data.name}
+                                            isLoading={isComplexInfoLoading}
+                                        />
+                                    </TabContent>
+
                                 </div>
 
                             </Tabs>
@@ -601,7 +661,10 @@ const ComplexCheckboard = () => {
             <CheckboardPropertyDrawer
                 isOpen={detailsPanelOpen}
                 property={selectedProperty}
+                propertyDetails={propertyDetails ?? null}
+                isDetailsLoading={isPropertyDetailsLoading}
                 complexId={id}
+                complexName={data?.name}
                 onClose={handleCloseDrawer}
             />
 

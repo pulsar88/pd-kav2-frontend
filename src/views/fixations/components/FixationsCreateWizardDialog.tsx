@@ -18,7 +18,7 @@ import {
     apiCreateFixation,
     apiCreateFixationClient,
     apiGetFixationClients,
-    apiGetFixationComplexes,
+    apiGetFixationHouses,
 } from '@/services/FixationsService'
 import { apiGetCheckboard } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -33,7 +33,6 @@ import {
     TbArrowsMaximize,
     TbBuilding,
     TbCheck,
-    TbHome,
     TbMessage,
     TbNote,
     TbPlus,
@@ -117,9 +116,9 @@ const STEP_META: Record<
         description: 'Выберите клиента из списка или создайте нового',
     },
     complex: {
-        title: 'ЖК и менеджер',
+        title: 'Дом и менеджер',
         description:
-            'Выберите жилой комплекс, квартиру на шахматке и менеджера',
+            'Выберите дом, квартиру на шахматке и менеджера',
     },
     note: {
         title: 'Предпочтения',
@@ -254,7 +253,7 @@ const SummaryCard = ({
 }) => (
     <div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
         <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 text-primary">
+            <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                 <span className="text-xl">{icon}</span>
                 <p className="text-xs font-semibold uppercase tracking-wider">
                     {label}
@@ -496,7 +495,8 @@ const FixationsCreateWizardDialog = ({
     useEffect(() => {
         if (
             !isOpen ||
-            (step !== 'complex' && !initialSelection?.complexId)
+            (step !== 'complex' && !initialSelection?.complexId) ||
+            complexes.length > 0
         ) {
             return
         }
@@ -504,7 +504,7 @@ const FixationsCreateWizardDialog = ({
         const loadComplexes = async () => {
             setIsComplexesLoading(true)
             try {
-                const response = await apiGetFixationComplexes()
+                const response = await apiGetFixationHouses()
                 setComplexes(response || [])
             } catch {
                 setComplexes([])
@@ -514,7 +514,7 @@ const FixationsCreateWizardDialog = ({
         }
 
         void loadComplexes()
-    }, [isOpen, step, initialSelection?.complexId])
+    }, [isOpen, step, initialSelection?.complexId, complexes.length])
 
     useEffect(() => {
         if (!isOpen || initialSelectionAppliedRef.current) return
@@ -704,7 +704,7 @@ const FixationsCreateWizardDialog = ({
     const { data: selectedComplexCheckboard, isLoading: isCheckboardLoading } =
         useSWR(
             shouldLoadCheckboard
-                ? ['/api/objects/checkboard', selectedComplex?.id]
+                ? ['/api/v2/realty_objects/chess', selectedComplex?.id]
                 : null,
             () => apiGetCheckboard(selectedComplex?.id || ''),
             {
@@ -872,6 +872,27 @@ const FixationsCreateWizardDialog = ({
         paymentFormat,
     ])
 
+    const propertySubtitle = useMemo(() => {
+        const parts: string[] = []
+        const address = selectedComplex?.address?.trim()
+
+        if (address && address !== '—') {
+            parts.push(address)
+        }
+
+        if (selectedApartment) {
+            let apartment = `кв. ${selectedApartment.number}`
+            if (selectedApartment.rooms) {
+                apartment += ` · ${selectedApartment.rooms}-комн.`
+            }
+            parts.push(apartment)
+        } else if (selectedComplex) {
+            parts.push('Квартира не указана')
+        }
+
+        return parts.length > 0 ? parts.join(' · ') : undefined
+    }, [selectedApartment, selectedComplex])
+
     const handleCreateFixation = async () => {
         if (!selectedClient || !selectedComplex || !selectedManager) return
 
@@ -880,6 +901,8 @@ const FixationsCreateWizardDialog = ({
             await apiCreateFixation({
                 clientId: selectedClient.id,
                 complexId: selectedComplex.id,
+                complexName: selectedComplex.name,
+                complexAddress: selectedComplex.address,
                 apartmentId: selectedApartment?.id,
                 managerId:
                     selectedManager === 'any'
@@ -955,7 +978,7 @@ const FixationsCreateWizardDialog = ({
                         onChange={handleStepIndexChange}
                     >
                         <Steps.Item title="Клиент" />
-                        <Steps.Item title="ЖК" />
+                        <Steps.Item title="Дом" />
                         <Steps.Item title="Предпочтения" />
                         <Steps.Item title="Итог" />
                     </Steps>
@@ -1210,13 +1233,16 @@ const FixationsCreateWizardDialog = ({
                                 </div>
 
                                 <div className="flex shrink-0 flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-                                    <Pagination
-                                        pageSize={clientsPageSize}
-                                        currentPage={clientsPageIndex}
-                                        total={clientsTotal}
-                                        onChange={setClientsPageIndex}
-                                    />
-                                    <div className="min-w-[130px]">
+                                    <div className="overflow-x-auto">
+                                        <Pagination
+                                            pageSize={clientsPageSize}
+                                            currentPage={clientsPageIndex}
+                                            total={clientsTotal}
+                                            pagerCount={5}
+                                            onChange={setClientsPageIndex}
+                                        />
+                                    </div>
+                                    <div className="w-[130px] shrink-0 self-end sm:self-auto">
                                         <Select
                                             size="sm"
                                             menuPlacement="top"
@@ -1245,30 +1271,35 @@ const FixationsCreateWizardDialog = ({
                     ) : null}
 
                     {step === 'complex' ? (
-                        isComplexesLoading ? (
-                            <div className="flex h-48 items-center justify-center text-sm text-gray-500">
-                                Загрузка ЖК...
-                            </div>
-                        ) : (
-                            <div className="grid min-w-0 gap-4">
-                                <FormItem asterisk label="Жилой комплекс">
-                                    <Select
-                                        {...selectMenuProps}
-                                        placeholder="Выберите ЖК"
-                                        options={complexOptions}
-                                        value={
-                                            complexOptions.find(
-                                                (item) =>
-                                                    item.value ===
-                                                    selectedComplex?.id,
-                                            ) || null
-                                        }
-                                        onChange={(option) =>
-                                            handleComplexChange(
-                                                option as SelectOption | null,
-                                            )
-                                        }
-                                    />
+                        <div
+                            className={classNames(
+                                'grid min-w-0 gap-4',
+                                isComplexesLoading && 'opacity-60',
+                            )}
+                        >
+                            <FormItem asterisk label="Дом">
+                                <Select
+                                    {...selectMenuProps}
+                                    isLoading={isComplexesLoading}
+                                    placeholder={
+                                        isComplexesLoading
+                                            ? 'Загрузка домов...'
+                                            : 'Выберите дом'
+                                    }
+                                    options={complexOptions}
+                                    value={
+                                        complexOptions.find(
+                                            (item) =>
+                                                item.value ===
+                                                selectedComplex?.id,
+                                        ) || null
+                                    }
+                                    onChange={(option) =>
+                                        handleComplexChange(
+                                            option as SelectOption | null,
+                                        )
+                                    }
+                                />
                                 </FormItem>
                                 <FormItem asterisk label="Менеджер">
                                     <Select
@@ -1304,7 +1335,7 @@ const FixationsCreateWizardDialog = ({
                                 <FormItem className="min-w-0" label="Квартира (необязательно)">
                                     {!selectedComplex ? (
                                         <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                                            Сначала выберите жилой комплекс
+                                            Сначала выберите дом
                                         </div>
                                     ) : isCheckboardLoading ? (
                                         <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
@@ -1313,7 +1344,7 @@ const FixationsCreateWizardDialog = ({
                                     ) : !isApartmentCheckboardCollapsed &&
                                       !selectedComplexCheckboard ? (
                                         <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                                            Не удалось загрузить шахматку для выбранного ЖК
+                                            Не удалось загрузить шахматку для выбранного дома
                                         </div>
                                     ) : (
                                         <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 p-3 dark:border-gray-700">
@@ -1388,15 +1419,7 @@ const FixationsCreateWizardDialog = ({
                                                         </span>
                                                     </div>
 
-                                                    <div
-                                                        className="checkboard-scroll max-h-[calc(100dvh-12rem)] min-w-0 w-full max-w-full overflow-x-auto overflow-y-auto overscroll-contain rounded-lg border border-gray-200 p-2 dark:border-gray-700"
-                                                        onWheel={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                        onTouchMove={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                    >
+                                                    <div className="checkboard-scroll min-w-0 w-full max-w-full touch-pan-x overflow-x-auto overflow-y-visible rounded-lg border border-gray-200 p-2 dark:border-gray-700">
                                                     {selectedComplexCheckboard ? (
                                                         <CheckboardClassic
                                                             building={
@@ -1430,7 +1453,6 @@ const FixationsCreateWizardDialog = ({
                                     )}
                                 </FormItem>
                             </div>
-                        )
                     ) : null}
 
                     {step === 'note' ? (
@@ -1676,26 +1698,10 @@ const FixationsCreateWizardDialog = ({
                             />
                             <SummaryCard
                                 icon={<TbBuilding />}
-                                label="ЖК"
+                                label="Дом и квартира"
                                 title={selectedComplex?.name || '—'}
-                                subtitle={selectedComplex?.address}
+                                subtitle={propertySubtitle}
                                 isFilled={Boolean(selectedComplex)}
-                                onEdit={() => setStep('complex')}
-                            />
-                            <SummaryCard
-                                icon={<TbHome />}
-                                label="Квартира"
-                                title={
-                                    selectedApartment
-                                        ? `кв. ${selectedApartment.number}`
-                                        : 'Не указана'
-                                }
-                                subtitle={
-                                    selectedApartment?.rooms
-                                        ? `${selectedApartment.rooms}-комн.`
-                                        : undefined
-                                }
-                                isFilled={Boolean(selectedApartment)}
                                 onEdit={() => setStep('complex')}
                             />
                             <SummaryCard
@@ -1741,16 +1747,14 @@ const FixationsCreateWizardDialog = ({
                                 scrollableContent
                                 onEdit={() => setStep('note')}
                             />
-                            <div className="md:col-span-2">
-                                <SummaryCard
-                                    icon={<TbMessage />}
-                                    label="Комментарий"
-                                    title={note.trim() || 'Не указано'}
-                                    isFilled={hasComment}
-                                    scrollableContent
-                                    onEdit={() => setStep('note')}
-                                />
-                            </div>
+                            <SummaryCard
+                                icon={<TbMessage />}
+                                label="Комментарий"
+                                title={note.trim() || 'Не указано'}
+                                isFilled={hasComment}
+                                scrollableContent
+                                onEdit={() => setStep('note')}
+                            />
                         </div>
                     ) : null}
                 </div>
@@ -1878,9 +1882,7 @@ const FixationsCreateWizardDialog = ({
                 </div>
 
                 <div
-                    className="checkboard-scroll max-h-[calc(95dvh-12rem)] min-h-0 min-w-0 overflow-x-auto overflow-y-auto overscroll-contain rounded-xl border border-gray-200 p-2 dark:border-gray-700"
-                    onWheel={(e) => e.stopPropagation()}
-                    onTouchMove={(e) => e.stopPropagation()}
+                    className="checkboard-scroll min-h-0 min-w-0 max-h-[calc(95dvh-12rem)] overflow-x-auto overflow-y-auto overscroll-y-auto rounded-xl border border-gray-200 p-2 dark:border-gray-700"
                 >
                     {isCheckboardLoading ? (
                         <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
@@ -1895,7 +1897,7 @@ const FixationsCreateWizardDialog = ({
                         />
                     ) : (
                         <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
-                            Не удалось загрузить шахматку для выбранного ЖК
+                            Не удалось загрузить шахматку для выбранного дома
                         </div>
                     )}
                 </div>

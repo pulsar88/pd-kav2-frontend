@@ -1,50 +1,75 @@
 export type PremiseType = 'apartment' | 'apartments' | 'commercial'
+
+export type RealtyPropertyTypeCode =
+    | 'property'
+    | 'apartment'
+    | 'parking'
+    | 'office'
+    | 'pantry'
+    | 'free_destination'
 export type HouseType = 'monolith' | 'brick' | 'panel'
 export type FinishingType = 'none' | 'rough' | 'fine'
 export type HouseStatus = 'under_construction' | 'commissioned'
 
+export type RealtyProject = {
+    id: string
+    name: string
+}
+
 export type Complex = {
     id: string
     name: string
-    address: string
-    image: string
-    apartmentsCount: number
-    priceFrom: number
-    pricePerSqm: number
-    completionDate: string
-    houseType: HouseType
-    houseStatus: HouseStatus
-    floors: number
-    finishing: FinishingType
+    externalId?: number
+    address?: string
+    image?: string
+    apartmentsCount?: number
+    priceFrom?: number
+    pricePerSqm?: number
+    completionDate?: string
+    houseType?: HouseType
+    houseStatus?: HouseStatus
+    floors?: number
+    finishing?: FinishingType
+    matchingPremisesCount?: number
 }
 
 export type Premise = {
     id: string
     checkboardPropertyId: number
-    complexId: string
-    complexName: string
-    address: string
     number: string
     type: PremiseType
+    typeCode?: RealtyPropertyTypeCode | string
     rooms: number
     area: number
     floor: number
-    floorsInBuilding: number
-    price: number
-    pricePerSqm: number
-    houseType: HouseType
-    finishing: FinishingType
-    houseStatus: HouseStatus
-    deliveryDate: string
+    externalId?: number
+    goodArea?: number
+    section?: string
+    typeName?: string
+    complexId?: string
+    complexName?: string
+    address?: string
+    floorsInBuilding?: number
+    price?: number
+    pricePerSqm?: number
+    houseType?: HouseType
+    finishing?: FinishingType
+    houseStatus?: HouseStatus
+    buildingState?: string
+    deliveryDate?: string
+    developmentStart?: string
+    facing?: string
+    material?: string
     ceilingHeight?: number
     layout?: string
-    layoutImage: string
+    layoutImage?: string
+    floorPlanImage?: string
     description?: string
 }
 
 export type ObjectsSearchFilters = {
-    type?: PremiseType[]
-    complexIds?: string[]
+    type?: RealtyPropertyTypeCode[]
+    realtyProjectIds?: string[]
     complexId?: string
     rooms?: number[]
     priceFrom?: number | ''

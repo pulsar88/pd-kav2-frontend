@@ -24,6 +24,8 @@ type MotionDefault = {
     right?: string | number
     bottom?: string | number
     transform?: string
+    display?: string
+    justifyContent?: string
 }
 
 type MotionTransition = {
@@ -97,8 +99,10 @@ const scaleTransition = (
         'top-center': {
             default: {
                 top: offsetY,
-                left: '50%',
-                transform: 'translateX(-50%)',
+                left: 0,
+                right: 0,
+                display: 'flex',
+                justifyContent: 'center',
             },
             variants: {
                 ...scaleMotionProps,
@@ -125,8 +129,10 @@ const scaleTransition = (
         'bottom-center': {
             default: {
                 bottom: offsetY,
-                left: '50%',
-                transform: 'translateX(-50%)',
+                left: 0,
+                right: 0,
+                display: 'flex',
+                justifyContent: 'center',
             },
             variants: {
                 ...scaleMotionProps,
@@ -161,8 +167,10 @@ const fadeTransition = (
         'top-center': {
             default: {
                 top: offsetY,
-                left: '50%',
-                transform: 'translateX(-50%)',
+                left: 0,
+                right: 0,
+                display: 'flex',
+                justifyContent: 'center',
             },
             variants: {
                 ...fadeMotionProps,
@@ -189,8 +197,10 @@ const fadeTransition = (
         'bottom-center': {
             default: {
                 bottom: offsetY,
-                left: '50%',
-                transform: 'translateX(-50%)',
+                left: 0,
+                right: 0,
+                display: 'flex',
+                justifyContent: 'center',
             },
             variants: {
                 ...fadeMotionProps,

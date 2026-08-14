@@ -98,6 +98,8 @@ const ChangePassword = () => {
 
     return (
         <Card
+            className="h-full flex flex-col"
+            bodyClass="flex-1"
             header={{
                 content: (
                     <div className="flex items-start gap-3">

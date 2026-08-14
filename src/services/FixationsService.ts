@@ -5,6 +5,8 @@ import {
     fixationClientsData,
     fixationComplexesData,
 } from '@/mock/data/fixationWizardData'
+import { apiGetRealtyPropertiesSummary } from '@/services/ObjectsService'
+import type { Complex } from '@/views/objects/types'
 import type {
     CreateFixationClientPayload,
     CreateFixationPayload,
@@ -85,6 +87,26 @@ export async function apiCreateFixationClient(
     return client
 }
 
+const DEFAULT_FIXATION_MANAGERS =
+    fixationComplexesData.find((item) => item.managers.length > 0)
+        ?.managers ?? []
+
+const mapComplexToFixationComplex = (item: Complex): FixationComplex => ({
+    id: item.id,
+    name: item.name,
+    address: item.address?.trim() || '',
+    apartments: [],
+    managers: DEFAULT_FIXATION_MANAGERS,
+})
+
+export async function apiGetFixationHouses(): Promise<FixationComplex[]> {
+    const response = await apiGetRealtyPropertiesSummary({
+        per_page: 1000,
+    })
+
+    return response.items.map(mapComplexToFixationComplex)
+}
+
 export async function apiGetFixationComplexes(): Promise<FixationComplex[]> {
     await delay()
     return [...fixationComplexesData]
@@ -95,9 +117,17 @@ export async function apiCreateFixation(
 ): Promise<Fixation> {
     await delay()
     const client = fixationClientsData.find((item) => item.id === data.clientId)
-    const complex = fixationComplexesData.find(
-        (item) => item.id === data.complexId,
-    )
+    const complex =
+        fixationComplexesData.find((item) => item.id === data.complexId) ||
+        (data.complexId
+            ? {
+                  id: data.complexId,
+                  name: data.complexName || '—',
+                  address: data.complexAddress || '—',
+                  apartments: [],
+                  managers: DEFAULT_FIXATION_MANAGERS,
+              }
+            : undefined)
     const apartment = complex?.apartments.find(
         (item) => item.id === data.apartmentId,
     )

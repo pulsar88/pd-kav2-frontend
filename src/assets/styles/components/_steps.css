@@ -31,8 +31,20 @@
       }
 
       .step-item-title:not(.step-item-title-error) {
-        @apply text-primary dark:text-primary;
+        @apply text-gray-900 dark:text-gray-100;
       }
+    }
+  }
+
+  .step-item-complete {
+    .step-item-title {
+      @apply text-gray-800 dark:text-gray-200;
+    }
+  }
+
+  .step-item-in-progress {
+    .step-item-title {
+      @apply text-gray-900 dark:text-gray-100;
     }
   }
 

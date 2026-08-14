@@ -208,7 +208,13 @@ export const normalizeRuPhoneDigits = (input: string) => {
         digits = digits.slice(1)
     }
 
-    return digits.slice(0, 10)
+    digits = digits.slice(0, 10)
+
+    if (digits.length > 0 && digits[0] !== '9') {
+        return ''
+    }
+
+    return digits
 }
 
 export const formatRuPhone = (input: string) => {
@@ -225,4 +231,4 @@ export const formatRuPhone = (input: string) => {
     return `+7 ${parts.join(' ')}`
 }
 
-export const RU_PHONE_REGEX = /^\+7 \d{3} \d{3} \d{2} \d{2}$/
+export const RU_PHONE_REGEX = /^\+7 9\d{2} \d{3} \d{2} \d{2}$/

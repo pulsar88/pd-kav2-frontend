@@ -72,7 +72,7 @@ const SideNav = ({
                     mode={mode || defaultMode}
                     type={sideNavCollapse ? 'streamline' : 'full'}
                     className={classNames(
-                        sideNavCollapse && 'ltr:ml-[11.5px] ltr:mr-[11.5px]',
+                        sideNavCollapse && 'mx-auto my-0', // ltr:ml-[11.5px] ltr:mr-[11.5px]
                         sideNavCollapse
                             ? SIDE_NAV_CONTENT_GUTTER
                             : LOGO_X_GUTTER,

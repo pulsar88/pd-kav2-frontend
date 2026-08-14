@@ -6,7 +6,7 @@ import {
     HiChevronDoubleRight,
 } from 'react-icons/hi'
 
-const PAGER_COUNT_DEFAULT = 7
+const PAGER_COUNT_DEFAULT = 5
 
 type More = 'nextMore' | 'prevMore'
 

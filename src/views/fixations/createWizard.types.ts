@@ -44,6 +44,8 @@ export type CreateFixationRelativePayload = {
 export type CreateFixationPayload = {
     clientId: string
     complexId: string
+    complexName?: string
+    complexAddress?: string
     apartmentId?: string
     managerId?: string
     relatives?: CreateFixationRelativePayload[]

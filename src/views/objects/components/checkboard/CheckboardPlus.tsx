@@ -15,6 +15,7 @@ import {
     getSectionFloors,
 } from '../../checkboardUtils'
 import DualHorizontalScroll from './DualHorizontalScroll'
+import CheckboardPropertyCellTooltip from './CheckboardPropertyCellTooltip'
 
 type CheckboardPlusProps = {
     building: CheckboardBuilding
@@ -167,67 +168,74 @@ const PlusBlock = ({
                                     : 0
 
                             return (
-                                <button
+                                <CheckboardPropertyCellTooltip
                                     key={property.id}
-                                    type="button"
-                                    data-property-id={property.id}
-                                    className={classNames(
-                                        CELL_HEIGHT,
-                                        'relative z-0 flex flex-col overflow-hidden rounded-xl border p-2 text-left transition-[opacity,filter,box-shadow]',
-                                        !active && DIMMED_CELL_CLASS,
-                                        isSelected &&
-                                            'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
-                                        exact &&
-                                            !isSelected &&
-                                            'z-[1] shadow-md ring-2 ring-primary/70',
-                                    )}
-                                    style={{
-                                        backgroundColor: property.status.color,
-                                        color: property.status.text_color,
-                                        borderColor:
-                                            property.status.accent_color,
-                                    }}
-                                    onMouseEnter={setCellHover}
-                                    onClick={() =>
-                                        onPropertySelect?.(property.id)
-                                    }
+                                    property={property}
+                                    wrapperClass="block shrink-0"
                                 >
-                                    <div className="mb-0.5 flex items-start justify-between gap-1">
-                                        <span
-                                            className={classNames(
-                                                'font-bold leading-tight',
-                                                property.type.has_rooms
-                                                    ? 'text-sm'
-                                                    : 'text-[12px]',
+                                    <button
+                                        type="button"
+                                        data-property-id={property.id}
+                                        className={classNames(
+                                            CELL_HEIGHT,
+                                            'relative z-0 flex w-full flex-col overflow-hidden rounded-xl p-2 text-left transition-[opacity,filter,box-shadow]',
+                                            !active && DIMMED_CELL_CLASS,
+                                            isSelected &&
+                                                'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
+                                            exact &&
+                                                !isSelected &&
+                                                'z-[1] shadow-md ring-2 ring-primary/70',
+                                        )}
+                                        style={{
+                                            backgroundColor:
+                                                property.status.color,
+                                            color: property.status.text_color,
+                                        }}
+                                        onMouseEnter={setCellHover}
+                                        onClick={() =>
+                                            onPropertySelect?.(property.id)
+                                        }
+                                    >
+                                        <div className="mb-0.5 flex items-start justify-between gap-1">
+                                            <span
+                                                className={classNames(
+                                                    'font-bold leading-tight',
+                                                    property.type.has_rooms
+                                                        ? 'text-sm'
+                                                        : 'text-[12px]',
+                                                )}
+                                            >
+                                                {property.type.has_rooms
+                                                    ? property.studio
+                                                        ? 'Студия'
+                                                        : `${property.rooms_count}-комн.`
+                                                    : property.type.name}
+                                            </span>
+                                            <span className="text-[12px] font-semibold uppercase opacity-80">
+                                                №{property.number}
+                                            </span>
+                                        </div>
+                                        {property.type.has_rooms ? (
+                                            <p className="mb-1.5 text-[12px] font-medium opacity-90">
+                                                {property.type.name}
+                                            </p>
+                                        ) : (
+                                            <p className="mb-1.5 text-[12px] font-medium opacity-90">
+                                                {property.status.name}
+                                            </p>
+                                        )}
+                                        <p className="mt-auto text-[18px] font-bold leading-tight">
+                                            {formatCheckboardPrice(
+                                                property.price,
                                             )}
-                                        >
-                                            {property.type.has_rooms
-                                                ? property.studio
-                                                    ? 'Студия'
-                                                    : `${property.rooms_count}-комн.`
-                                                : property.type.name}
-                                        </span>
-                                        <span className="text-[12px] font-semibold uppercase opacity-80">
-                                            №{property.number}
-                                        </span>
-                                    </div>
-                                    {property.type.has_rooms ? (
-                                        <p className="mb-1.5 text-[12px] font-medium opacity-90">
-                                            {property.type.name}
                                         </p>
-                                    ) : (
-                                        <p className="mb-1.5 text-[12px] font-medium opacity-90">
-                                            {property.status.name}
+                                        <p className="mt-0.5 text-[14px] opacity-85">
+                                            {property.area} м² ·{' '}
+                                            {formatCheckboardPrice(pricePerSqm)}
+                                            /м²
                                         </p>
-                                    )}
-                                    <p className="mt-auto text-[18px] font-bold leading-tight">
-                                        {formatCheckboardPrice(property.price)}
-                                    </p>
-                                    <p className="mt-0.5 text-[14px] opacity-85">
-                                        {property.area} м² ·{' '}
-                                        {formatCheckboardPrice(pricePerSqm)}/м²
-                                    </p>
-                                </button>
+                                    </button>
+                                </CheckboardPropertyCellTooltip>
                             )
                         })}
                         <div

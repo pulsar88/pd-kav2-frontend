@@ -3,13 +3,35 @@ import type {
     HouseStatus,
     HouseType,
     Premise,
-    PremiseType,
+    RealtyPropertyTypeCode,
 } from './types'
+import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
 
-export const premiseTypeLabel: Record<PremiseType, string> = {
-    apartment: 'Квартира',
-    apartments: 'Апартаменты',
-    commercial: 'Коммерция',
+export const realtyPropertyTypeLabel: Record<RealtyPropertyTypeCode, string> = {
+    property: 'Квартира',
+    apartment: 'Апартаменты',
+    parking: 'Парковка',
+    office: 'Офис',
+    pantry: 'Кладовая',
+    free_destination: 'Свободного назначения',
+}
+
+export const getPremiseTypeLabel = (
+    premise: Pick<Premise, 'typeCode' | 'typeName'>,
+) => {
+    if (premise.typeName) {
+        return premise.typeName
+    }
+
+    const normalizedTypeCode = premise.typeCode
+        ? normalizeRealtyPropertyTypeCode(premise.typeCode)
+        : null
+
+    if (normalizedTypeCode) {
+        return realtyPropertyTypeLabel[normalizedTypeCode]
+    }
+
+    return '—'
 }
 
 export const houseTypeLabel: Record<HouseType, string> = {
@@ -29,9 +51,10 @@ export const houseStatusLabel: Record<HouseStatus, string> = {
     commissioned: 'Сдан',
 }
 
-export type PremiseSortField = 'price' | 'area' | 'rooms'
+export type PremiseSortField = 'price' | 'area' | 'floor'
 export type PremiseSortDir = 'asc' | 'desc'
 export type PremiseSortKey = `${PremiseSortField}_${PremiseSortDir}`
+export type PremiseSortState = PremiseSortKey | null
 
 export const premiseSortFields: Array<{
     value: PremiseSortField
@@ -39,7 +62,7 @@ export const premiseSortFields: Array<{
 }> = [
     { value: 'price', label: 'Цена' },
     { value: 'area', label: 'Площадь' },
-    { value: 'rooms', label: 'Комнаты' },
+    { value: 'floor', label: 'Этаж' },
 ]
 
 export const toPremiseSortKey = (
@@ -54,9 +77,19 @@ export const parsePremiseSortKey = (
     return { field, dir }
 }
 
+export const toPremiseSortParams = (key: PremiseSortKey) => {
+    const { field, dir } = parsePremiseSortKey(key)
+
+    return {
+        sort_by: field,
+        order: dir,
+    }
+}
+
 export const countPremisesByComplex = (list: Premise[]) => {
     const counts: Record<string, number> = {}
     for (const item of list) {
+        if (!item.complexId) continue
         counts[item.complexId] = (counts[item.complexId] || 0) + 1
     }
     return counts
@@ -71,17 +104,17 @@ export const sortPremises = (
     sorted.sort((a, b) => {
         switch (sortKey) {
             case 'price_asc':
-                return a.price - b.price
+                return (a.price ?? 0) - (b.price ?? 0)
             case 'price_desc':
-                return b.price - a.price
+                return (b.price ?? 0) - (a.price ?? 0)
             case 'area_asc':
                 return a.area - b.area
             case 'area_desc':
                 return b.area - a.area
-            case 'rooms_asc':
-                return a.rooms - b.rooms
-            case 'rooms_desc':
-                return b.rooms - a.rooms
+            case 'floor_asc':
+                return a.floor - b.floor
+            case 'floor_desc':
+                return b.floor - a.floor
             default:
                 return 0
         }
@@ -97,12 +130,75 @@ export const formatPrice = (value: number) =>
         maximumFractionDigits: 0,
     }).format(value)
 
+export const getPremisePricePerSqm = (
+    price: number | undefined,
+    area: number,
+): number | undefined => {
+    if (price === undefined || area <= 0) return undefined
+    return Math.round(price / area)
+}
+
+export type PremisePreviewSlide = {
+    src: string
+    title?: string
+}
+
+export const getPremisePreviewSlides = (
+    premise: Pick<Premise, 'layoutImage' | 'floorPlanImage'>,
+): PremisePreviewSlide[] => {
+    const slides: PremisePreviewSlide[] = []
+
+    if (premise.layoutImage) {
+        slides.push({ src: premise.layoutImage, title: 'Планировка' })
+    }
+
+    if (
+        premise.floorPlanImage &&
+        premise.floorPlanImage !== premise.layoutImage
+    ) {
+        slides.push({ src: premise.floorPlanImage, title: 'План этажа' })
+    }
+
+    return slides
+}
+
+export const getPremiseCoverImage = (
+    premise: Pick<Premise, 'layoutImage' | 'floorPlanImage'>,
+) => premise.layoutImage ?? premise.floorPlanImage
+
+export const hasPremisePreviewImages = (
+    premise: Pick<Premise, 'layoutImage' | 'floorPlanImage'>,
+) => getPremisePreviewSlides(premise).length > 0
+
 export const formatArea = (value: number) =>
     `${value.toLocaleString('ru-RU')} м²`
 
+export const formatRoomsCount = (rooms: number) => {
+    const mod10 = rooms % 10
+    const mod100 = rooms % 100
+
+    if (mod10 === 1 && mod100 !== 11) {
+        return `${rooms} комната`
+    }
+
+    if (
+        mod10 >= 2 &&
+        mod10 <= 4 &&
+        (mod100 < 10 || mod100 >= 20)
+    ) {
+        return `${rooms} комнаты`
+    }
+
+    return `${rooms} комнат`
+}
+
 export const formatCompletionDate = (value: string) => {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '—'
+    const trimmed = value.trim()
+    if (!trimmed) return '—'
+
+    const date = new Date(trimmed)
+    if (Number.isNaN(date.getTime())) return trimmed
+
     return date.toLocaleDateString('ru-RU', {
         month: 'long',
         year: 'numeric',
@@ -110,11 +206,11 @@ export const formatCompletionDate = (value: string) => {
 }
 
 export const roomsOptions = [
-    { value: 0, label: 'Студия' },
     { value: 1, label: '1' },
     { value: 2, label: '2' },
     { value: 3, label: '3' },
-    { value: 4, label: '4+' },
+    { value: 4, label: '4' },
+    { value: 5, label: '5' },
 ]
 
 export const deliveryOptions = [

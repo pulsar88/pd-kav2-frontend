@@ -13,7 +13,7 @@ export interface PaginationProps extends CommonProps {
     onChange?: (pageNumber: number) => void
     pageSize?: number
     total?: number
-    /** Сколько номеров страниц показывать в ряду (по умолчанию 7) */
+    /** Сколько номеров страниц показывать в ряду (по умолчанию 5) */
     pagerCount?: number
 }
 

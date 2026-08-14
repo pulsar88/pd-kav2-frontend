@@ -37,9 +37,21 @@ export const protectedRoutes: Routes = [
         authority: [],
     },
     {
+        key: 'favoritePremises',
+        path: '/favorite-premises',
+        component: lazy(() => import('@/views/favorite-premises')),
+        authority: [],
+    },
+    {
         key: 'profile',
         path: '/account/profile',
         component: lazy(() => import('@/views/account/Profile')),
+        authority: [],
+    },
+    {
+        key: 'notifications',
+        path: '/account/notifications',
+        component: lazy(() => import('@/views/notifications')),
         authority: [],
     },
     {

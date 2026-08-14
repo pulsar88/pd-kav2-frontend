@@ -9,7 +9,7 @@ const colors = [
     { label: 'Серый', value: '#6B7280' },
     { label: 'Красный', value: '#EF4444' },
     { label: 'Оранжевый', value: '#F97316' },
-    { label: 'Зелёный', value: '#22C55E' },
+    { label: 'Серый', value: '#f4f6f8' },
     { label: 'Синий', value: '#3B82F6' },
     { label: 'Фиолетовый', value: '#8B5CF6' },
     { label: 'Белый', value: '#F9FAFB' },

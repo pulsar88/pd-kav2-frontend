@@ -14,7 +14,7 @@ const Views = (props: ViewsProps) => {
 
     return (
         <Suspense
-            key={location.key}
+            key={location.pathname}
             fallback={<Loading loading={true} className="w-full" />}
         >
             <AllRoutes {...props} />

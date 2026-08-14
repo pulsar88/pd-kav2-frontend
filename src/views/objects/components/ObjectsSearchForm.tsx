@@ -1,20 +1,23 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
+import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
+import { apiGetRealtyProjects } from '@/services/ObjectsService'
 import RangeInputGroup from './RangeInputGroup'
-import type { Complex, ObjectsSearchFilters, PremiseType } from '../types'
-import { premiseTypeLabel, roomsOptions } from '../utils'
+import type { ObjectsSearchFilters, RealtyPropertyTypeCode } from '../types'
+import { hasActiveObjectsSearchFilters } from '../filtersQuery'
+import { realtyPropertyTypeLabel, roomsOptions } from '../utils'
 
 type Option = { value: string; label: string }
 
 type ObjectsSearchFormProps = {
-    complexes: Complex[]
     filters: ObjectsSearchFilters
     isSearching: boolean
+    hasAppliedFilters?: boolean
     collapsed?: boolean
     multiComplexSelect?: boolean
     /** На xl+ кнопки в одной сетке с инпутами, справа */
@@ -30,7 +33,7 @@ const isFilled = (
 ) => (Array.isArray(value) ? value.length > 0 : value !== '' && value !== undefined && value !== null)
 
 const filledInputClass =
-    'border-primary bg-primary/10 text-primary font-medium dark:bg-primary/15'
+    'border-primary bg-primary/10 font-semibold text-gray-800 dark:bg-primary/15 dark:text-gray-100'
 
 const filledSelectClass =
     '[&_.select-control]:border-primary [&_.select-control]:bg-primary/10 [&_.select-control]:text-primary dark:[&_.select-control]:bg-primary/15 [&_.select-single-value]:text-primary [&_.select-single-value]:font-medium'
@@ -48,9 +51,9 @@ const selectMenuProps = {
 }
 
 const ObjectsSearchForm = ({
-    complexes,
     filters,
     isSearching,
+    hasAppliedFilters = false,
     collapsed: collapsedProp,
     multiComplexSelect = false,
     desktopActionsInGrid = false,
@@ -68,12 +71,21 @@ const ObjectsSearchForm = ({
         }
     }
 
-    const complexOptions: Option[] = complexes.map((item) => ({
+    const { data: realtyProjects = [] } = useSWR(
+        multiComplexSelect ? '/api/v2/realty_projects' : null,
+        () => apiGetRealtyProjects(),
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+        },
+    )
+
+    const projectOptions: Option[] = realtyProjects.map((item) => ({
         value: item.id,
         label: item.name,
     }))
 
-    const typeOptions: Option[] = Object.entries(premiseTypeLabel).map(
+    const typeOptions: Option[] = Object.entries(realtyPropertyTypeLabel).map(
         ([value, label]) => ({ value, label }),
     )
     const roomSelectOptions: Option[] = roomsOptions.map((item) => ({
@@ -87,18 +99,23 @@ const ObjectsSearchForm = ({
         [filters],
     )
 
+    const hasDraftFilters = hasActiveObjectsSearchFilters(filters)
+    const canSearch = hasDraftFilters
+    const canReset = hasDraftFilters || hasAppliedFilters
+
     const patch = (partial: Partial<ObjectsSearchFilters>) =>
         onChange({ ...filters, ...partial })
 
     const actionButtons = (
         <>
-            <Button type="button" onClick={onReset}>
+            <Button type="button" disabled={!canReset} onClick={onReset}>
                 Сбросить
             </Button>
             <Button
                 variant="solid"
                 type="button"
                 loading={isSearching}
+                disabled={!canSearch}
                 onClick={onSearch}
             >
                 Найти помещения
@@ -122,7 +139,7 @@ const ObjectsSearchForm = ({
                             ? activeFiltersCount > 0
                                 ? `Свернуто · выбрано параметров: ${activeFiltersCount}`
                                 : 'Свернуто · параметры не заданы'
-                            : 'Общие параметры для списка ЖК и каталога помещений'}
+                            : 'Общие параметры для списка домов и каталога помещений'}
                     </p>
                 </div>
                 <HiChevronDown
@@ -154,19 +171,20 @@ const ObjectsSearchForm = ({
                                             isClearable
                                             placeholder="Все ЖК"
                                             className={classNames(
-                                                isFilled(filters.complexIds) &&
+                                                isFilled(filters.realtyProjectIds) &&
                                                     filledSelectClass,
                                             )}
-                                            options={complexOptions}
-                                            value={complexOptions.filter(
+                                            options={projectOptions}
+                                            value={projectOptions.filter(
                                                 (item) =>
                                                     (
-                                                        filters.complexIds || []
+                                                        filters.realtyProjectIds ||
+                                                        []
                                                     ).includes(item.value),
                                             )}
                                             onChange={(option) =>
                                                 patch({
-                                                    complexIds: (
+                                                    realtyProjectIds: (
                                                         option as readonly Option[] | null
                                                     )?.map(
                                                         (item) => item.value,
@@ -190,7 +208,7 @@ const ObjectsSearchForm = ({
                                         options={typeOptions}
                                         value={typeOptions.filter((item) =>
                                             (filters.type || []).includes(
-                                                item.value as PremiseType,
+                                                item.value as RealtyPropertyTypeCode,
                                             ),
                                         )}
                                         onChange={(option) =>

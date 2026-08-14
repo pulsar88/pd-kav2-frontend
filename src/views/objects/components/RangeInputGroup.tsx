@@ -2,6 +2,11 @@ import classNames from 'classnames'
 import Input from '@/components/ui/Input'
 import InputGroup from '@/components/ui/InputGroup'
 
+const rangeInputClass =
+    'font-semibold text-gray-800 placeholder:font-semibold placeholder:text-gray-400 dark:text-gray-100'
+
+const rangeAddonClass = 'font-semibold text-gray-400 dark:text-gray-400'
+
 const isFilled = (value: number | '' | undefined | null) =>
     value !== '' && value !== undefined && value !== null
 
@@ -50,19 +55,21 @@ const RangeInputGroup = ({
                     placeholder={fromPlaceholder}
                     className={classNames(
                         baseInputClass,
+                        rangeInputClass,
                         isFilled(fromValue) && 'relative z-10',
                         isFilled(fromValue) && filledClass,
                     )}
                     value={formatPriceValue(fromValue)}
                     onChange={(e) => onFromChange(parsePrice(e.target.value))}
                 />
-                <InputGroup.Addon>до</InputGroup.Addon>
+                <InputGroup.Addon className={rangeAddonClass}>до</InputGroup.Addon>
                 <Input
                     type="text"
                     inputMode="numeric"
                     placeholder={toPlaceholder}
                     className={classNames(
                         baseInputClass,
+                        rangeInputClass,
                         isFilled(toValue) && 'relative z-10',
                         isFilled(toValue) && filledClass,
                     )}
@@ -80,6 +87,7 @@ const RangeInputGroup = ({
                 placeholder={fromPlaceholder}
                 className={classNames(
                     baseInputClass,
+                    rangeInputClass,
                     isFilled(fromValue) && 'relative z-10',
                     isFilled(fromValue) && filledClass,
                 )}
@@ -90,12 +98,13 @@ const RangeInputGroup = ({
                     )
                 }
             />
-            <InputGroup.Addon>до</InputGroup.Addon>
+            <InputGroup.Addon className={rangeAddonClass}>до</InputGroup.Addon>
             <Input
                 type="number"
                 placeholder={toPlaceholder}
                 className={classNames(
                     baseInputClass,
+                    rangeInputClass,
                     isFilled(toValue) && 'relative z-10',
                     isFilled(toValue) && filledClass,
                 )}

@@ -123,7 +123,41 @@ export type User = {
     userName?: string | null
     email?: string | null
     phone?: string | null
+    countryCode?: string | null
     authority?: string[]
+}
+
+export type ProfilePicture = {
+    id: number
+    uuid: string
+    name: string
+    file_name: string
+    mime_type: string
+    size: number
+    src: string
+    upload_date: string
+    responsive: unknown[]
+    base_url: string
+    responsive_path: string
+    url_path: string
+}
+
+export type CurrentUserResponse = {
+    id: number
+    name: string
+    email: string | null
+    phone: string
+    country_code: string
+    roles: string[]
+    profile_picture: ProfilePicture | null
+}
+
+export type UpdateUserPayload = {
+    id: number
+    name: string
+    email: string
+    phone: string
+    country_code: string
 }
 
 export type Token = {

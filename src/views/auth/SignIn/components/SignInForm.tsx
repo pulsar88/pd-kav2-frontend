@@ -100,7 +100,7 @@ const phoneSchema = z.object({
     phone: z
         .string()
         .regex(RU_PHONE_REGEX, {
-            message: 'Введите номер телефона',
+            message: 'Введите номер в формате +7 9XX XXX XX XX',
         }),
     personalDataConsent: z
         .boolean()
