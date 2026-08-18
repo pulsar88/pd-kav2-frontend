@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
-import { TbHeart, TbHeartFilled, TbLayoutGrid, TbZoomIn } from 'react-icons/tb'
+import { TbBuildingSkyscraper, TbHeart, TbHeartFilled, TbLayoutGrid, TbZoomIn } from 'react-icons/tb'
 import classNames from '@/utils/classNames'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import Tooltip from '@/components/ui/Tooltip'
+import Notification from '@/components/ui/Notification'
+import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import type { ObjectsSearchFilters, Premise } from '../types'
 import { serializeObjectsSearchFilters, withoutComplexFilters, appendObjectsCatalogTab } from '../filtersQuery'
 import {
@@ -23,6 +26,70 @@ import {
     houseTypeLabel,
 } from '../utils'
 
+const PendingRemovalBanner = ({
+    startedAt,
+    durationMs,
+    onCancel,
+}: {
+    startedAt: number
+    durationMs: number
+    onCancel: () => void
+}) => {
+    const [remainingMs, setRemainingMs] = useState(() =>
+        Math.max(0, durationMs - (Date.now() - startedAt)),
+    )
+
+    useEffect(() => {
+        const tick = () => {
+            setRemainingMs(Math.max(0, durationMs - (Date.now() - startedAt)))
+        }
+
+        tick()
+        const interval = window.setInterval(tick, 100)
+        return () => window.clearInterval(interval)
+    }, [startedAt, durationMs])
+
+    const progress = durationMs > 0 ? remainingMs / durationMs : 0
+    const secondsLeft = Math.max(0, Math.ceil(remainingMs / 1000))
+
+    return (
+        <div className="border-t border-rose-200 bg-rose-50 px-3 py-2.5 dark:border-rose-900/40 dark:bg-rose-950/30 sm:px-4">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs text-rose-700 dark:text-rose-300">
+                <span>Будет удалено из избранного</span>
+                <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-semibold tabular-nums">
+                        {secondsLeft} сек
+                    </span>
+                    <Button
+                        type="button"
+                        size="xs"
+                        variant="plain"
+                        className="h-7 px-2 text-rose-700 hover:text-rose-800 dark:text-rose-300 dark:hover:text-rose-200"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onCancel()
+                        }}
+                    >
+                        Отмена
+                    </Button>
+                </div>
+            </div>
+            <div
+                className="h-1.5 overflow-hidden rounded-full bg-rose-200 dark:bg-rose-900/50"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress * 100)}
+            >
+                <div
+                    className="h-full rounded-full bg-rose-500 transition-[width] duration-100 ease-linear dark:bg-rose-400"
+                    style={{ width: `${progress * 100}%` }}
+                />
+            </div>
+        </div>
+    )
+}
+
 type PremiseResultItemProps = {
     premise: Premise
     onPreviewLayout: () => void
@@ -30,6 +97,13 @@ type PremiseResultItemProps = {
     selectable?: boolean
     selected?: boolean
     onSelectedChange?: (selected: boolean) => void
+    onToggleFavorite?: (premise: Premise) => void | Promise<void>
+    favoriteState?: boolean
+    pendingRemoval?: {
+        startedAt: number
+        durationMs: number
+    }
+    onCancelPendingRemoval?: () => void | Promise<void>
 }
 
 
@@ -87,12 +161,17 @@ const PremiseResultItem = ({
     selectable = false,
     selected = false,
     onSelectedChange,
+    onToggleFavorite,
+    favoriteState,
+    pendingRemoval,
+    onCancelPendingRemoval,
 }: PremiseResultItemProps) => {
     const navigate = useNavigate()
     const [open, setOpen] = useState(false)
     const isFavorite = useFavoritesStore((state) =>
-        state.premises.some((item) => item.id === premise.id),
+        state.favoriteIds.includes(premise.id),
     )
+    const isFavoriteDisplay = favoriteState ?? isFavorite
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
     const typeLabel = getPremiseTypeLabel(premise)
     const pricePerSqm = getPremisePricePerSqm(premise.price, premise.area)
@@ -100,18 +179,28 @@ const PremiseResultItem = ({
     const coverImageLabel = premise.layoutImage ? 'Планировка' : 'План этажа'
     const canPreviewImages = hasPremisePreviewImages(premise)
 
-    const locationParts = [
+    const premiseMetaLine = [
         `эт. ${premise.floor}${
             premise.floorsInBuilding ? `/${premise.floorsInBuilding}` : ''
         }`,
         `№${premise.number}`,
-    ].filter(Boolean)
+        premise.layout,
+    ]
+        .filter(Boolean)
+        .join(' · ')
+
+    const expandedPlanBlockCaption = premise.layoutName ?? ''
 
     const apartmentDetails = (
         <>
             <Detail label="Тип помещения" value={typeLabel} />
             <Detail label="Номер" value={`№ ${premise.number}`} />
-            <Detail label="Комнат" value={formatRoomsCount(premise.rooms)} />
+            {premise.rooms > 0 ? (
+                <Detail
+                    label="Комнат"
+                    value={formatRoomsCount(premise.rooms)}
+                />
+            ) : null}
             <Detail label="Площадь" value={formatArea(premise.area)} />
             {premise.goodArea !== undefined ? (
                 <Detail
@@ -245,10 +334,17 @@ const PremiseResultItem = ({
     const hasPriceInfo =
         premise.price !== undefined || pricePerSqm !== undefined
 
+    const complexBadge = premise.complexName ? (
+        <span className="mb-1.5 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1 text-sm font-bold leading-tight text-neutral shadow-sm ring-1 ring-primary-deep/30">
+            <TbBuildingSkyscraper className="shrink-0 text-base text-neutral" />
+            <span className="truncate">{premise.complexName}</span>
+        </span>
+    ) : null
+
     const favoriteButton = (
         <Tooltip
             title={
-                isFavorite
+                isFavoriteDisplay
                     ? 'Убрать из избранного'
                     : 'Добавить в избранное'
             }
@@ -259,12 +355,24 @@ const PremiseResultItem = ({
                 variant="plain"
                 className={classNames(
                     'bg-white/90 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 sm:bg-transparent sm:shadow-none sm:backdrop-blur-none',
-                    isFavorite ? 'text-rose-500' : 'text-gray-500',
+                    isFavoriteDisplay ? 'text-rose-500' : 'text-gray-500',
                 )}
-                icon={isFavorite ? <TbHeartFilled /> : <TbHeart />}
+                icon={isFavoriteDisplay ? <TbHeartFilled /> : <TbHeart />}
                 onClick={(event) => {
                     event.stopPropagation()
-                    togglePremise(premise)
+                    const action =
+                        onToggleFavorite ??
+                        (() => togglePremise(premise))
+                    void Promise.resolve(action(premise)).catch((error) => {
+                        toast.push(
+                            <Notification type="danger">
+                                {getApiErrorMessage(
+                                    error,
+                                    'Не удалось обновить избранное',
+                                )}
+                            </Notification>,
+                        )
+                    })
                 }}
             />
         </Tooltip>
@@ -274,13 +382,21 @@ const PremiseResultItem = ({
         <div
             className={classNames(
                 'overflow-hidden rounded-2xl border transition-colors duration-200',
-                open
-                    ? 'border-gray-700 bg-gray-900'
-                    : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800',
+                pendingRemoval
+                    ? 'border-rose-300 dark:border-rose-800/70'
+                    : open
+                      ? 'border-gray-700 bg-gray-900'
+                      : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800',
+                pendingRemoval && !open && 'bg-rose-50/40 dark:bg-rose-950/10',
             )}
         >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3">
-                <div className="relative shrink-0 px-3 pt-3 sm:px-0 sm:pt-0">
+            <div className="relative flex flex-col sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3">
+                <div
+                    className={classNames(
+                        'relative shrink-0 px-3 pt-3 sm:px-0 sm:pt-0',
+                        open && 'hidden sm:block',
+                    )}
+                >
                     {coverImage ? (
                         <button
                             type="button"
@@ -319,7 +435,12 @@ const PremiseResultItem = ({
                             </div>
                         </Tooltip>
                     )}
-                    <div className="absolute right-5 top-5 flex items-center gap-1 sm:hidden">
+                    <div
+                        className={classNames(
+                            'absolute right-5 top-5 flex items-center gap-1 sm:hidden',
+                            open && 'hidden',
+                        )}
+                    >
                         {favoriteButton}
                     </div>
                 </div>
@@ -327,10 +448,16 @@ const PremiseResultItem = ({
                 <div className="flex w-full min-w-0 flex-1 items-start gap-2 sm:items-center">
                     <button
                         type="button"
-                        className="flex min-w-0 flex-1 items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-0 sm:py-0"
+                        className="relative flex min-w-0 flex-1 items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-0 sm:py-0"
                         onClick={() => setOpen((value) => !value)}
                     >
-                    <div className="min-w-0 flex-1">
+                    <div
+                        className={classNames(
+                            'flex min-w-0 flex-1 flex-col items-start',
+                            open && 'pr-10 sm:pr-0',
+                        )}
+                    >
+                        {complexBadge}
                         <p
                             className={classNames(
                                 'text-sm font-semibold leading-snug sm:text-base',
@@ -339,14 +466,14 @@ const PremiseResultItem = ({
                                     : 'text-gray-900 dark:text-gray-100',
                             )}
                         >
-                            {typeLabel} · {formatArea(premise.area)} ·{' '}
-                            {formatRoomsCount(premise.rooms)}
+                            {[
+                                typeLabel,
+                                formatArea(premise.area),
+                                formatRoomsCount(premise.rooms),
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
                         </p>
-                        {!open && premise.complexName ? (
-                            <span className="mt-1.5 inline-flex max-w-full truncate rounded-lg bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                                {premise.complexName}
-                            </span>
-                        ) : null}
                         <p
                             className={classNames(
                                 'mt-1 text-sm leading-snug sm:truncate',
@@ -355,20 +482,8 @@ const PremiseResultItem = ({
                                     : 'text-gray-500 dark:text-gray-400',
                             )}
                         >
-                            {locationParts.join(' · ')}
+                            {premiseMetaLine}
                         </p>
-                        {premise.layout ? (
-                            <p
-                                className={classNames(
-                                    'mt-0.5 text-xs leading-snug sm:truncate',
-                                    open
-                                        ? 'text-gray-500'
-                                        : 'text-gray-500 dark:text-gray-400',
-                                )}
-                            >
-                                {premise.layout}
-                            </p>
-                        ) : null}
                         {hasPriceInfo ? (
                             <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 sm:hidden">
                                 {priceBlock}
@@ -382,14 +497,30 @@ const PremiseResultItem = ({
                     ) : null}
                     <HiChevronDown
                         className={classNames(
-                            'mt-0.5 shrink-0 text-xl text-gray-400 transition-transform duration-200',
+                            'shrink-0 text-xl text-gray-400 transition-transform duration-200',
+                            open
+                                ? 'absolute bottom-3 right-3 sm:static sm:self-center'
+                                : 'ml-auto self-end sm:ml-0 sm:self-center',
                             open && 'rotate-180',
                         )}
                     />
                     </button>
-                    <div className="hidden shrink-0 self-center pr-3 sm:block sm:pr-0">
+                    <div
+                        className={classNames(
+                            'hidden shrink-0 self-center sm:block sm:pr-0',
+                        )}
+                    >
                         {favoriteButton}
                     </div>
+                </div>
+
+                <div
+                    className={classNames(
+                        'absolute right-5 top-5 z-10 flex items-center gap-1 sm:hidden',
+                        !open && 'hidden',
+                    )}
+                >
+                    {favoriteButton}
                 </div>
             </div>
 
@@ -404,41 +535,45 @@ const PremiseResultItem = ({
                         className="overflow-hidden"
                     >
                         <div className="border-t border-gray-700 px-4 py-4">
-                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-stretch">
                                 {coverImage ? (
-                                    <button
-                                        type="button"
-                                        className="group overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 p-3 text-left"
-                                        onClick={onPreviewLayout}
-                                    >
-                                        <p className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-gray-100">
-                                            <span>
-                                                {coverImageLabel}
-                                                {premise.layout && coverImageLabel === 'Планировка'
-                                                    ? ` · ${premise.layout}`
-                                                    : ''}
+                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
+                                        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-700 px-3 py-2.5">
+                                            <span className="min-w-0 text-sm font-semibold leading-snug text-gray-100">
+                                                {expandedPlanBlockCaption}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-primary">
+                                            <button
+                                                type="button"
+                                                className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-gray-400 transition-colors hover:text-primary"
+                                                onClick={onPreviewLayout}
+                                            >
                                                 <TbZoomIn />
                                                 Увеличить
-                                            </span>
-                                        </p>
-                                        <img
-                                            src={coverImage}
-                                            alt={`${coverImageLabel} помещения №${premise.number}`}
-                                            className="mx-auto max-h-[420px] w-full object-contain"
-                                        />
-                                    </button>
+                                            </button>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="group flex flex-1 items-center justify-center p-3"
+                                            onClick={onPreviewLayout}
+                                        >
+                                            <img
+                                                src={coverImage}
+                                                alt={`${coverImageLabel} помещения №${premise.number}`}
+                                                className="max-h-[420px] max-w-full object-contain"
+                                            />
+                                        </button>
+                                    </div>
                                 ) : (
-                                    <div className="overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 p-3">
-                                        <p className="mb-2 text-sm font-semibold text-gray-100">
-                                            Планировка
-                                            {premise.layout
-                                                ? ` · ${premise.layout}`
-                                                : ''}
-                                        </p>
-                                        <div className="mx-auto flex min-h-[220px] max-w-full items-center justify-center rounded-xl border border-dashed border-gray-600 bg-gray-900/40">
-                                            <LayoutImagePlaceholder />
+                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
+                                        <div className="shrink-0 border-b border-gray-700 px-3 py-2.5">
+                                            <span className="text-sm font-semibold leading-snug text-gray-100">
+                                                {expandedPlanBlockCaption}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-1 items-center justify-center p-3">
+                                            <div className="flex min-h-[220px] w-full max-w-full items-center justify-center rounded-xl border border-dashed border-gray-600 bg-gray-900/40">
+                                                <LayoutImagePlaceholder />
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -504,6 +639,26 @@ const PremiseResultItem = ({
                     </motion.div>
                 ) : null}
             </AnimatePresence>
+            {pendingRemoval && onCancelPendingRemoval ? (
+                <PendingRemovalBanner
+                    startedAt={pendingRemoval.startedAt}
+                    durationMs={pendingRemoval.durationMs}
+                    onCancel={() => {
+                        void Promise.resolve(onCancelPendingRemoval()).catch(
+                            (error) => {
+                                toast.push(
+                                    <Notification type="danger">
+                                        {getApiErrorMessage(
+                                            error,
+                                            'Не удалось отменить удаление',
+                                        )}
+                                    </Notification>,
+                                )
+                            },
+                        )
+                    }}
+                />
+            ) : null}
         </div>
     )
 

@@ -6,11 +6,10 @@ import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
-import { apiGetRealtyProjects } from '@/services/ObjectsService'
+import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
 import RangeInputGroup from './RangeInputGroup'
 import type { ObjectsSearchFilters, RealtyPropertyTypeCode } from '../types'
 import { hasActiveObjectsSearchFilters } from '../filtersQuery'
-import { realtyPropertyTypeLabel, roomsOptions } from '../utils'
 
 type Option = { value: string; label: string }
 
@@ -31,12 +30,6 @@ type ObjectsSearchFormProps = {
 const isFilled = (
     value: string | number | Array<string | number> | '' | undefined | null,
 ) => (Array.isArray(value) ? value.length > 0 : value !== '' && value !== undefined && value !== null)
-
-const filledInputClass =
-    'border-primary bg-primary/10 font-semibold text-gray-800 dark:bg-primary/15 dark:text-gray-100'
-
-const filledSelectClass =
-    '[&_.select-control]:border-primary [&_.select-control]:bg-primary/10 [&_.select-control]:text-primary dark:[&_.select-control]:bg-primary/15 [&_.select-single-value]:text-primary [&_.select-single-value]:font-medium'
 
 const selectMenuProps = {
     menuPortalTarget:
@@ -71,27 +64,35 @@ const ObjectsSearchForm = ({
         }
     }
 
-    const { data: realtyProjects = [] } = useSWR(
-        multiComplexSelect ? '/api/v2/realty_projects' : null,
-        () => apiGetRealtyProjects(),
+    const { data: filterOptions } = useSWR(
+        '/api/v2/realty_properties/filters',
+        () => apiGetRealtyPropertiesFilters(),
         {
             revalidateOnFocus: false,
             revalidateOnReconnect: false,
         },
     )
 
-    const projectOptions: Option[] = realtyProjects.map((item) => ({
-        value: item.id,
-        label: item.name,
-    }))
-
-    const typeOptions: Option[] = Object.entries(realtyPropertyTypeLabel).map(
-        ([value, label]) => ({ value, label }),
+    const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
+        (item) => ({
+            value: item.id,
+            label: item.name,
+        }),
     )
-    const roomSelectOptions: Option[] = roomsOptions.map((item) => ({
-        value: String(item.value),
-        label: item.label,
-    }))
+
+    const typeOptions: Option[] = (filterOptions?.realtyTypes ?? []).map(
+        (item) => ({
+            value: item.value,
+            label: item.label,
+        }),
+    )
+
+    const roomSelectOptions: Option[] = (filterOptions?.realtyRooms ?? []).map(
+        (item) => ({
+            value: item.value,
+            label: item.label,
+        }),
+    )
 
     const activeFiltersCount = useMemo(
         () =>
@@ -170,10 +171,6 @@ const ObjectsSearchForm = ({
                                             closeMenuOnSelect={false}
                                             isClearable
                                             placeholder="Все ЖК"
-                                            className={classNames(
-                                                isFilled(filters.realtyProjectIds) &&
-                                                    filledSelectClass,
-                                            )}
                                             options={projectOptions}
                                             value={projectOptions.filter(
                                                 (item) =>
@@ -201,10 +198,6 @@ const ObjectsSearchForm = ({
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любой"
-                                        className={classNames(
-                                            isFilled(filters.type) &&
-                                                filledSelectClass,
-                                        )}
                                         options={typeOptions}
                                         value={typeOptions.filter((item) =>
                                             (filters.type || []).includes(
@@ -227,23 +220,18 @@ const ObjectsSearchForm = ({
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любая"
-                                        className={classNames(
-                                            isFilled(filters.rooms) &&
-                                                filledSelectClass,
-                                        )}
                                         options={roomSelectOptions}
                                         value={roomSelectOptions.filter((item) =>
                                             (filters.rooms || []).includes(
-                                                Number(item.value),
+                                                item.value,
                                             ),
                                         )}
                                         onChange={(option) => {
                                             patch({
                                                 rooms: (
                                                     option as readonly Option[] | null
-                                                )?.map((item) =>
-                                                    Number(item.value),
-                                                ) || [],
+                                                )?.map((item) => item.value) ||
+                                                [],
                                             })
                                         }}
                                     />
@@ -254,7 +242,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.floorTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(floorFrom) =>
                                             patch({ floorFrom })
                                         }
@@ -269,7 +256,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.areaTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(areaFrom) =>
                                             patch({ areaFrom })
                                         }
@@ -285,7 +271,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.priceTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(priceFrom) =>
                                             patch({ priceFrom })
                                         }

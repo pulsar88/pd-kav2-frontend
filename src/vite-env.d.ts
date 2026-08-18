@@ -2,7 +2,6 @@
 
 interface ImportMetaEnv {
     readonly VITE_API_BASE_URL: string
-    readonly VITE_ENABLE_MOCK: string
     readonly VITE_WS_APP_KEY: string
     readonly VITE_PUSHER_HOST: string
     readonly VITE_PUSHER_PATH: string

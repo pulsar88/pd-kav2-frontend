@@ -20,6 +20,7 @@ const endpointConfig = {
     userNotificationDictionaries: '/v2/user/notifications/dictionaries',
     realtyProperties: '/v2/realty_properties',
     realtyPropertiesSummary: '/v2/realty_properties/summary',
+    realtyPropertiesFilters: '/v2/realty_properties/filters',
     realtyProjects: '/v2/realty_projects',
     realtyProperty: (propertyId: string | number) =>
         `/v2/realty_properties/${propertyId}`,
@@ -27,8 +28,23 @@ const endpointConfig = {
         `/v2/realty_objects/${objectId}`,
     realtyObjectChess: (complexId: string | number) =>
         `/v2/realty_objects/${complexId}/chess`,
+    fixations: '/v2/fixations',
+    fixation: (fixationId: string | number) => `/v2/fixations/${fixationId}`,
+    clients: '/v2/clients',
+    managers: '/v2/managers',
+    realtyCollectionDefault: '/v2/realty_collections/default',
+    realtyCollectionProperties: (collectionId: string | number) =>
+        `/v2/realty_collections/${collectionId}/properties`,
+    realtyCollectionDefaultProperties:
+        '/v2/realty_collections/default/properties',
+    realtyCollectionCheckProperties: (collectionId: string | number) =>
+        `/v2/realty_collections/${collectionId}/check_properties`,
     pushSubscribe: '/v2/push/subscribe',
     pushUnsubscribe: '/v2/push/unsubscribe',
+    news: '/v2/news',
+    newsArticles: '/v2/news/articles',
+    newsEvents: '/v2/news/events',
+    newsItem: (newsId: string | number) => `/v2/news/${newsId}`,
 }
 
 export default endpointConfig

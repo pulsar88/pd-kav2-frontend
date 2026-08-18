@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { TbCalendar, TbMapPin, TbZoomIn } from 'react-icons/tb'
 import ImageGallery from '@/components/shared/ImageGallery'
-import { DEFAULT_COMPLEX_IMAGE } from '@/mock/data/premisesData'
+import { DEFAULT_COMPLEX_IMAGE } from '@/views/objects/constants'
 import type { Complex } from '../../types'
+import { parseComplexPromoText } from '../../utils'
 
 type ComplexAboutTabProps = {
     complex: Complex | null
@@ -11,16 +12,6 @@ type ComplexAboutTabProps = {
 }
 
 const dash = '—'
-
-const COMPLEX_FEATURES = [
-    'Потрясающие виды на лес и реку из панорамных окон.',
-    'Закрытая придомовая территория с контролем доступа и КПП с пунктом охраны.',
-    'Мини-парк с соснами и разнообразные зоны для отдыха и детских игр на территории.',
-    'Фитнес-зал и детская игровая в комплексе.',
-    'Собственная котельная и система центрального кондиционирования.',
-    'Дистанционное снятие показаний счётчиков.',
-    'Дом сдан.',
-]
 
 const ComplexAboutTab = ({
     complex,
@@ -41,6 +32,9 @@ const ComplexAboutTab = ({
     const image = complex?.image || DEFAULT_COMPLEX_IMAGE
     const address = complex?.address?.trim() || dash
     const completionDate = complex?.completionDate?.trim() || 'Не указано'
+    const { title: promoTitle, features } = parseComplexPromoText(
+        complex?.promoText,
+    )
 
     return (
         <>
@@ -104,25 +98,27 @@ const ComplexAboutTab = ({
                                 </div>
                             </div>
 
-                            <div className="border-t border-gray-100 pt-5 dark:border-gray-700">
-                                <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                    Особенности
-                                </h5>
-                                <ul className="mt-3 space-y-2.5">
-                                    {COMPLEX_FEATURES.map((feature) => (
-                                        <li
-                                            key={feature}
-                                            className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700 dark:text-gray-300"
-                                        >
-                                            <span
-                                                aria-hidden
-                                                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                                            />
-                                            {feature}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
+                            {features.length > 0 ? (
+                                <div className="border-t border-gray-100 pt-5 dark:border-gray-700">
+                                    <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        {promoTitle || 'Особенности'}
+                                    </h5>
+                                    <ul className="mt-3 space-y-2.5">
+                                        {features.map((feature) => (
+                                            <li
+                                                key={feature}
+                                                className="flex items-start gap-2.5 text-sm leading-relaxed text-gray-700 dark:text-gray-300"
+                                            >
+                                                <span
+                                                    aria-hidden
+                                                    className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                                                />
+                                                {feature}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                 </div>

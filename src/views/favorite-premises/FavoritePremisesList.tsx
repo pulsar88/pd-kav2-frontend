@@ -1,16 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
+import Notification from '@/components/ui/Notification'
+import toast from '@/components/ui/toast'
+import { useAuth } from '@/auth'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import Checkbox from '@/components/ui/Checkbox'
 import Pagination from '@/components/ui/Pagination'
 import Select from '@/components/ui/Select'
 import DebouceInput from '@/components/shared/DebouceInput'
 import ImageGallery from '@/components/shared/ImageGallery'
 import PremiseResultItem from '@/views/objects/components/PremiseResultItem'
+import PremisesListSkeleton from '@/views/objects/components/PremisesListSkeleton'
 import { createEmptyObjectsSearchFilters } from '@/views/objects/filtersQuery'
+import {
+    apiGetDefaultCollectionPropertiesPage,
+    getFavoriteCollectionSwrKey,
+    isFavoriteCollectionSwrKey,
+    type FavoriteCollectionPageData,
+} from '@/services/RealtyCollectionsService'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { mutate } from 'swr'
 import { TbArrowDown, TbArrowUp, TbSearch } from 'react-icons/tb'
 import type { Premise } from '@/views/objects/types'
 import {
@@ -20,12 +32,11 @@ import {
     getPremiseTypeLabel,
     parsePremiseSortKey,
     premiseSortFields,
-    sortPremises,
     toPremiseSortKey,
     type PremiseSortField,
     type PremiseSortKey,
+    type PremiseSortState,
 } from '@/views/objects/utils'
-import { enrichPremisesList } from './utils'
 
 type Option = { value: string | number; label: string }
 
@@ -41,34 +52,27 @@ const pageSizeOptions = [20, 50, 100].map((number) => ({
 
 const emptySearchFilters = createEmptyObjectsSearchFilters()
 
+const REMOVAL_DELAY_MS = 5000
+
+const mutateFavoriteCollectionPages = (
+    updater: (
+        current: FavoriteCollectionPageData | undefined,
+    ) => FavoriteCollectionPageData | undefined,
+) =>
+    mutate<FavoriteCollectionPageData>(
+        (key) => isFavoriteCollectionSwrKey(key),
+        updater,
+        { revalidate: false },
+    )
+
 const FavoritePremisesList = ({
     selectedIds,
     onSelectedIdsChange,
 }: FavoritePremisesListProps) => {
-    const premises = useFavoritesStore((state) => state.premises)
-
-    const premiseIdsKey = useMemo(
-        () =>
-            premises
-                .map((premise) => premise.id)
-                .sort()
-                .join(','),
-        [premises],
-    )
-
-    const { data: enrichedPremises = premises } = useSWR(
-        premises.length > 0
-            ? ['/favorite-premises/enriched', premiseIdsKey]
-            : null,
-        () => enrichPremisesList(premises),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
-    )
-
-    const [sortKey, setSortKey] = useState<PremiseSortKey>('price_asc')
+    const { authenticated } = useAuth()
+    const addPremise = useFavoritesStore((state) => state.addPremise)
+    const removePremise = useFavoritesStore((state) => state.removePremise)
+    const [sortKey, setSortKey] = useState<PremiseSortState>(null)
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(20)
     const [search, setSearch] = useState('')
@@ -76,14 +80,150 @@ const FavoritePremisesList = ({
     const [previewSlides, setPreviewSlides] = useState<Array<{ src: string }>>(
         [],
     )
+    const { data, isLoading } = useSWR(
+        authenticated
+            ? getFavoriteCollectionSwrKey(pageIndex, pageSize, sortKey)
+            : null,
+        ([, page, perPage, sort]) =>
+            apiGetDefaultCollectionPropertiesPage({
+                page,
+                per_page: perPage,
+                sort: sort ?? undefined,
+            }),
+        {
+            revalidateOnFocus: false,
+            keepPreviousData: true,
+        },
+    )
 
-    const { field: sortField, dir: sortDir } = parsePremiseSortKey(sortKey)
+    const premises = data?.items ?? []
+    const totalCount = data?.meta.total ?? 0
+    const [pendingRemovals, setPendingRemovals] = useState<
+        Map<string, number>
+    >(() => new Map())
+    const removalTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+        new Map(),
+    )
+
+    useEffect(() => {
+        const timers = removalTimersRef.current
+        return () => {
+            timers.forEach((timer) => clearTimeout(timer))
+            timers.clear()
+        }
+    }, [])
+
+    const clearPendingRemovalState = (premiseId: string) => {
+        setPendingRemovals((prev) => {
+            if (!prev.has(premiseId)) return prev
+            const next = new Map(prev)
+            next.delete(premiseId)
+            return next
+        })
+    }
+
+    const cancelDelayedCacheRemoval = (premiseId: string) => {
+        const timer = removalTimersRef.current.get(premiseId)
+        if (timer) {
+            clearTimeout(timer)
+            removalTimersRef.current.delete(premiseId)
+        }
+        clearPendingRemovalState(premiseId)
+    }
+
+    const scheduleDelayedCacheRemoval = (premiseId: string) => {
+        cancelDelayedCacheRemoval(premiseId)
+        setPendingRemovals((prev) => new Map(prev).set(premiseId, Date.now()))
+
+        const timer = setTimeout(() => {
+            clearPendingRemovalState(premiseId)
+            void mutateFavoriteCollectionPages((current) => {
+                if (!current) return current
+
+                const hasItem = current.items.some(
+                    (item) => item.id === premiseId,
+                )
+                if (!hasItem) return current
+
+                return {
+                    ...current,
+                    items: current.items.filter(
+                        (item) => item.id !== premiseId,
+                    ),
+                    meta: {
+                        ...current.meta,
+                        total: Math.max(0, current.meta.total - 1),
+                    },
+                }
+            })
+            removalTimersRef.current.delete(premiseId)
+        }, REMOVAL_DELAY_MS)
+
+        removalTimersRef.current.set(premiseId, timer)
+    }
+
+    const handleCancelPendingRemoval = async (premise: Premise) => {
+        cancelDelayedCacheRemoval(premise.id)
+
+        try {
+            await addPremise(premise.id)
+        } catch (error) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        error,
+                        'Не удалось вернуть помещение в избранное',
+                    )}
+                </Notification>,
+            )
+        }
+    }
+
+    const handleToggleFavorite = async (premise: Premise) => {
+        const isPendingRemoval = pendingRemovals.has(premise.id)
+
+        if (!isPendingRemoval) {
+            scheduleDelayedCacheRemoval(premise.id)
+            try {
+                await removePremise(premise.id)
+            } catch (error) {
+                cancelDelayedCacheRemoval(premise.id)
+                toast.push(
+                    <Notification type="danger">
+                        {getApiErrorMessage(
+                            error,
+                            'Не удалось обновить избранное',
+                        )}
+                    </Notification>,
+                )
+            }
+            return
+        }
+
+        cancelDelayedCacheRemoval(premise.id)
+        try {
+            await addPremise(premise.id)
+        } catch (error) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        error,
+                        'Не удалось обновить избранное',
+                    )}
+                </Notification>,
+            )
+        }
+    }
+
+    const sortState = sortKey ? parsePremiseSortKey(sortKey) : null
+    const sortField = sortState?.field
+    const sortDir = sortState?.dir
 
     const filteredList = useMemo(() => {
         const query = search.trim().toLowerCase()
-        if (!query) return enrichedPremises
+        if (!query) return premises
 
-        return enrichedPremises.filter((premise) => {
+        return premises.filter((premise) => {
             const roomsLabel =
                 premise.rooms === 0 ? 'студия' : `${premise.rooms}`
             const haystack = [
@@ -103,31 +243,13 @@ const FavoritePremisesList = ({
 
             return haystack.includes(query)
         })
-    }, [enrichedPremises, search])
+    }, [premises, search])
 
-    const sortedResults = useMemo(
-        () => sortPremises(filteredList, sortKey),
-        [filteredList, sortKey],
-    )
+    const pageData = filteredList
 
     useEffect(() => {
         setPageIndex(1)
-    }, [filteredList, sortKey, pageSize])
-
-    useEffect(() => {
-        const next = selectedIds.filter((id) =>
-            premises.some((premise) => premise.id === id),
-        )
-        if (next.length !== selectedIds.length) {
-            onSelectedIdsChange(next)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [premises])
-
-    const pageData = useMemo(() => {
-        const start = (pageIndex - 1) * pageSize
-        return sortedResults.slice(start, start + pageSize)
-    }, [sortedResults, pageIndex, pageSize])
+    }, [search, sortKey, pageSize])
 
     const pageSelectedCount = pageData.filter((premise) =>
         selectedIds.includes(premise.id),
@@ -143,13 +265,18 @@ const FavoritePremisesList = ({
     }
 
     const handleFieldChange = (field: PremiseSortField) => {
-        if (field === sortField) {
+        if (field === sortField && sortDir) {
             setSortKey(
                 toPremiseSortKey(field, sortDir === 'asc' ? 'desc' : 'asc'),
             )
             return
         }
         setSortKey(toPremiseSortKey(field, 'asc'))
+    }
+
+    const handleResetSort = () => {
+        setSortKey(null)
+        setPageIndex(1)
     }
 
     const handleTogglePremise = (premise: Premise, selected: boolean) => {
@@ -177,7 +304,11 @@ const FavoritePremisesList = ({
         setPreviewIndex(0)
     }
 
-    if (!premises.length) {
+    if (isLoading && !data) {
+        return <PremisesListSkeleton count={4} />
+    }
+
+    if (totalCount === 0 && !pendingRemovals.size) {
         return (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center dark:border-gray-600 dark:bg-gray-800/40">
                 <p className="mb-2 text-lg font-semibold heading-text">
@@ -215,7 +346,7 @@ const FavoritePremisesList = ({
                         Выбрать на странице
                     </Checkbox>
                     <h4 className="mb-0 text-base font-semibold">
-                        В избранном: {filteredList.length}
+                        В избранном: {totalCount}
                     </h4>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -231,7 +362,7 @@ const FavoritePremisesList = ({
                                     key={item.value}
                                     type="button"
                                     title={
-                                        active
+                                        active && sortDir
                                             ? sortDir === 'asc'
                                                 ? 'По возрастанию · нажмите, чтобы изменить'
                                                 : 'По убыванию · нажмите, чтобы изменить'
@@ -248,7 +379,7 @@ const FavoritePremisesList = ({
                                     }
                                 >
                                     <span>{item.label}</span>
-                                    {active ? (
+                                    {active && sortDir ? (
                                         sortDir === 'asc' ? (
                                             <TbArrowUp className="text-base" />
                                         ) : (
@@ -258,39 +389,65 @@ const FavoritePremisesList = ({
                                 </button>
                             )
                         })}
+                        <button
+                            type="button"
+                            disabled={!sortKey}
+                            className="rounded-lg px-2.5 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-default disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700"
+                            onClick={handleResetSort}
+                        >
+                            Сбросить
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {sortedResults.length === 0 ? (
+            {pageData.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-700">
                     По поисковому запросу ничего не найдено
                 </div>
             ) : (
                 <>
                     <div className="flex flex-col gap-3">
-                        {pageData.map((premise) => (
+                        {pageData.map((premise) => {
+                            const removalStartedAt =
+                                pendingRemovals.get(premise.id)
+
+                            return (
                             <PremiseResultItem
                                 key={premise.id}
                                 selectable
                                 selected={selectedIds.includes(premise.id)}
                                 premise={premise}
+                                favoriteState={!pendingRemovals.has(premise.id)}
                                 searchFilters={emptySearchFilters}
+                                pendingRemoval={
+                                    removalStartedAt
+                                        ? {
+                                              startedAt: removalStartedAt,
+                                              durationMs: REMOVAL_DELAY_MS,
+                                          }
+                                        : undefined
+                                }
                                 onSelectedChange={(selected) =>
                                     handleTogglePremise(premise, selected)
                                 }
                                 onPreviewLayout={() =>
                                     handlePreviewLayout(premise)
                                 }
+                                onToggleFavorite={handleToggleFavorite}
+                                onCancelPendingRemoval={() =>
+                                    handleCancelPendingRemoval(premise)
+                                }
                             />
-                        ))}
+                            )
+                        })}
                     </div>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="overflow-x-auto">
                             <Pagination
                                 currentPage={pageIndex}
                                 pageSize={pageSize}
-                                total={sortedResults.length}
+                                total={totalCount}
                                 pagerCount={5}
                                 onChange={setPageIndex}
                             />

@@ -15,6 +15,7 @@ import {
 } from '@/services/AuthService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { disconnectEcho } from '@/services/broadcast/echo'
+import { clearFavoritesStore } from '@/store/favoritesStore'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
 import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
@@ -91,6 +92,7 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const handleSignOut = () => {
         disconnectEcho()
+        clearFavoritesStore()
         setToken('')
         setTokenState('')
         setUser({})

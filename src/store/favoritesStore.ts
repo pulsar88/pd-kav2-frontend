@@ -1,59 +1,81 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import {
+    apiAddRealtyCollectionProperty,
+    apiRemoveRealtyCollectionProperty,
+    clearDefaultRealtyCollectionCache,
+} from '@/services/RealtyCollectionsService'
 import type { Premise } from '@/views/objects/types'
 
 type FavoritesState = {
-    premises: Premise[]
+    favoriteIds: string[]
 }
 
 type FavoritesAction = {
-    addPremise: (premise: Premise) => void
-    removePremise: (premiseId: string) => void
-    togglePremise: (premise: Premise) => void
+    setFavoriteIds: (ids: string[]) => void
+    addPremise: (propertyId: string) => Promise<void>
+    removePremise: (propertyId: string) => Promise<void>
+    togglePremise: (premise: Premise) => Promise<void>
     isFavorite: (premiseId: string) => boolean
     clear: () => void
 }
 
-export const useFavoritesStore = create<FavoritesState & FavoritesAction>()(
-    persist(
-        (set, get) => ({
-            premises: [],
-            addPremise: (premise) =>
-                set((state) => {
-                    const index = state.premises.findIndex(
-                        (item) => item.id === premise.id,
-                    )
+export const useFavoritesStore = create<FavoritesState & FavoritesAction>(
+    (set, get) => ({
+        favoriteIds: [],
+        setFavoriteIds: (ids) => set({ favoriteIds: ids }),
+        addPremise: async (propertyId) => {
+            const exists = get().isFavorite(propertyId)
+            if (exists) return
 
-                    if (index >= 0) {
-                        const next = [...state.premises]
-                        next[index] = { ...next[index], ...premise }
-                        return { premises: next }
-                    }
+            set((state) => ({
+                favoriteIds: [...state.favoriteIds, propertyId],
+            }))
 
-                    return { premises: [...state.premises, premise] }
-                }),
-            removePremise: (premiseId) =>
+            try {
+                await apiAddRealtyCollectionProperty(propertyId)
+            } catch (error) {
                 set((state) => ({
-                    premises: state.premises.filter(
-                        (item) => item.id !== premiseId,
+                    favoriteIds: state.favoriteIds.filter(
+                        (id) => id !== propertyId,
                     ),
-                })),
-            togglePremise: (premise) => {
-                const exists = get().premises.some(
-                    (item) => item.id === premise.id,
-                )
-                if (exists) {
-                    get().removePremise(premise.id)
-                    return
-                }
-                get().addPremise(premise)
-            },
-            isFavorite: (premiseId) =>
-                get().premises.some((item) => item.id === premiseId),
-            clear: () => set({ premises: [] }),
-        }),
-        {
-            name: 'favoritePremises',
+                }))
+                throw error
+            }
         },
-    ),
+        removePremise: async (propertyId) => {
+            const exists = get().isFavorite(propertyId)
+            if (!exists) return
+
+            set((state) => ({
+                favoriteIds: state.favoriteIds.filter(
+                    (id) => id !== propertyId,
+                ),
+            }))
+
+            try {
+                await apiRemoveRealtyCollectionProperty(propertyId)
+            } catch (error) {
+                set((state) => ({
+                    favoriteIds: [...state.favoriteIds, propertyId],
+                }))
+                throw error
+            }
+        },
+        togglePremise: async (premise) => {
+            if (get().isFavorite(premise.id)) {
+                await get().removePremise(premise.id)
+                return
+            }
+            await get().addPremise(premise.id)
+        },
+        isFavorite: (premiseId) => get().favoriteIds.includes(premiseId),
+        clear: () => {
+            clearDefaultRealtyCollectionCache()
+            set({ favoriteIds: [] })
+        },
+    }),
 )
+
+export const clearFavoritesStore = () => {
+    useFavoritesStore.getState().clear()
+}

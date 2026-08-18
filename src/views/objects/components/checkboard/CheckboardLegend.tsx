@@ -10,7 +10,7 @@ type StatusItem = {
 type CheckboardLegendProps = {
     statuses: StatusItem[]
     activeStatusCode?: string
-    onStatusClick: (code: string) => void
+    onStatusClick?: (code: string) => void
 }
 
 const CheckboardLegend = ({
@@ -27,18 +27,36 @@ const CheckboardLegend = ({
             </span>
             {statuses.map((status) => {
                 const active = activeStatusCode === status.code
+                const className = classNames(
+                    'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
+                    onStatusClick && 'transition-shadow',
+                    onStatusClick &&
+                        active &&
+                        'ring-2 ring-primary ring-offset-1',
+                )
+                const style = {
+                    backgroundColor: status.color,
+                    color: status.text_color,
+                }
+
+                if (!onStatusClick) {
+                    return (
+                        <span
+                            key={status.code}
+                            className={className}
+                            style={style}
+                        >
+                            {status.name}
+                        </span>
+                    )
+                }
+
                 return (
                     <button
                         key={status.code}
                         type="button"
-                        className={classNames(
-                            'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium transition-shadow',
-                            active && 'ring-2 ring-primary ring-offset-1',
-                        )}
-                        style={{
-                            backgroundColor: status.color,
-                            color: status.text_color,
-                        }}
+                        className={className}
+                        style={style}
                         onClick={() => onStatusClick(status.code)}
                     >
                         {status.name}

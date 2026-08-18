@@ -174,6 +174,10 @@ export const formatArea = (value: number) =>
     `${value.toLocaleString('ru-RU')} м²`
 
 export const formatRoomsCount = (rooms: number) => {
+    if (rooms === 0) {
+        return ''
+    }
+
     const mod10 = rooms % 10
     const mod100 = rooms % 100
 
@@ -203,6 +207,41 @@ export const formatCompletionDate = (value: string) => {
         month: 'long',
         year: 'numeric',
     })
+}
+
+export const parseComplexPromoText = (promoText?: string) => {
+    if (!promoText?.trim()) {
+        return { title: undefined, features: [] as string[] }
+    }
+
+    let title: string | undefined
+    const features: string[] = []
+
+    promoText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .forEach((line) => {
+            if (line.startsWith('* ')) {
+                features.push(line.slice(2).trim())
+                return
+            }
+
+            const boldMatch = line.match(/^\*\*(.+)\*\*$/)
+            if (boldMatch) {
+                title = boldMatch[1].trim()
+                return
+            }
+
+            if (!title && features.length === 0) {
+                title = line
+                return
+            }
+
+            features.push(line.replace(/^\*\s*/, '').trim())
+        })
+
+    return { title, features }
 }
 
 export const roomsOptions = [

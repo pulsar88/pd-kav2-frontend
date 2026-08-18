@@ -16,6 +16,17 @@ export type RealtyProject = {
     name: string
 }
 
+export type RealtyFilterOption = {
+    value: string
+    label: string
+}
+
+export type RealtyPropertiesFilters = {
+    projects: RealtyProject[]
+    realtyTypes: RealtyFilterOption[]
+    realtyRooms: RealtyFilterOption[]
+}
+
 export type Complex = {
     id: string
     name: string
@@ -31,6 +42,7 @@ export type Complex = {
     floors?: number
     finishing?: FinishingType
     matchingPremisesCount?: number
+    promoText?: string
 }
 
 export type Premise = {
@@ -62,8 +74,11 @@ export type Premise = {
     material?: string
     ceilingHeight?: number
     layout?: string
+    layoutName?: string
     layoutImage?: string
     floorPlanImage?: string
+    complexImage?: string
+    promoText?: string
     description?: string
 }
 
@@ -71,7 +86,7 @@ export type ObjectsSearchFilters = {
     type?: RealtyPropertyTypeCode[]
     realtyProjectIds?: string[]
     complexId?: string
-    rooms?: number[]
+    rooms?: string[]
     priceFrom?: number | ''
     priceTo?: number | ''
     areaFrom?: number | ''

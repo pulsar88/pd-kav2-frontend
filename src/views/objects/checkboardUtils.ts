@@ -8,6 +8,7 @@ import type {
     SectionColumn,
 } from './checkboard.types'
 import type { ObjectsSearchFilters, Premise, PremiseType, RealtyPropertyTypeCode } from './types'
+import { matchesRealtyRoomFilters } from './realtyPropertyQuery'
 import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
 
 const mapCheckboardTypeCodeToPremiseType = (code: string): PremiseType => {
@@ -398,7 +399,6 @@ export const matchesObjectsSearchFilters = (
     filters: ObjectsSearchFilters,
 ): boolean => {
     const selectedTypes = filters.type || []
-    const rooms = (filters.rooms || []).map(Number).filter(Number.isFinite)
     const priceFrom = toFilterNumber(filters.priceFrom)
     const priceTo = toFilterNumber(filters.priceTo)
     const areaFrom = toFilterNumber(filters.areaFrom)
@@ -410,13 +410,10 @@ export const matchesObjectsSearchFilters = (
         return false
     }
 
-    if (rooms.length > 0) {
-        const roomMatched = rooms.some((room) => {
-            if (room >= 4) return property.rooms_count >= 4
-            return property.rooms_count === room
-        })
-
-        if (!roomMatched) return false
+    if (
+        !matchesRealtyRoomFilters(property, filters.rooms || [])
+    ) {
+        return false
     }
 
     if (priceFrom !== undefined && property.price < priceFrom) return false

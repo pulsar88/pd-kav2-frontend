@@ -22,8 +22,11 @@ export const mergePremiseDetails = (
         goodArea: premise.goodArea ?? details.goodArea,
         typeName: premise.typeName ?? details.typeName,
         layout: premise.layout ?? details.layout,
+        layoutName: premise.layoutName ?? details.layoutName,
         layoutImage: premise.layoutImage ?? details.layoutImage,
         floorPlanImage: premise.floorPlanImage ?? details.floorPlanImage,
+        complexImage: premise.complexImage ?? details.complexImage,
+        promoText: premise.promoText ?? details.promoText,
         price: premise.price ?? details.price,
         pricePerSqm: premise.pricePerSqm ?? details.pricePerSqm,
     }

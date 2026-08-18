@@ -7,6 +7,7 @@ import {
     houseStatusLabel,
     houseTypeLabel,
     getPremiseTypeLabel,
+    parseComplexPromoText,
 } from '@/views/objects/utils'
 
 pdfMake.addVirtualFileSystem(pdfFonts)
@@ -23,6 +24,8 @@ export type CommercialProposalManager = {
 
 const IMAGE_WIDTH = 230
 const IMAGE_HEIGHT = 260
+const CONTENT_WIDTH = 515
+const FULL_WIDTH_IMAGE_HEIGHT = 340
 
 const roomsLabel = (rooms: number) =>
     rooms === 0 ? 'Студия' : `${rooms}-комн.`
@@ -35,11 +38,15 @@ const resolveHouseStatusLabel = (premise: Premise) => {
     return premise.buildingState || ''
 }
 
-const resolvePremisePlanImageUrl = (premise: Premise) =>
-    premise.layoutImage ?? premise.floorPlanImage ?? null
+const resolveLayoutImageUrl = (premise: Premise) => premise.layoutImage ?? null
 
-const resolveComplexPlanImageUrl = (premise: Premise) =>
+const resolveFloorPlanImageUrl = (premise: Premise) =>
     premise.floorPlanImage ?? null
+
+const resolveComplexImageUrl = (
+    premise: Premise,
+    complex?: Complex | null,
+) => complex?.image ?? premise.complexImage ?? null
 
 const kv = (label: string, value: string) => ({
     columns: [
@@ -63,10 +70,14 @@ const sectionTitle = (text: string) => ({
     margin: [0, 0, 0, 10] as [number, number, number, number],
 })
 
-const imagePlaceholder = (label: string) => ({
+const imagePlaceholder = (
+    label: string,
+    width = IMAGE_WIDTH,
+    height = IMAGE_HEIGHT,
+) => ({
     table: {
-        widths: [IMAGE_WIDTH],
-        heights: [IMAGE_HEIGHT],
+        widths: [width],
+        heights: [height],
         body: [
             [
                 {
@@ -74,7 +85,7 @@ const imagePlaceholder = (label: string) => ({
                     alignment: 'center' as const,
                     color: '#9CA3AF',
                     fontSize: 11,
-                    margin: [0, IMAGE_HEIGHT / 2 - 8, 0, 0] as [
+                    margin: [0, height / 2 - 8, 0, 0] as [
                         number,
                         number,
                         number,
@@ -92,6 +103,21 @@ const imagePlaceholder = (label: string) => ({
         paddingTop: () => 0,
         paddingBottom: () => 0,
     },
+})
+
+const sectionDivider = () => ({
+    canvas: [
+        {
+            type: 'line',
+            x1: 0,
+            y1: 0,
+            x2: CONTENT_WIDTH,
+            y2: 0,
+            lineWidth: 1,
+            lineColor: '#D1D5DB',
+        },
+    ],
+    margin: [0, 16, 0, 16] as [number, number, number, number],
 })
 
 const toAbsoluteUrl = (url: string) => {
@@ -126,16 +152,39 @@ const fetchImageAsDataUrl = async (url?: string | null) => {
 const buildImageOrPlaceholder = (
     dataUrl: string | null,
     placeholderLabel: string,
+    width = IMAGE_WIDTH,
+    height = IMAGE_HEIGHT,
 ) => {
     if (dataUrl) {
         return {
             image: dataUrl,
-            width: IMAGE_WIDTH,
-            fit: [IMAGE_WIDTH, IMAGE_HEIGHT] as [number, number],
+            width,
+            fit: [width, height] as [number, number],
             alignment: 'center' as const,
         }
     }
-    return imagePlaceholder(placeholderLabel)
+    return imagePlaceholder(placeholderLabel, width, height)
+}
+
+const buildFullWidthImageBlock = (
+    dataUrl: string | null,
+    placeholderLabel: string,
+) => {
+    if (dataUrl) {
+        return {
+            image: dataUrl,
+            width: CONTENT_WIDTH,
+            fit: [CONTENT_WIDTH, FULL_WIDTH_IMAGE_HEIGHT] as [number, number],
+            alignment: 'center' as const,
+            margin: [0, 0, 0, 0] as [number, number, number, number],
+        }
+    }
+
+    return imagePlaceholder(
+        placeholderLabel,
+        CONTENT_WIDTH,
+        FULL_WIDTH_IMAGE_HEIGHT,
+    )
 }
 
 const buildPremiseFields = (premise: Premise) => [
@@ -233,12 +282,244 @@ const buildTwoColumnBlock = (
     },
 ]
 
+const buildComplexPromoContent = (
+    premise: Premise,
+    complex?: Complex | null,
+) => {
+    const { title, features } = parseComplexPromoText(
+        complex?.promoText ?? premise.promoText,
+    )
+
+    if (!title && features.length === 0) {
+        return []
+    }
+
+    const content: Record<string, unknown>[] = [
+        {
+            text: 'Преимущества',
+            style: 'sectionTitle',
+            margin: [0, 16, 0, 8] as [number, number, number, number],
+        },
+    ]
+
+    if (title) {
+        content.push({
+            text: title,
+            style: 'fieldValue',
+            margin: [0, 0, 0, features.length ? 8 : 0] as [
+                number,
+                number,
+                number,
+                number,
+            ],
+        })
+    }
+
+    if (features.length) {
+        content.push({
+            ul: features,
+            style: 'fieldValue',
+            margin: [0, 0, 0, 0] as [number, number, number, number],
+        })
+    }
+
+    return content
+}
+
+const sanitizeFileNamePart = (value: string) =>
+    value.trim().replace(/[\\/:*?"<>|]/g, '')
+
+const formatProposalFileDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}.${month}.${year}`
+}
+
+const buildProposalInfoTitle = (items: CommercialProposalItem[]) => {
+    const segments = items.map(({ premise, complex }) => {
+        const complexName = sanitizeFileNamePart(
+            complex?.name || premise.complexName || 'ЖК',
+        )
+        const number = sanitizeFileNamePart(premise.number)
+        return `${number}-${complexName}`
+    })
+
+    if (segments.length === 1) {
+        return `КП_${segments[0]}`
+    }
+
+    return `КП_${segments.join('_')}_${formatProposalFileDate(new Date())}`
+}
+
+const PREVIEW_WINDOW_NAME = 'commercial-proposal-preview'
+
+const escapeHtml = (value: string) =>
+    value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+
+const resolvePreviewWindow = (
+    previewWindow?: Window | null,
+): Window | null => {
+    if (previewWindow && !previewWindow.closed) {
+        return previewWindow
+    }
+
+    const namedWindow = window.open('', PREVIEW_WINDOW_NAME)
+    if (!namedWindow || namedWindow.closed) {
+        return null
+    }
+
+    return namedWindow
+}
+
+export const openCommercialProposalPreviewWindow = (): Window | null => {
+    const previewWindow = window.open('about:blank', PREVIEW_WINDOW_NAME)
+
+    if (!previewWindow) {
+        return null
+    }
+
+    previewWindow.document.open()
+    previewWindow.document.write(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>Формирование PDF</title>
+    <style>
+        html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #374151;
+            background: #f9fafb;
+        }
+    </style>
+</head>
+<body>Формирование коммерческого предложения…</body>
+</html>`)
+    previewWindow.document.close()
+
+    return previewWindow
+}
+
+const buildProposalPreviewHtml = (pdfUrl: string, fileTitle: string) => {
+    const fileName = `${fileTitle}.pdf`
+    const safeTitle = escapeHtml(fileTitle)
+    const safeFileName = escapeHtml(fileName)
+
+    return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>${safeTitle}</title>
+    <style>
+        html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; background: #111827; }
+        body { display: flex; flex-direction: column; }
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .toolbar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .toolbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .toolbar-hint {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .download-link {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 14px;
+            border-radius: 8px;
+            background: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        iframe {
+            flex: 1;
+            width: 100%;
+            border: 0;
+            background: #111827;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="toolbar-title">${safeTitle}</div>
+        <div class="toolbar-actions">
+            <span class="toolbar-hint">Для сохранения используйте кнопку справа</span>
+            <a class="download-link" href="${pdfUrl}" download="${safeFileName}">Скачать PDF</a>
+        </div>
+    </div>
+    <iframe src="${pdfUrl}" title="${safeTitle}"></iframe>
+    <script>
+        window.addEventListener('beforeunload', function () {
+            URL.revokeObjectURL(${JSON.stringify(pdfUrl)});
+        });
+    </script>
+</body>
+</html>`
+}
+
+const renderProposalPdfPreview = (
+    previewWindow: Window | null | undefined,
+    blob: Blob,
+    fileTitle: string,
+) => {
+    const pdfUrl = URL.createObjectURL(blob)
+    const previewHtml = buildProposalPreviewHtml(pdfUrl, fileTitle)
+    const previewHtmlUrl = URL.createObjectURL(
+        new Blob([previewHtml], { type: 'text/html;charset=utf-8' }),
+    )
+    const targetWindow = resolvePreviewWindow(previewWindow)
+
+    if (!targetWindow) {
+        URL.revokeObjectURL(pdfUrl)
+        URL.revokeObjectURL(previewHtmlUrl)
+        throw new Error('Не удалось открыть окно предпросмотра PDF')
+    }
+
+    targetWindow.location.href = previewHtmlUrl
+}
+
+const openProposalPdfPreview = async (
+    docDefinition: Record<string, unknown>,
+    fileTitle: string,
+    previewWindow: Window | null | undefined,
+) => {
+    const blob = await pdfMake.createPdf(docDefinition).getBlob()
+    renderProposalPdfPreview(previewWindow, blob, fileTitle)
+}
+
 const buildFooter =
     (manager: CommercialProposalManager) =>
     () => ({
         columns: [
             {
-                text: manager.name || '—',
+                text: `Агент: ${manager.name || '—'}`,
                 alignment: 'left' as const,
                 fontSize: 9,
                 color: '#6B7280',
@@ -255,21 +536,34 @@ const buildFooter =
 
 export const downloadCommercialProposalPdf = async (
     items: CommercialProposalItem[],
-    manager?: CommercialProposalManager,
+    manager: CommercialProposalManager | undefined,
+    previewWindow: Window | null | undefined,
 ) => {
-    if (!items.length) return
+    if (!items.length) {
+        resolvePreviewWindow(previewWindow)?.close()
+        return
+    }
 
     const prepared = await Promise.all(
         items.map(async (item) => {
-            const [premisePlanImage, complexPlanImage] = await Promise.all([
-                fetchImageAsDataUrl(resolvePremisePlanImageUrl(item.premise)),
-                fetchImageAsDataUrl(resolveComplexPlanImageUrl(item.premise)),
-            ])
+            const [layoutImage, floorPlanImage, complexImage] =
+                await Promise.all([
+                    fetchImageAsDataUrl(
+                        resolveLayoutImageUrl(item.premise),
+                    ),
+                    fetchImageAsDataUrl(
+                        resolveFloorPlanImageUrl(item.premise),
+                    ),
+                    fetchImageAsDataUrl(
+                        resolveComplexImageUrl(item.premise, item.complex),
+                    ),
+                ])
 
             return {
                 ...item,
-                premisePlanImage,
-                complexPlanImage,
+                layoutImage,
+                floorPlanImage,
+                complexImage,
             }
         }),
     )
@@ -283,34 +577,26 @@ export const downloadCommercialProposalPdf = async (
             },
             ...buildTwoColumnBlock(
                 `Помещение № ${item.premise.number}`,
-                buildImageOrPlaceholder(
-                    item.premisePlanImage,
-                    'Планировка',
-                ),
+                buildImageOrPlaceholder(item.layoutImage, 'Планировка'),
                 buildPremiseFields(item.premise),
             ),
-            {
-                canvas: [
-                    {
-                        type: 'line',
-                        x1: 0,
-                        y1: 0,
-                        x2: 515,
-                        y2: 0,
-                        lineWidth: 1,
-                        lineColor: '#D1D5DB',
-                    },
-                ],
-                margin: [0, 16, 0, 16] as [number, number, number, number],
-            },
+            ...(item.floorPlanImage
+                ? [
+                      sectionDivider(),
+                      sectionTitle('План этажа'),
+                      buildFullWidthImageBlock(
+                          item.floorPlanImage,
+                          'План этажа',
+                      ),
+                      { text: '', pageBreak: 'before' as const },
+                  ]
+                : [sectionDivider()]),
             ...buildTwoColumnBlock(
                 resolveComplexTitle(item.premise, item.complex),
-                buildImageOrPlaceholder(
-                    item.complexPlanImage,
-                    'План этажа',
-                ),
+                buildImageOrPlaceholder(item.complexImage, 'Фото ЖК'),
                 buildComplexFields(item.premise, item.complex),
             ),
+            ...buildComplexPromoContent(item.premise, item.complex),
         ]
 
         if (index < prepared.length - 1) {
@@ -320,6 +606,9 @@ export const downloadCommercialProposalPdf = async (
     })
 
     const docDefinition = {
+        info: {
+            title: buildProposalInfoTitle(items),
+        },
         pageOrientation: 'portrait' as const,
         pageMargins: [40, 40, 40, 56] as [number, number, number, number],
         ...(manager?.name || manager?.phone
@@ -369,5 +658,9 @@ export const downloadCommercialProposalPdf = async (
         },
     }
 
-    pdfMake.createPdf(docDefinition).open()
+    await openProposalPdfPreview(
+        docDefinition,
+        buildProposalInfoTitle(items),
+        previewWindow,
+    )
 }

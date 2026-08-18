@@ -40,6 +40,59 @@ export type ApiFilterParamsValue = string | number | Array<string | number>
 
 export type ApiFilterParams = Record<string, ApiFilterParamsValue>
 
+export type RealtyRoomMatchProperty = {
+    studio?: boolean
+    euro?: boolean
+    rooms_count: number
+    type?: { has_rooms?: boolean; has_layout_type?: boolean }
+}
+
+export const matchesRealtyRoomFilters = (
+    property: RealtyRoomMatchProperty,
+    filterValues: string[],
+): boolean => {
+    if (!filterValues.length) {
+        return true
+    }
+
+    return filterValues.some((filter) => {
+        switch (filter) {
+            case 'studio':
+                return Boolean(property.studio)
+            case 'free_layout':
+                return Boolean(
+                    property.type?.has_layout_type &&
+                        !property.studio &&
+                        property.rooms_count === 0,
+                )
+            case '4':
+                return property.rooms_count >= 4 && !property.studio
+            default:
+                if (filter.endsWith('c')) {
+                    const count = Number(filter.slice(0, -1))
+                    return (
+                        Boolean(property.euro) &&
+                        !property.studio &&
+                        property.rooms_count === count
+                    )
+                }
+
+                {
+                    const count = Number(filter)
+                    if (!Number.isFinite(count)) {
+                        return false
+                    }
+
+                    return (
+                        !property.euro &&
+                        !property.studio &&
+                        property.rooms_count === count
+                    )
+                }
+        }
+    })
+}
+
 export const toAxiosParams = (params: ApiFilterParams) => {
     const searchParams = new URLSearchParams()
 
@@ -96,7 +149,7 @@ export const mapObjectsSearchFiltersToApiParams = (
     }
 
     if (filters.rooms?.length) {
-        params['rooms_count[]'] = filters.rooms
+        params['rooms[]'] = filters.rooms
     }
 
     if (filters.realtyProjectIds?.length) {

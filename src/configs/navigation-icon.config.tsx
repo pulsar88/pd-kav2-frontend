@@ -4,6 +4,8 @@ import {
     PiClipboardTextDuotone,
     PiBuildingsDuotone,
     PiQuestionDuotone,
+    PiNewspaperDuotone,
+    PiCalendarDuotone,
     PiWrenchDuotone,
     PiHeartDuotone,
 } from 'react-icons/pi'
@@ -19,6 +21,8 @@ const navigationIcon: NavigationIcons = {
     profile: <PiUserDuotone />,
     tools: <PiWrenchDuotone />,
     help: <PiQuestionDuotone />,
+    news: <PiNewspaperDuotone />,
+    events: <PiCalendarDuotone />,
 }
 
 export default navigationIcon

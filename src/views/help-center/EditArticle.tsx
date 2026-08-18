@@ -1,32 +1,39 @@
 import { useEffect, useState } from 'react'
-import Button from '@/components/ui/Button'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import Loading from '@/components/shared/Loading'
 import EditArticleHeader from './components/EditArticleHeader'
 import EditArticleBody from './components/EditArticleBody'
+import ArticleFormActions from './components/ArticleFormActions'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
     apiGetSupportHubArticle,
     apiUpdateSupportHubArticle,
 } from '@/services/HelpCenterService'
 import { useNavigate, useParams } from 'react-router'
-import useSWR from 'swr'
-import { TbArrowNarrowLeft, TbDeviceFloppy } from 'react-icons/tb'
+import useSWR, { useSWRConfig } from 'swr'
+import {
+    isPublicationListKey,
+    publicationItemKey,
+} from './helpCenterQuery'
+import { usePublicationKind } from './publicationKind'
 import type { GetSupportHubArticleResponse } from './types'
 
 const EditArticle = () => {
-    const { topic, id } = useParams()
+    const { id } = useParams()
     const navigate = useNavigate()
+    const { mutate } = useSWRConfig()
+    const kind = usePublicationKind()
     const [title, setTitle] = useState('')
+    const [previewText, setPreviewText] = useState('')
     const [content, setContent] = useState('')
-    const [tags, setTags] = useState<{ id: string; label: string }[]>([])
+    const [articleCode, setArticleCode] = useState<string>()
     const [isSaving, setIsSaving] = useState(false)
 
-    const articlePath =
-        topic && id ? `/help/${topic}/${id}` : id ? `/help/${id}` : '/help'
+    const itemPath = id ? `${kind.basePath}/${id}` : kind.basePath
 
     const { data, isLoading } = useSWR(
-        id ? [`/helps/articles/${id}`, { id }] : null,
+        id ? publicationItemKey(id) : null,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         ([_, params]) =>
             apiGetSupportHubArticle<GetSupportHubArticleResponse>(params),
@@ -39,27 +46,61 @@ const EditArticle = () => {
     useEffect(() => {
         if (!data) return
         setTitle(data.title)
+        setPreviewText(data.previewText || '')
         setContent(data.content)
-        setTags(data.tags || [])
+        setArticleCode(data.code)
     }, [data])
 
     const handleSave = async () => {
         if (!id) return
+
+        if (!title.trim()) {
+            toast.push(
+                <Notification type="warning">{kind.titleRequired}</Notification>,
+                { placement: 'top-end' },
+            )
+            return
+        }
+
+        if (!previewText.trim()) {
+            toast.push(
+                <Notification type="warning">
+                    {kind.previewRequired}
+                </Notification>,
+                { placement: 'top-end' },
+            )
+            return
+        }
+
         setIsSaving(true)
         try {
             await apiUpdateSupportHubArticle({
                 id,
-                data: { title, content, tags },
+                data: {
+                    title: title.trim(),
+                    previewText: previewText.trim(),
+                    content,
+                    code: articleCode,
+                    type: kind.type,
+                },
             })
             toast.push(
-                <Notification type="success">Статья сохранена</Notification>,
+                <Notification type="success">{kind.updateSuccess}</Notification>,
                 { placement: 'top-end' },
             )
-            navigate(articlePath)
-        } catch {
+            await mutate(isPublicationListKey(kind.listEndpoint), undefined, {
+                revalidate: true,
+            })
+            if (id) {
+                await mutate(publicationItemKey(id), undefined, {
+                    revalidate: true,
+                })
+            }
+            navigate(itemPath)
+        } catch (error) {
             toast.push(
                 <Notification type="danger">
-                    Не удалось сохранить статью
+                    {getApiErrorMessage(error, kind.updateError)}
                 </Notification>,
                 { placement: 'top-end' },
             )
@@ -69,46 +110,32 @@ const EditArticle = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-[1200px] px-4 pb-28 pt-6">
-            <Loading loading={isLoading}>
-                {data ? (
-                    <div className="flex flex-col gap-4">
-                        <EditArticleHeader
-                            title={title}
-                            authors={data.authors}
-                            updateTime={data.updateTime}
-                            tags={tags}
-                            onTitleChange={setTitle}
-                            onTagsChange={setTags}
-                        />
-                        <EditArticleBody
-                            content={content}
-                            onChange={setContent}
-                        />
-                    </div>
-                ) : null}
-            </Loading>
-
-            <div className="fixed bottom-0 left-0 right-0 z-10 border-t border-gray-200 bg-white py-4 dark:border-gray-700 dark:bg-gray-800">
-                <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4">
-                    <Button
-                        variant="plain"
-                        icon={<TbArrowNarrowLeft />}
-                        onClick={() => navigate(articlePath)}
-                    >
-                        Назад
-                    </Button>
-                    <Button
-                        variant="solid"
-                        icon={<TbDeviceFloppy />}
-                        loading={isSaving}
-                        onClick={() => void handleSave()}
-                    >
-                        Сохранить
-                    </Button>
-                </div>
+        <>
+            <div className="mx-auto w-full min-w-0 max-w-[1200px] pt-6">
+                <Loading loading={isLoading}>
+                    {data ? (
+                        <div className="flex flex-col gap-4">
+                            <EditArticleHeader
+                                title={title}
+                                previewText={previewText}
+                                onTitleChange={setTitle}
+                                onPreviewTextChange={setPreviewText}
+                            />
+                            <EditArticleBody
+                                content={content}
+                                onChange={setContent}
+                            />
+                        </div>
+                    ) : null}
+                </Loading>
             </div>
-        </div>
+            <ArticleFormActions
+                saveLabel="Сохранить"
+                isSaving={isSaving}
+                onBack={() => navigate(itemPath)}
+                onSave={() => void handleSave()}
+            />
+        </>
     )
 }
 

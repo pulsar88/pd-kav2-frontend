@@ -34,7 +34,7 @@ const FavoritePremisesSelected = ({
                     defaultClass="container mx-auto rounded-xl border border-gray-200 px-8 dark:border-gray-600"
                 >
                     <div className="container mx-auto">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <span>
                                 <span className="flex items-center gap-2">
                                     <span className="text-lg text-primary">
@@ -52,10 +52,9 @@ const FavoritePremisesSelected = ({
                                 </span>
                             </span>
 
-                            <div className="flex items-center">
+                            <div className="flex items-center gap-3">
                                 <Button
                                     size="sm"
-                                    className="ltr:mr-3 rtl:ml-3"
                                     type="button"
                                     customColorClass={() =>
                                         'border-error ring-1 ring-error text-error hover:border-error hover:ring-error hover:text-error'

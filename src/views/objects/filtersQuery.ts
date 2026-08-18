@@ -71,8 +71,6 @@ export const parseObjectsSearchFilters = (
 
             if (typedKey === 'rooms') {
                 filters.rooms = values
-                    .map((value) => Number(value))
-                    .filter((value) => Number.isFinite(value))
             }
 
             if (typedKey === 'realtyProjectIds') {

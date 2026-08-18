@@ -38,6 +38,7 @@ const _UserDropdown = () => {
         <Dropdown
             className="flex"
             toggleClassName="flex items-center"
+            menuClass="w-64 max-w-[calc(100vw-2rem)]"
             renderTitle={
                 <div className="cursor-pointer flex items-center">
                     <Avatar size={32} {...avatarProps} />
@@ -46,13 +47,19 @@ const _UserDropdown = () => {
             placement="bottom-end"
         >
             <Dropdown.Item variant="header">
-                <div className="py-2 px-3 flex items-center gap-3">
-                    <Avatar {...avatarProps} />
-                    <div>
-                        <div className="font-bold text-gray-900 dark:text-gray-100">
+                <div className="flex min-w-0 items-center gap-3 px-3 py-2">
+                    <Avatar className="shrink-0" {...avatarProps} />
+                    <div className="min-w-0">
+                        <div
+                            className="truncate font-bold text-gray-900 dark:text-gray-100"
+                            title={userName || undefined}
+                        >
                             {userName || 'Anonymous'}
                         </div>
-                        <div className="text-xs">
+                        <div
+                            className="truncate text-xs"
+                            title={email || undefined}
+                        >
                             {email || 'No email available'}
                         </div>
                     </div>

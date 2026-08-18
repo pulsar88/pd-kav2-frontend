@@ -2,12 +2,17 @@ export type FixationClient = {
     id: string
     fullName: string
     phone: string
+    countryCode?: string
+    isNew?: boolean
+    firstName?: string
+    secondName?: string
+    lastName?: string
 }
 
 export type GetFixationClientsParams = {
     q?: string
     page?: number
-    limit?: number
+    page_size?: number
 }
 
 export type GetFixationClientsResponse = {
@@ -41,13 +46,22 @@ export type CreateFixationRelativePayload = {
     relation: string
 }
 
+/** Базовый payload — совпадает с текущим POST /v2/fixations */
 export type CreateFixationPayload = {
-    clientId: string
-    complexId: string
-    complexName?: string
-    complexAddress?: string
+    objectId: number
+    managerId: number
+    clientId?: number
+    client?: FixationClient
+}
+
+/**
+ * Расширенные поля wizard — пока не отправляются в API.
+ * Когда бэкенд добавит поддержку, раскомментировать маппинг в
+ * mapCreateFixationPayloadToApiBody и включить WIZARD_EXTENDED_FIELDS_ENABLED.
+ */
+export type CreateFixationExtendedPayload = {
     apartmentId?: string
-    managerId?: string
+    propertyId?: number
     relatives?: CreateFixationRelativePayload[]
     note?: string
     desiredArea?: string
@@ -56,6 +70,9 @@ export type CreateFixationPayload = {
     budget?: string
     meetingDate?: string
 }
+
+export type CreateFixationWizardPayload = CreateFixationPayload &
+    Partial<CreateFixationExtendedPayload>
 
 export type CreateFixationClientPayload = {
     lastName: string

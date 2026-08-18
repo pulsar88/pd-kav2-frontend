@@ -13,7 +13,6 @@ type StackedSideNavSecondaryProps = {
     routeKey: string
     onCollapse: () => void
     direction?: Direction
-    translationSetup?: boolean
     userAuthority: string[]
 }
 
@@ -25,7 +24,6 @@ const StackedSideNavSecondary = (props: StackedSideNavSecondaryProps) => {
         routeKey,
         onCollapse,
         direction,
-        translationSetup,
         userAuthority,
         ...rest
     } = props
@@ -58,7 +56,6 @@ const StackedSideNavSecondary = (props: StackedSideNavSecondaryProps) => {
                 <VerticalMenuContent
                     routeKey={routeKey}
                     navigationTree={menu}
-                    translationSetup={translationSetup}
                     userAuthority={userAuthority}
                 />
             </ScrollBar>

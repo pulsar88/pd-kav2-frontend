@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { TbBuilding, TbCalendar, TbHome, TbMapPin, TbRuler } from 'react-icons/tb'
-import { DEFAULT_COMPLEX_IMAGE } from '@/mock/data/premisesData'
+import { DEFAULT_COMPLEX_IMAGE } from '@/views/objects/constants'
 import type { Complex, ObjectsSearchFilters } from '../types'
 import { serializeObjectsSearchFilters, withoutComplexFilters } from '../filtersQuery'
 import { formatCompletionDate, formatPrice } from '../utils'

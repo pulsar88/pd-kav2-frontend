@@ -13,6 +13,7 @@ import type { Fixation } from '../types'
 import {
     fixationStatusMap,
     formatFixationDate,
+    getFixationStatusDisplay,
     getFixationExpiryAccentClass,
 } from '../utils'
 import {
@@ -38,8 +39,12 @@ const FixationsTable = () => {
     const [isExtendSubmitting, setIsExtendSubmitting] = useState(false)
 
     const { data, isLoading } = useSWR(
-        '/api/fixations',
-        () => apiGetFixations(),
+        ['/api/v2/fixations', pageIndex, pageSize],
+        () =>
+            apiGetFixations({
+                page: pageIndex,
+                page_size: pageSize,
+            }),
         {
             revalidateOnFocus: false,
             revalidateIfStale: false,
@@ -48,6 +53,7 @@ const FixationsTable = () => {
     )
 
     const list = data?.list ?? []
+    const total = data?.total ?? 0
 
     useEffect(() => {
         saveFixationColumnVisibility(columnVisibility)
@@ -108,7 +114,7 @@ const FixationsTable = () => {
         if (!query) return list
 
         return list.filter((fixation) => {
-            const statusLabel = fixationStatusMap[fixation.status].label
+            const statusLabel = getFixationStatusDisplay(fixation).label
             const haystack = [
                 fixation.fullName,
                 fixation.phone,
@@ -176,7 +182,9 @@ const FixationsTable = () => {
                 minSize: 120,
                 maxSize: 160,
                 cell: (props) => {
-                    const status = fixationStatusMap[props.row.original.status]
+                    const status = getFixationStatusDisplay(
+                        props.row.original,
+                    )
                     return (
                         <span
                             className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}
@@ -266,10 +274,7 @@ const FixationsTable = () => {
         })
     }, [columnVisibility])
 
-    const pageData = useMemo(() => {
-        const start = (pageIndex - 1) * pageSize
-        return filteredList.slice(start, start + pageSize)
-    }, [filteredList, pageIndex, pageSize])
+    const pageData = filteredList
 
     return (
         <div className="flex flex-col gap-4">
@@ -284,7 +289,7 @@ const FixationsTable = () => {
                 loading={isLoading}
                 noData={!isLoading && pageData.length === 0}
                 pagingData={{
-                    total: filteredList.length,
+                    total: search.trim() ? filteredList.length : total,
                     pageIndex,
                     pageSize,
                 }}

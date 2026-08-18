@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import Container from '@/components/shared/Container'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
-import { useFavoritesStore } from '@/store/favoritesStore'
 import {
     apiGetRealtyObject,
     apiGetRealtyProperty,
@@ -11,8 +10,13 @@ import type { Complex, Premise } from '@/views/objects/types'
 import { formatRuPhone } from '@/views/fixations/utils'
 import FavoritePremisesList from './FavoritePremisesList'
 import FavoritePremisesSelected from './FavoritePremisesSelected'
-import { downloadCommercialProposalPdf } from './downloadCommercialProposalPdf'
-import { enrichPremisesList, mergePremiseDetails } from './utils'
+import {
+    downloadCommercialProposalPdf,
+    openCommercialProposalPreviewWindow,
+} from './downloadCommercialProposalPdf'
+import { mergePremiseDetails } from './utils'
+import toast from '@/components/ui/toast'
+import Notification from '@/components/ui/Notification'
 
 const enrichPremiseForProposal = async (premise: Premise): Promise<Premise> => {
     const details = await apiGetRealtyProperty(premise.id)
@@ -20,18 +24,32 @@ const enrichPremiseForProposal = async (premise: Premise): Promise<Premise> => {
 }
 
 const FavoritePremises = () => {
-    const premises = useFavoritesStore((state) => state.premises)
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [isGenerating, setIsGenerating] = useState(false)
 
     const handleGenerateProposal = async () => {
         if (!selectedIds.length) return
 
+        const previewWindow = openCommercialProposalPreviewWindow()
+        if (!previewWindow) {
+            toast.push(
+                <Notification type="danger">
+                    Не удалось открыть окно предпросмотра. Разрешите
+                    всплывающие окна для этого сайта.
+                </Notification>,
+                { placement: 'top-center' },
+            )
+            return
+        }
+
         setIsGenerating(true)
         try {
-            const selectedPremises = premises.filter((premise) =>
-                selectedIds.includes(premise.id),
-            )
+            const selectedPremises = (
+                await Promise.all(
+                    selectedIds.map((id) => apiGetRealtyProperty(id)),
+                )
+            ).filter((premise): premise is Premise => premise != null)
+
             const enrichedPremises = await Promise.all(
                 selectedPremises.map((premise) =>
                     enrichPremiseForProposal(premise),
@@ -71,7 +89,17 @@ const FavoritePremises = () => {
                         ? formatRuPhone(currentUser.phone)
                         : '',
                 },
+                previewWindow,
             )
+        } catch (error) {
+            previewWindow.close()
+            toast.push(
+                <Notification type="danger">
+                    Не удалось сформировать коммерческое предложение
+                </Notification>,
+                { placement: 'top-center' },
+            )
+            console.error(error)
         } finally {
             setIsGenerating(false)
         }
@@ -106,4 +134,3 @@ const FavoritePremises = () => {
 }
 
 export default FavoritePremises
-

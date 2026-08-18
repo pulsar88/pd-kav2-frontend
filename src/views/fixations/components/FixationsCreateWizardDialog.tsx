@@ -16,9 +16,9 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import {
     apiCreateFixation,
-    apiCreateFixationClient,
     apiGetFixationClients,
     apiGetFixationHouses,
+    apiGetFixationManagers,
 } from '@/services/FixationsService'
 import { apiGetCheckboard } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,7 +41,11 @@ import {
     TbUsers,
 } from 'react-icons/tb'
 import CheckboardClassic from '@/views/objects/components/checkboard/CheckboardClassic'
-import { findBuildingPropertyById } from '@/views/objects/checkboardUtils'
+import CheckboardLegend from '@/views/objects/components/checkboard/CheckboardLegend'
+import {
+    collectStatuses,
+    findBuildingPropertyById,
+} from '@/views/objects/checkboardUtils'
 import type { CheckboardCellLabel } from '@/views/objects/checkboard.types'
 import type {
     FixationApartment,
@@ -66,7 +70,8 @@ type SelectedRelative = {
     relation: string
 }
 
-type ManagerSelection = FixationManager | 'any'
+// type ManagerSelection = FixationManager | 'any' // TODO(api): «Любой менеджер» — когда API поддержит
+type ManagerSelection = FixationManager
 
 type FixationsCreateWizardDialogProps = {
     isOpen: boolean
@@ -91,24 +96,37 @@ type ClientSelectOption = SelectOption & {
 }
 
 const CLIENTS_PAGE_SIZES = [20, 50, 100]
-const ANY_MANAGER_VALUE = 'any'
 
-const STEP_INDEX: Record<Exclude<WizardStep, 'client-create'>, number> = {
+/**
+ * Расширенные шаги wizard (помещение, предпочтения, родственники, комментарий).
+ * UI и state сохранены — скрыты флагом до появления полей в POST /v2/fixations.
+ * После обновления API:
+ * 1. поставить true
+ * 2. раскомментировать маппинг в fixationCreateMapper.ts
+ * 3. раскомментировать поля в CreateFixationApiBody
+ */
+const WIZARD_EXTENDED_FIELDS_ENABLED = false
+
+const STEP_INDEX: Record<
+    Exclude<WizardStep, 'client-create' | 'note'>,
+    number
+> = {
     client: 0,
     complex: 1,
-    note: 2,
-    confirm: 3,
+    confirm: 2,
 }
 
-const STEP_BY_INDEX: Record<number, Exclude<WizardStep, 'client-create'>> = {
+const STEP_BY_INDEX: Record<
+    number,
+    Exclude<WizardStep, 'client-create' | 'note'>
+> = {
     0: 'client',
     1: 'complex',
-    2: 'note',
-    3: 'confirm',
+    2: 'confirm',
 }
 
 const STEP_META: Record<
-    Exclude<WizardStep, 'client-create'>,
+    Exclude<WizardStep, 'client-create' | 'note'>,
     { title: string; description: string }
 > = {
     client: {
@@ -117,13 +135,12 @@ const STEP_META: Record<
     },
     complex: {
         title: 'Дом и менеджер',
-        description:
-            'Выберите дом, квартиру на шахматке и менеджера',
+        description: 'Выберите дом и менеджера',
     },
-    note: {
-        title: 'Предпочтения',
-        description: 'Добавьте пожелания к фиксации при необходимости',
-    },
+    // note: {
+    //     title: 'Предпочтения',
+    //     description: 'Добавьте пожелания к фиксации при необходимости',
+    // },
     confirm: {
         title: 'Подтверждение',
         description: 'Проверьте данные перед созданием фиксации',
@@ -151,6 +168,52 @@ const formatBudgetValue = (value: string) => {
     if (!digits) return ''
 
     return new Intl.NumberFormat('ru-RU').format(Number(digits))
+}
+
+const formatSelectedPremiseLabel = (premise: FixationApartment) => {
+    const parts = [`№ ${premise.number}`]
+
+    if (premise.rooms && premise.rooms > 0) {
+        parts.push(`${premise.rooms}-комн.`)
+    }
+
+    return parts.join(' · ')
+}
+
+type PremiseSelectionControlsProps = {
+    selectedApartment: FixationApartment | null
+    onClearSelection: () => void
+}
+
+const PremiseSelectionControls = ({
+    selectedApartment,
+    onClearSelection,
+}: PremiseSelectionControlsProps) => {
+    if (selectedApartment) {
+        return (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    Выбрано:{' '}
+                    {formatSelectedPremiseLabel(selectedApartment)}
+                </span>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="plain"
+                    onClick={onClearSelection}
+                >
+                    Сбросить
+                </Button>
+            </div>
+        )
+    }
+
+    return (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+            Фиксация будет создана без помещения. Выберите
+            помещение на шахматке ниже, если нужно указать конкретное.
+        </p>
+    )
 }
 
 const SELECT_MENU_CLOSE_SCROLL_PX = 56
@@ -314,8 +377,10 @@ const FixationsCreateWizardDialog = ({
     const [clientsPageSize, setClientsPageSize] = useState(20)
     const [hasClientsLoaded, setHasClientsLoaded] = useState(false)
     const [complexes, setComplexes] = useState<FixationComplex[]>([])
+    const [managers, setManagers] = useState<FixationManager[]>([])
     const [isClientsLoading, setIsClientsLoading] = useState(false)
     const [isComplexesLoading, setIsComplexesLoading] = useState(false)
+    const [isManagersLoading, setIsManagersLoading] = useState(false)
 
     const [clientPhoneQuery, setClientPhoneQuery] = useState('')
     const [clientSearchQuery, setClientSearchQuery] = useState('')
@@ -416,7 +481,7 @@ const FixationsCreateWizardDialog = ({
                 const response = await apiGetFixationClients({
                     q: clientSearchQuery || undefined,
                     page: clientsPageIndex,
-                    limit: clientsPageSize,
+                    page_size: clientsPageSize,
                 })
                 if (!cancelled) {
                     setClients(response.list || [])
@@ -517,6 +582,38 @@ const FixationsCreateWizardDialog = ({
     }, [isOpen, step, initialSelection?.complexId, complexes.length])
 
     useEffect(() => {
+        if (!isOpen || step !== 'complex' || managers.length > 0) {
+            return
+        }
+
+        let cancelled = false
+
+        const loadManagers = async () => {
+            setIsManagersLoading(true)
+            try {
+                const response = await apiGetFixationManagers()
+                if (!cancelled) {
+                    setManagers(response || [])
+                }
+            } catch {
+                if (!cancelled) {
+                    setManagers([])
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsManagersLoading(false)
+                }
+            }
+        }
+
+        void loadManagers()
+
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen, step, managers.length])
+
+    useEffect(() => {
         if (!isOpen || initialSelectionAppliedRef.current) return
         if (!initialSelection?.complexId || complexes.length === 0) return
 
@@ -559,7 +656,7 @@ const FixationsCreateWizardDialog = ({
         setSelectedComplex(complex)
         setSelectedApartment(apartment)
         setSelectedPropertyId(initialSelection.propertyId ?? null)
-        setSelectedManager('any')
+        setSelectedManager(null)
         setIsApartmentCheckboardCollapsed(!apartment)
         initialSelectionAppliedRef.current = true
     }, [complexes, initialSelection, isOpen])
@@ -590,46 +687,37 @@ const FixationsCreateWizardDialog = ({
     }, [selectedComplex])
 
     const managerOptions: SelectOption[] = useMemo(
-        () => [
-            { value: ANY_MANAGER_VALUE, label: 'Любой' },
-            ...(selectedComplex?.managers.map((item) => ({
+        () =>
+            managers.map((item) => ({
                 value: item.id,
                 label: item.fullName,
-            })) ?? []),
-        ],
-        [selectedComplex],
+            })),
+        [managers],
     )
 
     const selectedManagerOption = useMemo(() => {
-        if (selectedManager === 'any') {
-            return (
-                managerOptions.find(
-                    (item) => item.value === ANY_MANAGER_VALUE,
-                ) || null
-            )
+        if (!selectedManager) {
+            return null
         }
 
-        if (selectedManager) {
-            return (
-                managerOptions.find(
-                    (item) => item.value === selectedManager.id,
-                ) || null
-            )
-        }
-
-        return null
+        return (
+            managerOptions.find((item) => item.value === selectedManager.id) ||
+            null
+        )
     }, [managerOptions, selectedManager])
 
     const currentStepIndex =
-        step === 'client-create' ? STEP_INDEX.client : STEP_INDEX[step]
+        step === 'client-create'
+            ? STEP_INDEX.client
+            : step === 'note'
+              ? STEP_INDEX.confirm
+              : STEP_INDEX[step]
     const checkboardLabelMode: CheckboardCellLabel = 'number'
 
     const canGoToStep = (index: number) => {
         if (index === 0) return true
         if (index === 1) return Boolean(selectedClient)
         if (index === 2)
-            return Boolean(selectedClient && selectedComplex && selectedManager)
-        if (index === 3)
             return Boolean(selectedClient && selectedComplex && selectedManager)
         return false
     }
@@ -654,14 +742,23 @@ const FixationsCreateWizardDialog = ({
     const handleCreateClient = async (values: ClientCreateSchema) => {
         try {
             setIsCreatingClient(true)
-            const client = await apiCreateFixationClient({
+            const fullName = [values.lastName, values.firstName, values.middleName]
+                .map((part) => part?.trim())
+                .filter(Boolean)
+                .join(' ')
+
+            const client: FixationClient = {
+                id: `new-${Date.now()}`,
+                fullName,
+                phone: values.phone,
+                isNew: true,
                 lastName: values.lastName,
                 firstName: values.firstName,
-                middleName: values.middleName,
-                phone: values.phone,
-            })
+                secondName: values.middleName,
+                countryCode: 'RU',
+            }
+
             setSelectedClient(client)
-            setClients((prev) => [client, ...prev])
             setSelectedRelatives((prev) =>
                 prev.filter((relative) => relative.client.id !== client.id),
             )
@@ -669,7 +766,7 @@ const FixationsCreateWizardDialog = ({
             setStep('complex')
             toast.push(
                 <Notification type="success">
-                    Клиент создан и выбран
+                    Клиент заполнен и выбран
                 </Notification>,
                 { placement: 'top-center' },
             )
@@ -677,7 +774,7 @@ const FixationsCreateWizardDialog = ({
             const message =
                 err instanceof Error
                     ? err.message
-                    : 'Не удалось создать клиента'
+                    : 'Не удалось сохранить данные клиента'
             toast.push(<Notification type="danger">{message}</Notification>, {
                 placement: 'top-center',
             })
@@ -692,7 +789,7 @@ const FixationsCreateWizardDialog = ({
         setSelectedComplex(complex)
         setSelectedApartment(null)
         setSelectedPropertyId(null)
-        setSelectedManager(complex ? 'any' : null)
+        setSelectedManager(null)
         setIsApartmentCheckboardCollapsed(true)
         setIsCheckboardFullscreen(false)
     }
@@ -713,6 +810,14 @@ const FixationsCreateWizardDialog = ({
                 revalidateOnReconnect: false,
             },
         )
+
+    const checkboardStatuses = useMemo(
+        () =>
+            selectedComplexCheckboard
+                ? collectStatuses(selectedComplexCheckboard)
+                : [],
+        [selectedComplexCheckboard],
+    )
 
     const openCheckboardFullscreen = () => {
         setIsApartmentCheckboardCollapsed(false)
@@ -757,6 +862,11 @@ const FixationsCreateWizardDialog = ({
         })
     }
 
+    const clearPremiseSelection = () => {
+        setSelectedApartment(null)
+        setSelectedPropertyId(null)
+    }
+
     const toClientOption = useCallback(
         (client: FixationClient): ClientSelectOption => ({
             value: client.id,
@@ -776,7 +886,7 @@ const FixationsCreateWizardDialog = ({
             const response = await apiGetFixationClients({
                 q: inputValue.trim() || undefined,
                 page: 1,
-                limit: 20,
+                page_size: 20,
             })
 
             return response.list
@@ -881,13 +991,9 @@ const FixationsCreateWizardDialog = ({
         }
 
         if (selectedApartment) {
-            let apartment = `кв. ${selectedApartment.number}`
-            if (selectedApartment.rooms) {
-                apartment += ` · ${selectedApartment.rooms}-комн.`
-            }
-            parts.push(apartment)
+            parts.push(formatSelectedPremiseLabel(selectedApartment))
         } else if (selectedComplex) {
-            parts.push('Квартира не указана')
+            parts.push('Помещение не указано')
         }
 
         return parts.length > 0 ? parts.join(' · ') : undefined
@@ -899,27 +1005,28 @@ const FixationsCreateWizardDialog = ({
         try {
             setIsSubmitting(true)
             await apiCreateFixation({
-                clientId: selectedClient.id,
-                complexId: selectedComplex.id,
-                complexName: selectedComplex.name,
-                complexAddress: selectedComplex.address,
-                apartmentId: selectedApartment?.id,
-                managerId:
-                    selectedManager === 'any'
-                        ? undefined
-                        : selectedManager.id,
-                relatives: selectedRelatives.map((relative) => ({
-                    clientId: relative.client.id,
-                    relation: relative.relation,
-                })),
-                note: note.trim() || undefined,
-                desiredArea: desiredArea || undefined,
-                desiredRooms: desiredRooms || undefined,
-                paymentFormat: paymentFormat || undefined,
-                budget: budget.trim() || undefined,
-                meetingDate: meetingDate || undefined,
+                objectId: Number(selectedComplex.id),
+                managerId: Number(selectedManager.id),
+                ...(selectedClient.isNew
+                    ? { client: selectedClient }
+                    : { clientId: Number(selectedClient.id) }),
+                // TODO(api): раскомментировать вместе с WIZARD_EXTENDED_FIELDS_ENABLED
+                // apartmentId: selectedApartment?.id,
+                // propertyId: selectedPropertyId ?? undefined,
+                // relatives: selectedRelatives.map((relative) => ({
+                //     clientId: relative.client.id,
+                //     relation: relative.relation,
+                // })),
+                // note: note.trim() || undefined,
+                // desiredArea: desiredArea || undefined,
+                // desiredRooms: desiredRooms || undefined,
+                // paymentFormat: paymentFormat || undefined,
+                // budget: budget.trim() || undefined,
+                // meetingDate: meetingDate || undefined,
             })
-            await mutate('/api/fixations')
+            await mutate((key) =>
+                Array.isArray(key) && key[0] === '/api/v2/fixations',
+            )
             toast.push(
                 <Notification type="success">Фиксация создана</Notification>,
                 { placement: 'top-center' },
@@ -943,9 +1050,11 @@ const FixationsCreateWizardDialog = ({
             ? {
                   title: 'Создать клиента',
                   description:
-                      'Заполните данные — клиент будет создан и сразу выбран',
+                      'Заполните данные — клиент будет создан вместе с фиксацией',
               }
-            : STEP_META[step]
+            : step === 'note'
+              ? STEP_META.confirm
+              : STEP_META[step as Exclude<WizardStep, 'client-create' | 'note'>]
 
     const isClientStep = step === 'client' || step === 'client-create'
 
@@ -954,19 +1063,25 @@ const FixationsCreateWizardDialog = ({
         <Dialog
             isOpen={isOpen}
             width={820}
-            height={isClientStep ? '90vh' : undefined}
-            className={
-                isClientStep
-                    ? 'h-[90vh] max-h-[90vh]'
-                    : 'max-h-[calc(100dvh-4rem)]'
+            height={
+                isClientStep ? 'min(90vh, calc(100dvh - 8rem))' : undefined
             }
+            className="max-h-[calc(100dvh-8rem)]"
+            style={{
+                content: {
+                    position: 'fixed',
+                    inset: 'unset',
+                    top: '50%',
+                    left: '50%',
+                    margin: 0,
+                    transform: 'translate(-50%, -50%)',
+                },
+            }}
             onClose={onClose}
             onRequestClose={onClose}
             contentClassName={classNames(
-                'flex min-h-0 flex-col overflow-hidden !p-4 sm:!p-6',
-                isClientStep
-                    ? 'h-full max-h-[90vh]'
-                    : 'max-h-[calc(100dvh-4rem)]',
+                'flex min-h-0 flex-col overflow-hidden !p-4 sm:!p-6 !my-0 max-h-[calc(100dvh-8rem)]',
+                isClientStep && 'h-full',
             )}
         >
             <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -979,7 +1094,9 @@ const FixationsCreateWizardDialog = ({
                     >
                         <Steps.Item title="Клиент" />
                         <Steps.Item title="Дом" />
-                        <Steps.Item title="Предпочтения" />
+                        {WIZARD_EXTENDED_FIELDS_ENABLED ? (
+                            <Steps.Item title="Предпочтения" />
+                        ) : null}
                         <Steps.Item title="Итог" />
                     </Steps>
                     <h5 className="mb-1 text-base font-semibold sm:text-lg">
@@ -1304,8 +1421,13 @@ const FixationsCreateWizardDialog = ({
                                 <FormItem asterisk label="Менеджер">
                                     <Select
                                         {...selectMenuProps}
+                                        isLoading={isManagersLoading}
                                         isDisabled={!selectedComplex}
-                                        placeholder="Выберите менеджера"
+                                        placeholder={
+                                            isManagersLoading
+                                                ? 'Загрузка менеджеров...'
+                                                : 'Выберите менеджера'
+                                        }
                                         options={managerOptions}
                                         value={selectedManagerOption}
                                         onChange={(option) => {
@@ -1318,21 +1440,16 @@ const FixationsCreateWizardDialog = ({
                                                 return
                                             }
 
-                                            if (value === ANY_MANAGER_VALUE) {
-                                                setSelectedManager('any')
-                                                return
-                                            }
-
                                             const manager =
-                                                selectedComplex?.managers.find(
-                                                    (item) =>
-                                                        item.id === value,
+                                                managers.find(
+                                                    (item) => item.id === value,
                                                 ) || null
                                             setSelectedManager(manager)
                                         }}
                                     />
                                 </FormItem>
-                                <FormItem className="min-w-0" label="Квартира (необязательно)">
+                                {WIZARD_EXTENDED_FIELDS_ENABLED ? (
+                                <FormItem className="min-w-0" label="Помещение (необязательно)">
                                     {!selectedComplex ? (
                                         <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
                                             Сначала выберите дом
@@ -1360,13 +1477,15 @@ const FixationsCreateWizardDialog = ({
                                                 >
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                            Выбор квартиры на шахматке
+                                                            Выбор помещения на шахматке
                                                         </p>
-                                                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                                            {selectedApartment
-                                                                ? `Выбрано: кв. ${selectedApartment.number}`
-                                                                : 'Квартира не выбрана'}
-                                                        </p>
+                                                        {selectedApartment ? (
+                                                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                {formatSelectedPremiseLabel(
+                                                                    selectedApartment,
+                                                                )}
+                                                            </p>
+                                                        ) : null}
                                                     </div>
                                                     <HiChevronDown
                                                         className={classNames(
@@ -1393,31 +1512,26 @@ const FixationsCreateWizardDialog = ({
 
                                             {!isApartmentCheckboardCollapsed ? (
                                                 <>
-                                                    <div className="mt-3 mb-3 flex flex-wrap items-center gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant={
-                                                                selectedApartment ===
-                                                                null
-                                                                    ? 'solid'
-                                                                    : 'default'
+                                                    <div className="mt-3 mb-3">
+                                                        <PremiseSelectionControls
+                                                            selectedApartment={
+                                                                selectedApartment
                                                             }
-                                                            onClick={() => {
-                                                                setSelectedApartment(
-                                                                    null,
-                                                                )
-                                                                setSelectedPropertyId(
-                                                                    null,
-                                                                )
-                                                            }}
-                                                        >
-                                                            Без квартиры
-                                                        </Button>
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                            Выберите квартиру на шахматке объекта
-                                                        </span>
+                                                            onClearSelection={
+                                                                clearPremiseSelection
+                                                            }
+                                                        />
                                                     </div>
+
+                                                    {checkboardStatuses.length > 0 ? (
+                                                        <div className="mb-3">
+                                                            <CheckboardLegend
+                                                                statuses={
+                                                                    checkboardStatuses
+                                                                }
+                                                            />
+                                                        </div>
+                                                    ) : null}
 
                                                     <div className="checkboard-scroll min-w-0 w-full max-w-full touch-pan-x overflow-x-auto overflow-y-visible rounded-lg border border-gray-200 p-2 dark:border-gray-700">
                                                     {selectedComplexCheckboard ? (
@@ -1437,25 +1551,16 @@ const FixationsCreateWizardDialog = ({
                                                         />
                                                     ) : null}
                                                     </div>
-
-                                                    {selectedApartment ? (
-                                                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                            Выбрано: кв.{' '}
-                                                            {selectedApartment.number}
-                                                            {selectedApartment.rooms
-                                                                ? ` · ${selectedApartment.rooms}-комн.`
-                                                                : ''}
-                                                        </p>
-                                                    ) : null}
                                                 </>
                                             ) : null}
                                         </div>
                                     )}
                                 </FormItem>
+                                ) : null}
                             </div>
                     ) : null}
 
-                    {step === 'note' ? (
+                    {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'note' ? (
                         <div className="grid gap-4 md:grid-cols-2">
                             <FormItem label="Желаемая площадь от, м²">
                                 <Select
@@ -1698,28 +1803,26 @@ const FixationsCreateWizardDialog = ({
                             />
                             <SummaryCard
                                 icon={<TbBuilding />}
-                                label="Дом и квартира"
+                                label="Дом"
                                 title={selectedComplex?.name || '—'}
-                                subtitle={propertySubtitle}
+                                subtitle={
+                                    WIZARD_EXTENDED_FIELDS_ENABLED
+                                        ? propertySubtitle
+                                        : selectedComplex?.address
+                                }
                                 isFilled={Boolean(selectedComplex)}
                                 onEdit={() => setStep('complex')}
                             />
                             <SummaryCard
                                 icon={<TbUsers />}
                                 label="Менеджер"
-                                title={
-                                    selectedManager === 'any'
-                                        ? 'Любой'
-                                        : selectedManager?.fullName || '—'
-                                }
-                                subtitle={
-                                    selectedManager === 'any'
-                                        ? undefined
-                                        : selectedManager?.phone
-                                }
+                                title={selectedManager?.fullName || '—'}
+                                subtitle={selectedManager?.phone}
                                 isFilled={Boolean(selectedManager)}
                                 onEdit={() => setStep('complex')}
                             />
+                            {WIZARD_EXTENDED_FIELDS_ENABLED ? (
+                                <>
                             <SummaryCard
                                 icon={<TbUsers />}
                                 label="Родственники"
@@ -1755,6 +1858,8 @@ const FixationsCreateWizardDialog = ({
                                 scrollableContent
                                 onEdit={() => setStep('note')}
                             />
+                                </>
+                            ) : null}
                         </div>
                     ) : null}
                 </div>
@@ -1767,8 +1872,7 @@ const FixationsCreateWizardDialog = ({
                             icon={<TbArrowLeft />}
                             onClick={() => {
                                 if (step === 'complex') setStep('client')
-                                if (step === 'note') setStep('complex')
-                                if (step === 'confirm') setStep('note')
+                                if (step === 'confirm') setStep('complex')
                             }}
                         >
                             Назад
@@ -1786,12 +1890,12 @@ const FixationsCreateWizardDialog = ({
                                     variant="solid"
                                     className="w-full sm:w-auto"
                                     disabled={!canProceedFromComplex}
-                                    onClick={() => setStep('note')}
+                                    onClick={() => setStep('confirm')}
                                 >
                                     Далее
                                 </Button>
                             ) : null}
-                            {step === 'note' ? (
+                            {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'note' ? (
                                 <Button
                                     variant="solid"
                                     className="w-full sm:w-auto"
@@ -1836,53 +1940,48 @@ const FixationsCreateWizardDialog = ({
                     ? Math.max(window.innerWidth - 24, 320)
                     : 1200
             }
-            className="!mx-3 !my-3 max-h-[95dvh] w-[calc(100vw-1.5rem)] max-w-[calc(100vw-1.5rem)]"
-            overlayClassName="!z-[60]"
-            contentClassName="flex max-h-[95dvh] min-h-0 flex-col overflow-hidden !p-4 sm:!p-5"
+            height="100%"
+            className="!relative !m-0 !h-full !max-h-full !w-full !max-w-full"
+            overlayClassName="!z-[60] !box-border !flex !flex-col !p-3"
+            contentClassName="flex h-full max-h-full min-h-0 flex-col overflow-hidden !mx-0 !my-0 !p-4 sm:!p-5"
+            style={{
+                content: {
+                    position: 'relative',
+                    inset: 'unset',
+                    top: 'auto',
+                    left: 'auto',
+                    right: 'auto',
+                    bottom: 'auto',
+                    margin: 0,
+                    transform: 'none',
+                    flex: '1 1 auto',
+                    minHeight: 0,
+                },
+            }}
             onClose={() => setIsCheckboardFullscreen(false)}
             onRequestClose={() => setIsCheckboardFullscreen(false)}
         >
-            <div className="flex max-h-[calc(95dvh-2rem)] min-h-0 flex-col gap-3">
+            <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
                 <div className="shrink-0 pr-10">
                     <h5 className="mb-1 text-base font-semibold sm:text-lg">
-                        Выбор квартиры на шахматке
+                        Выбор помещения на шахматке
                     </h5>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedComplex?.name
-                            ? `${selectedComplex.name} · `
-                            : ''}
-                        {selectedApartment
-                            ? `выбрано: кв. ${selectedApartment.number}`
-                            : 'выберите помещение или продолжите без квартиры'}
+                        {selectedComplex?.name || '—'}
                     </p>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                            selectedApartment === null ? 'solid' : 'default'
-                        }
-                        onClick={() => {
-                            setSelectedApartment(null)
-                            setSelectedPropertyId(null)
-                        }}
-                    >
-                        Без квартиры
-                    </Button>
-                    {selectedApartment ? (
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                            кв. {selectedApartment.number}
-                            {selectedApartment.rooms
-                                ? ` · ${selectedApartment.rooms}-комн.`
-                                : ''}
-                        </span>
-                    ) : null}
-                </div>
+                <PremiseSelectionControls
+                    selectedApartment={selectedApartment}
+                    onClearSelection={clearPremiseSelection}
+                />
+
+                {checkboardStatuses.length > 0 ? (
+                    <CheckboardLegend statuses={checkboardStatuses} />
+                ) : null}
 
                 <div
-                    className="checkboard-scroll min-h-0 min-w-0 max-h-[calc(95dvh-12rem)] overflow-x-auto overflow-y-auto overscroll-y-auto rounded-xl border border-gray-200 p-2 dark:border-gray-700"
+                    className="checkboard-scroll min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-auto max-h-[calc(100dvh-14rem)] rounded-xl border border-gray-200 p-2 dark:border-gray-700"
                 >
                     {isCheckboardLoading ? (
                         <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">

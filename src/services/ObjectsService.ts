@@ -7,6 +7,7 @@ import type {
     PremiseType,
     ObjectsSearchFilters,
     RealtyProject,
+    RealtyPropertiesFilters,
     RealtyPropertyTypeCode,
 } from '@/views/objects/types'
 import {
@@ -33,6 +34,7 @@ type RealtyObjectApi = {
     address?: string
     external_id?: number
     image?: RealtyPropertyImageApi | string | null
+    project?: RealtyProjectApi | null
 }
 
 type RealtyPropertyTypeApi = {
@@ -63,6 +65,7 @@ type RealtyObjectBriefApi = {
     building_state?: string
     development_start?: string
     development_end?: string
+    image?: RealtyPropertyImageApi | string | null
 }
 
 type RealtyFloorPlanApi = {
@@ -95,12 +98,13 @@ type RealtyPropertyApi = {
     realty_object?: RealtyObjectBriefApi | null
     object_id?: number
     object?: RealtyObjectBriefApi | null
+    project?: RealtyProjectApi | null
 }
 
-const REALTY_PROPERTY_WITH =
-    'preset.image,object,realtyFloor.floorPlan'
+export const REALTY_PROPERTY_WITH =
+    'preset.image,object,realtyFloor.floorPlan,project,object.image'
 
-const REALTY_OBJECT_WITH = 'image'
+const REALTY_OBJECT_WITH = 'image,project'
 
 type PaginatedApiMeta = {
     current_page: number
@@ -166,11 +170,12 @@ const resolveFloorPlanImageUrl = (
     return plan.src || plan.url
 }
 
+const resolvePremiseLayoutName = (item: RealtyPropertyApi) =>
+    item.preset?.name ? `Планировка ${item.preset.name}` : undefined
+
 const resolvePremiseLayoutLabel = (item: RealtyPropertyApi) => {
     const sectionLabel = item.section ? `Секция ${item.section}` : undefined
-    const presetLabel = item.preset?.name
-        ? `Планировка ${item.preset.name}`
-        : undefined
+    const presetLabel = resolvePremiseLayoutName(item)
 
     if (sectionLabel && presetLabel) {
         return `${sectionLabel} · ${presetLabel}`
@@ -216,9 +221,30 @@ type RealtyPropertySummaryApi = {
 
 type SummaryApiResponse = PaginatedApiResponse<RealtyPropertySummaryApi>
 
+type RealtyFilterOptionApi = {
+    value: string
+    code: string
+    name: string
+}
+
+type RealtyPropertiesFiltersApiResponse = {
+    projects: RealtyProjectApi[]
+    realty_types: RealtyFilterOptionApi[]
+    realty_rooms: RealtyFilterOptionApi[]
+}
+
+const mapRealtyFilterOption = (
+    item: RealtyFilterOptionApi,
+): { value: string; label: string } => ({
+    value: item.value,
+    label: item.name,
+})
+
 type RealtyProjectApi = {
     id: number
     name: string
+    external_id?: number
+    promo_text?: string | null
 }
 
 type RealtyProjectsApiResponse =
@@ -263,6 +289,7 @@ const mapRealtyObjectToComplex = (item: RealtyObjectApi): Complex => ({
     image: resolveRealtyObjectImageUrl(item.image),
     address: item.address?.trim() || undefined,
     completionDate: item.development_end?.trim() || undefined,
+    promoText: item.project?.promo_text?.trim() || undefined,
 })
 
 const mapRealtyPropertySummaryToComplex = (
@@ -310,9 +337,10 @@ const mapRealtyObjectFields = (realtyObject?: RealtyObjectBriefApi | null) => ({
     houseStatus: mapBuildingStateToHouseStatus(realtyObject?.building_state),
     developmentStart: realtyObject?.development_start?.trim() || undefined,
     deliveryDate: realtyObject?.development_end?.trim() || undefined,
+    complexImage: resolveRealtyObjectImageUrl(realtyObject?.image),
 })
 
-const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => {
+export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => {
     const realtyObject = item.object ?? item.realty_object
     const objectFields = mapRealtyObjectFields(realtyObject)
 
@@ -332,8 +360,10 @@ const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => {
         price: item.price,
         pricePerSqm: item.price_per_sqm,
         layout: resolvePremiseLayoutLabel(item),
+        layoutName: resolvePremiseLayoutName(item),
         layoutImage: resolvePresetImageUrl(item.preset),
         floorPlanImage: resolveFloorPlanImageUrl(item.realty_floor),
+        promoText: item.project?.promo_text?.trim() || undefined,
         ...objectFields,
         complexId:
             objectFields.complexId ??
@@ -400,6 +430,22 @@ export async function apiGetRealtyProjects(): Promise<RealtyProject[]> {
     return unwrapRealtyProjectsResponse(response).map(
         mapRealtyProjectApiToProject,
     )
+}
+
+export async function apiGetRealtyPropertiesFilters(): Promise<RealtyPropertiesFilters> {
+    const response =
+        await ApiService.fetchDataWithAxios<RealtyPropertiesFiltersApiResponse>(
+            {
+                url: endpointConfig.realtyPropertiesFilters,
+                method: 'get',
+            },
+        )
+
+    return {
+        projects: response.projects.map(mapRealtyProjectApiToProject),
+        realtyTypes: response.realty_types.map(mapRealtyFilterOption),
+        realtyRooms: response.realty_rooms.map(mapRealtyFilterOption),
+    }
 }
 
 export async function apiGetRealtyProperties(

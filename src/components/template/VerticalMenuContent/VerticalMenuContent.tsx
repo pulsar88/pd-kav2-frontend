@@ -21,7 +21,6 @@ export interface VerticalMenuContentProps {
     navigationTree?: NavigationTree[]
     onMenuItemClick?: () => void
     direction?: Direction
-    translationSetup?: boolean
     userAuthority: string[]
 }
 
@@ -36,11 +35,10 @@ const VerticalMenuContent = (props: VerticalMenuContentProps) => {
         navigationTree = [],
         onMenuItemClick,
         direction = themeConfig.direction,
-        translationSetup,
         userAuthority,
     } = props
 
-    const { t } = useTranslation(!translationSetup)
+    const { t } = useTranslation()
 
     const [defaulExpandKey, setDefaulExpandKey] = useState<string[]>([])
 

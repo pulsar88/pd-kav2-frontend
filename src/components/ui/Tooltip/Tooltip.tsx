@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import classNames from 'classnames'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import Arrow from './Arrow'
 import type { CommonProps } from '../@types/common'
 import type { ArrowPlacement } from './Arrow'
@@ -48,7 +48,7 @@ const Tooltip = (props: TooltipProps) => {
     const defaultTooltipClass = `tooltip ${tooltipColor.background}`
 
     const { refs, floatingStyles, context } = useFloating({
-        open: isOpen,
+        open: tooltipOpen,
         onOpenChange: (open) => {
             if (!disabled) {
                 setTooltipOpen(open)
@@ -86,46 +86,37 @@ const Tooltip = (props: TooltipProps) => {
             >
                 {children}
             </span>
-            <FloatingPortal>
-                {tooltipOpen && (
-                    <AnimatePresence>
-                        <motion.div
-                            ref={refs.setFloating}
-                            className={classNames(
-                                defaultTooltipClass,
-                                className,
-                            )}
-                            initial={{
-                                opacity: 0,
-                                visibility: 'hidden',
-                            }}
-                            animate={
-                                tooltipOpen
-                                    ? {
-                                          opacity: 1,
-                                          visibility: 'visible',
-                                      }
-                                    : {
-                                          opacity: 0,
-                                          visibility: 'hidden',
-                                      }
-                            }
-                            transition={{
-                                duration: 0.15,
-                                type: 'tween',
-                            }}
-                            style={floatingStyles}
-                            {...getFloatingProps()}
-                        >
-                            <span>{title}</span>
-                            <Arrow
-                                placement={context.placement}
-                                color={tooltipColor.arrow}
-                            />
-                        </motion.div>
-                    </AnimatePresence>
-                )}
-            </FloatingPortal>
+            {tooltipOpen ? (
+                <FloatingPortal>
+                    <motion.div
+                        ref={refs.setFloating}
+                        className={classNames(
+                            defaultTooltipClass,
+                            className,
+                        )}
+                        initial={{
+                            opacity: 0,
+                            visibility: 'hidden',
+                        }}
+                        animate={{
+                            opacity: 1,
+                            visibility: 'visible',
+                        }}
+                        transition={{
+                            duration: 0.15,
+                            type: 'tween',
+                        }}
+                        style={floatingStyles}
+                        {...getFloatingProps()}
+                    >
+                        <span>{title}</span>
+                        <Arrow
+                            placement={context.placement}
+                            color={tooltipColor.arrow}
+                        />
+                    </motion.div>
+                </FloatingPortal>
+            ) : null}
         </>
     )
 }

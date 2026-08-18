@@ -1,4 +1,4 @@
-import type { FixationHistoryType, FixationStatus } from './types'
+import type { Fixation, FixationHistoryType, FixationStatus } from './types'
 
 export const fixationKinshipOptions = [
     { value: 'spouse', label: 'Супруг / супруга' },
@@ -21,31 +21,60 @@ export const fixationStatusMap: Record<
     FixationStatus,
     { label: string; className: string }
 > = {
+    pending: {
+        label: 'В ожидании',
+        className:
+            'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
+    },
+    denied: {
+        label: 'Отклонена',
+        className:
+            'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
+    },
     fixed: {
         label: 'Фиксирована',
         className:
             'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
     },
-    expired: {
-        label: 'Истекла',
+    registration: {
+        label: 'Оформление',
         className:
-            'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+            'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300',
     },
-    rejected: {
-        label: 'Отклонена',
+    success: {
+        label: 'Успешно',
         className:
-            'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
+            'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
+    },
+    failed: {
+        label: 'Не реализована',
+        className:
+            'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
     },
     deleted: {
         label: 'Удалена',
         className:
             'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300',
     },
-    not_realized: {
-        label: 'Не реализована',
-        className:
-            'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
-    },
+}
+
+export const getFixationStatusDisplay = (
+    fixation: Pick<Fixation, 'status' | 'statusLabel'>,
+) => {
+    const meta = fixationStatusMap[fixation.status]
+
+    if (!meta) {
+        return {
+            label: fixation.statusLabel ?? fixation.status,
+            className:
+                'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300',
+        }
+    }
+
+    return {
+        label: fixation.statusLabel ?? meta.label,
+        className: meta.className,
+    }
 }
 
 export const fixationHistoryTypeMap: Record<
@@ -229,6 +258,24 @@ export const formatRuPhone = (input: string) => {
     ].filter((part) => part.length > 0)
 
     return `+7 ${parts.join(' ')}`
+}
+
+export const formatFixationPhone = (value?: string | null) => {
+    const trimmed = value?.trim()
+    if (!trimmed || trimmed === '—') {
+        return '—'
+    }
+
+    return formatRuPhone(trimmed) || trimmed
+}
+
+export const serializeRuPhoneForApi = (input: string) => {
+    const digits = normalizeRuPhoneDigits(input)
+    if (!digits) {
+        return input.replace(/\s/g, '')
+    }
+
+    return `+7${digits}`
 }
 
 export const RU_PHONE_REGEX = /^\+7 9\d{2} \d{3} \d{2} \d{2}$/

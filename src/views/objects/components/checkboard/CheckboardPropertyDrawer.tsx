@@ -7,7 +7,10 @@ import ImageGallery from '@/components/shared/ImageGallery'
 import Loading from '@/components/shared/Loading'
 import useResponsive from '@/utils/hooks/useResponsive'
 import classNames from '@/utils/classNames'
+import Notification from '@/components/ui/Notification'
+import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { TbHeart, TbHeartFilled, TbLayoutGrid, TbPlus, TbZoomIn } from 'react-icons/tb'
 import type { FlatCheckboardProperty } from '../../checkboard.types'
 import type { Premise } from '../../types'
@@ -113,7 +116,7 @@ const CheckboardPropertyDrawer = ({
 
     const isFavorite = useFavoritesStore((state) =>
         favoritePremise
-            ? state.premises.some((item) => item.id === favoritePremise.id)
+            ? state.favoriteIds.includes(favoritePremise.id)
             : false,
     )
 
@@ -208,7 +211,18 @@ const CheckboardPropertyDrawer = ({
                                 onClick={(event) => {
                                     event.stopPropagation()
                                     if (!favoritePremise) return
-                                    togglePremise(favoritePremise)
+                                    void togglePremise(favoritePremise).catch(
+                                        (error) => {
+                                            toast.push(
+                                                <Notification type="danger">
+                                                    {getApiErrorMessage(
+                                                        error,
+                                                        'Не удалось обновить избранное',
+                                                    )}
+                                                </Notification>,
+                                            )
+                                        },
+                                    )
                                 }}
                             >
                                 {isFavorite

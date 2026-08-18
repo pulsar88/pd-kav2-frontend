@@ -28,13 +28,10 @@ import type { CheckboardCellLabel } from './checkboard.types'
 import type { Complex, ObjectsSearchFilters } from './types'
 
 import {
-
     collectStatuses,
-
     findBuildingPropertyById,
     flattenBuildingProperties,
     matchesObjectsSearchFilters,
-
 } from './checkboardUtils'
 
 import CheckboardClassic from './components/checkboard/CheckboardClassic'
@@ -54,8 +51,6 @@ import {
     serializeObjectsSearchFilters,
     withoutComplexFilters,
 } from './filtersQuery'
-
-
 
 const { TabList, TabNav, TabContent } = Tabs
 
@@ -78,14 +73,10 @@ const syncSearchStateInUrl = (
 }
 
 const ComplexCheckboard = () => {
-
     const { id } = useParams()
 
     const navigate = useNavigate()
-    const initialFilters = useMemo(
-        () => createEmptyObjectsSearchFilters(),
-        [],
-    )
+    const initialFilters = useMemo(() => createEmptyObjectsSearchFilters(), [])
 
     const [view, setView] = useState('classic')
 
@@ -103,24 +94,18 @@ const ComplexCheckboard = () => {
     )
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false)
 
-
-
     const { data, isLoading } = useSWR(
-
         id ? ['/api/v2/realty_objects/chess', id] : null,
 
         () => apiGetCheckboard(id || ''),
 
         {
-
             revalidateOnFocus: false,
 
             revalidateIfStale: false,
 
             revalidateOnReconnect: false,
-
         },
-
     )
 
     const { data: complexInfo, isLoading: isComplexInfoLoading } = useSWR(
@@ -134,24 +119,23 @@ const ComplexCheckboard = () => {
     )
 
     const selectedProperty = useMemo(() => {
-
         if (!data || selectedPropertyId == null) return null
 
         return findBuildingPropertyById(data, selectedPropertyId) ?? null
-
     }, [data, selectedPropertyId])
 
-    const { data: propertyDetails, isLoading: isPropertyDetailsLoading } = useSWR(
-        selectedPropertyId != null
-            ? ['/api/v2/realty_properties', selectedPropertyId]
-            : null,
-        () => apiGetRealtyProperty(selectedPropertyId!),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    const { data: propertyDetails, isLoading: isPropertyDetailsLoading } =
+        useSWR(
+            selectedPropertyId != null
+                ? ['/api/v2/realty_properties', selectedPropertyId]
+                : null,
+            () => apiGetRealtyProperty(selectedPropertyId!),
+            {
+                revalidateOnFocus: false,
+                revalidateIfStale: false,
+                revalidateOnReconnect: false,
+            },
+        )
 
     useEffect(() => {
         if (selectedPropertyId == null) return
@@ -184,8 +168,6 @@ const ComplexCheckboard = () => {
         }
     }, [selectedPropertyId, view])
 
-
-
     useEffect(() => {
         if (!data) return
 
@@ -195,7 +177,9 @@ const ComplexCheckboard = () => {
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
 
-        const param = new URLSearchParams(window.location.search).get('property_id')
+        const param = new URLSearchParams(window.location.search).get(
+            'property_id',
+        )
         if (!param) return
 
         const parsed = Number(param)
@@ -207,8 +191,6 @@ const ComplexCheckboard = () => {
             setDetailsPanelOpen(true)
         }
     }, [data, id])
-
-
 
     const currentComplex = useMemo((): Complex | null => {
         if (complexInfo) return complexInfo
@@ -296,11 +278,7 @@ const ComplexCheckboard = () => {
         return { total, available }
     }, [activePropertyIds, allProperties, data])
 
-
-
     const statuses = useMemo(() => (data ? collectStatuses(data) : []), [data])
-
-
 
     const handleApplyFilters = () => {
         const nextFilters = withoutComplexFilters(draftFilters)
@@ -335,13 +313,9 @@ const ComplexCheckboard = () => {
         syncSearchStateInUrl(nextFilters, selectedPropertyId)
     }
 
-
-
     const handleStatusClick = (code: string) => {
         setActiveStatusCode((prev) => (prev === code ? '' : code))
     }
-
-
 
     const handlePropertySelect = (propertyId: number) => {
         setSelectedPropertyId(propertyId)
@@ -355,23 +329,15 @@ const ComplexCheckboard = () => {
         syncSearchStateInUrl(appliedFilters, null)
     }
 
-
-
     return (
-
         <Container>
-
             <AdaptiveCard>
-
                 <Loading loading={isLoading}>
-
                     {!data ? (
                         <div className="py-10 text-center text-sm text-gray-500">
                             Шахматка не найдена
                         </div>
-
                     ) : (
-
                         <div className="flex flex-col gap-5">
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
@@ -399,24 +365,16 @@ const ComplexCheckboard = () => {
                                             )
                                         }}
                                     >
-
                                         К списку домов
-
                                     </Button>
 
                                     <h3 className="mb-1">{data.name}</h3>
 
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
-
                                         Шахматка помещений по секциям
-
                                     </p>
-
                                 </div>
-
                             </div>
-
-
 
                             <ObjectsSearchForm
                                 filters={draftFilters}
@@ -446,196 +404,112 @@ const ComplexCheckboard = () => {
                                 </span>
                             </div>
 
-
-
                             <CheckboardLegend
-
                                 statuses={statuses}
-
                                 activeStatusCode={activeStatusCode}
-
                                 onStatusClick={handleStatusClick}
-
                             />
 
-
-
                             <Tabs
-
                                 value={view}
-
                                 onChange={(value) => setView(value)}
-
                             >
-
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-
                                     <TabList>
-
                                         <TabNav
-
                                             value="classic"
-
                                             className="!px-2.5 sm:!px-5"
-
                                         >
-
                                             Шахматка
-
                                         </TabNav>
 
                                         <TabNav
-
                                             value="plus"
-
                                             className="!px-2.5 sm:!px-5"
-
                                         >
-
                                             Шахматка+
-
                                         </TabNav>
 
                                         <TabNav
-
                                             value="about"
-
                                             className="!px-2.5 sm:!px-5 text-center"
-
                                         >
-
                                             О Жилом комплексе
-
                                         </TabNav>
-
                                     </TabList>
 
-
-
                                     {view === 'classic' ? (
-
                                         <div className="flex items-center gap-1.5">
-
                                             <span className="text-sm text-gray-500">
-
                                                 Показывать:
-
                                             </span>
 
                                             {(
-
                                                 [
-
                                                     {
-
                                                         value: 'rooms',
 
                                                         label: 'Комнатность',
-
                                                     },
 
                                                     {
-
                                                         value: 'number',
 
                                                         label: 'Номер',
-
                                                     },
-
                                                 ] as const
-
                                             ).map((item) => (
-
                                                 <button
-
                                                     key={item.value}
-
                                                     type="button"
-
                                                     className={classNames(
-
                                                         'rounded-lg px-2.5 py-1.5 text-sm transition-colors',
 
                                                         labelMode === item.value
-
                                                             ? 'bg-primary text-neutral'
-
                                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200',
-
                                                     )}
-
                                                     onClick={() =>
-
                                                         setLabelMode(item.value)
-
                                                     }
-
                                                 >
-
                                                     {item.label}
-
                                                 </button>
-
                                             ))}
-
                                         </div>
-
                                     ) : null}
-
                                 </div>
 
-
-
                                 <div className="mt-5">
-
                                     <TabContent value="classic">
-
                                         <CheckboardClassic
-
                                             building={data}
-
                                             labelMode={labelMode}
-
-                                            activePropertyIds={activePropertyIds}
-
+                                            activePropertyIds={
+                                                activePropertyIds
+                                            }
                                             selectedPropertyId={
-
                                                 selectedPropertyId
-
                                             }
-
                                             onPropertySelect={
-
                                                 handlePropertySelect
-
                                             }
-
                                         />
-
                                     </TabContent>
 
                                     <TabContent value="plus">
-
                                         <CheckboardPlus
-
                                             building={data}
-
-                                            activePropertyIds={activePropertyIds}
-
+                                            activePropertyIds={
+                                                activePropertyIds
+                                            }
                                             selectedPropertyId={
-
                                                 selectedPropertyId
-
                                             }
-
                                             onPropertySelect={
-
                                                 handlePropertySelect
-
                                             }
-
                                         />
-
                                     </TabContent>
 
                                     <TabContent value="about">
@@ -645,17 +519,11 @@ const ComplexCheckboard = () => {
                                             isLoading={isComplexInfoLoading}
                                         />
                                     </TabContent>
-
                                 </div>
-
                             </Tabs>
-
                         </div>
-
                     )}
-
                 </Loading>
-
             </AdaptiveCard>
 
             <CheckboardPropertyDrawer
@@ -667,15 +535,8 @@ const ComplexCheckboard = () => {
                 complexName={data?.name}
                 onClose={handleCloseDrawer}
             />
-
         </Container>
-
     )
-
 }
 
-
-
 export default ComplexCheckboard
-
-

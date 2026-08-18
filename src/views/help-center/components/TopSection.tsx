@@ -3,6 +3,7 @@ import Button from '@/components/ui/Button'
 import Container from '@/components/shared/Container'
 import { TbSearch } from 'react-icons/tb'
 import { useNavigate } from 'react-router'
+import { usePublicationKind } from '../publicationKind'
 
 type TopSectionProps = {
     showSearch?: boolean
@@ -11,11 +12,12 @@ type TopSectionProps = {
 const TopSection = ({ showSearch = true }: TopSectionProps) => {
     const inputRef = useRef<HTMLInputElement>(null)
     const navigate = useNavigate()
+    const kind = usePublicationKind()
 
     const handleSetQueryText = () => {
         const value = inputRef.current?.value?.trim()
         if (value) {
-            navigate(`/help?q=${encodeURIComponent(value)}`)
+            navigate(`${kind.basePath}?q=${encodeURIComponent(value)}`)
         }
     }
 
@@ -23,10 +25,9 @@ const TopSection = ({ showSearch = true }: TopSectionProps) => {
         <section className="flex h-[260px] flex-col justify-center bg-primary/10 dark:bg-primary/20">
             <Container className="flex flex-col items-center px-4">
                 <div className="mb-6 flex flex-col items-center">
-                    <h2 className="mb-3 text-center">Центр помощи</h2>
+                    <h2 className="mb-3 text-center">{kind.title}</h2>
                     <p className="max-w-[420px] text-center text-gray-600 dark:text-gray-300">
-                        Ищите ответы, листайте разделы и открывайте статьи по
-                        работе с кабинетом агента.
+                        {kind.description}
                     </p>
                 </div>
                 {showSearch ? (
@@ -35,7 +36,7 @@ const TopSection = ({ showSearch = true }: TopSectionProps) => {
                             <input
                                 ref={inputRef}
                                 className="heading-text h-full flex-1 bg-transparent font-semibold placeholder:font-semibold placeholder:text-gray-400 focus:outline-hidden"
-                                placeholder="Поиск по статьям"
+                                placeholder={kind.searchPlaceholder}
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter') {
                                         handleSetQueryText()
@@ -45,7 +46,7 @@ const TopSection = ({ showSearch = true }: TopSectionProps) => {
                                         (event.target as HTMLInputElement)
                                             .value.length <= 1
                                     ) {
-                                        navigate('/help')
+                                        navigate(kind.basePath)
                                     }
                                 }}
                             />
