@@ -2,7 +2,7 @@ import SideNav from '@/components/template/SideNav'
 import Header from '@/components/template/Header'
 import SideNavToggle from '@/components/template/SideNavToggle'
 import MobileNav from '@/components/template/MobileNav'
-import UserProfileDropdown from '@/components//template/UserProfileDropdown'
+import HeaderEndActions from '@/components/template/HeaderEndActions'
 import LayoutBase from '@/components//template/LayoutBase'
 import useResponsive from '@/utils/hooks/useResponsive'
 import { LAYOUT_COLLAPSIBLE_SIDE } from '@/constants/theme.constant'
@@ -27,11 +27,7 @@ const CollapsibleSide = ({ children }: CommonProps) => {
                                 {larger.lg && <SideNavToggle />}
                             </>
                         }
-                        headerEnd={
-                            <>
-                                <UserProfileDropdown hoverable={false} />
-                            </>
-                        }
+                        headerEnd={<HeaderEndActions />}
                     />
                     <div className="h-full flex flex-auto flex-col">
                         {children}

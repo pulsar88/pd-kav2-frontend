@@ -1,20 +1,22 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
+import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
+import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
 import RangeInputGroup from './RangeInputGroup'
-import type { Complex, ObjectsSearchFilters, PremiseType } from '../types'
-import { premiseTypeLabel, roomsOptions } from '../utils'
+import type { ObjectsSearchFilters, RealtyPropertyTypeCode } from '../types'
+import { hasActiveObjectsSearchFilters } from '../filtersQuery'
 
 type Option = { value: string; label: string }
 
 type ObjectsSearchFormProps = {
-    complexes: Complex[]
     filters: ObjectsSearchFilters
     isSearching: boolean
+    hasAppliedFilters?: boolean
     collapsed?: boolean
     multiComplexSelect?: boolean
     /** На xl+ кнопки в одной сетке с инпутами, справа */
@@ -29,12 +31,6 @@ const isFilled = (
     value: string | number | Array<string | number> | '' | undefined | null,
 ) => (Array.isArray(value) ? value.length > 0 : value !== '' && value !== undefined && value !== null)
 
-const filledInputClass =
-    'border-primary bg-primary/10 text-primary font-medium dark:bg-primary/15'
-
-const filledSelectClass =
-    '[&_.select-control]:border-primary [&_.select-control]:bg-primary/10 [&_.select-control]:text-primary dark:[&_.select-control]:bg-primary/15 [&_.select-single-value]:text-primary [&_.select-single-value]:font-medium'
-
 const selectMenuProps = {
     menuPortalTarget:
         typeof document !== 'undefined' ? document.body : undefined,
@@ -48,9 +44,9 @@ const selectMenuProps = {
 }
 
 const ObjectsSearchForm = ({
-    complexes,
     filters,
     isSearching,
+    hasAppliedFilters = false,
     collapsed: collapsedProp,
     multiComplexSelect = false,
     desktopActionsInGrid = false,
@@ -68,18 +64,35 @@ const ObjectsSearchForm = ({
         }
     }
 
-    const complexOptions: Option[] = complexes.map((item) => ({
-        value: item.id,
-        label: item.name,
-    }))
-
-    const typeOptions: Option[] = Object.entries(premiseTypeLabel).map(
-        ([value, label]) => ({ value, label }),
+    const { data: filterOptions } = useSWR(
+        '/api/v2/realty_properties/filters',
+        () => apiGetRealtyPropertiesFilters(),
+        {
+            revalidateOnFocus: false,
+            revalidateOnReconnect: false,
+        },
     )
-    const roomSelectOptions: Option[] = roomsOptions.map((item) => ({
-        value: String(item.value),
-        label: item.label,
-    }))
+
+    const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
+        (item) => ({
+            value: item.id,
+            label: item.name,
+        }),
+    )
+
+    const typeOptions: Option[] = (filterOptions?.realtyTypes ?? []).map(
+        (item) => ({
+            value: item.value,
+            label: item.label,
+        }),
+    )
+
+    const roomSelectOptions: Option[] = (filterOptions?.realtyRooms ?? []).map(
+        (item) => ({
+            value: item.value,
+            label: item.label,
+        }),
+    )
 
     const activeFiltersCount = useMemo(
         () =>
@@ -87,18 +100,23 @@ const ObjectsSearchForm = ({
         [filters],
     )
 
+    const hasDraftFilters = hasActiveObjectsSearchFilters(filters)
+    const canSearch = hasDraftFilters
+    const canReset = hasDraftFilters || hasAppliedFilters
+
     const patch = (partial: Partial<ObjectsSearchFilters>) =>
         onChange({ ...filters, ...partial })
 
     const actionButtons = (
         <>
-            <Button type="button" onClick={onReset}>
+            <Button type="button" disabled={!canReset} onClick={onReset}>
                 Сбросить
             </Button>
             <Button
                 variant="solid"
                 type="button"
                 loading={isSearching}
+                disabled={!canSearch}
                 onClick={onSearch}
             >
                 Найти помещения
@@ -122,7 +140,7 @@ const ObjectsSearchForm = ({
                             ? activeFiltersCount > 0
                                 ? `Свернуто · выбрано параметров: ${activeFiltersCount}`
                                 : 'Свернуто · параметры не заданы'
-                            : 'Общие параметры для списка ЖК и каталога помещений'}
+                            : 'Общие параметры для списка домов и каталога помещений'}
                     </p>
                 </div>
                 <HiChevronDown
@@ -153,20 +171,17 @@ const ObjectsSearchForm = ({
                                             closeMenuOnSelect={false}
                                             isClearable
                                             placeholder="Все ЖК"
-                                            className={classNames(
-                                                isFilled(filters.complexIds) &&
-                                                    filledSelectClass,
-                                            )}
-                                            options={complexOptions}
-                                            value={complexOptions.filter(
+                                            options={projectOptions}
+                                            value={projectOptions.filter(
                                                 (item) =>
                                                     (
-                                                        filters.complexIds || []
+                                                        filters.realtyProjectIds ||
+                                                        []
                                                     ).includes(item.value),
                                             )}
                                             onChange={(option) =>
                                                 patch({
-                                                    complexIds: (
+                                                    realtyProjectIds: (
                                                         option as readonly Option[] | null
                                                     )?.map(
                                                         (item) => item.value,
@@ -183,14 +198,10 @@ const ObjectsSearchForm = ({
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любой"
-                                        className={classNames(
-                                            isFilled(filters.type) &&
-                                                filledSelectClass,
-                                        )}
                                         options={typeOptions}
                                         value={typeOptions.filter((item) =>
                                             (filters.type || []).includes(
-                                                item.value as PremiseType,
+                                                item.value as RealtyPropertyTypeCode,
                                             ),
                                         )}
                                         onChange={(option) =>
@@ -209,23 +220,18 @@ const ObjectsSearchForm = ({
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любая"
-                                        className={classNames(
-                                            isFilled(filters.rooms) &&
-                                                filledSelectClass,
-                                        )}
                                         options={roomSelectOptions}
                                         value={roomSelectOptions.filter((item) =>
                                             (filters.rooms || []).includes(
-                                                Number(item.value),
+                                                item.value,
                                             ),
                                         )}
                                         onChange={(option) => {
                                             patch({
                                                 rooms: (
                                                     option as readonly Option[] | null
-                                                )?.map((item) =>
-                                                    Number(item.value),
-                                                ) || [],
+                                                )?.map((item) => item.value) ||
+                                                [],
                                             })
                                         }}
                                     />
@@ -236,7 +242,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.floorTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(floorFrom) =>
                                             patch({ floorFrom })
                                         }
@@ -251,7 +256,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.areaTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(areaFrom) =>
                                             patch({ areaFrom })
                                         }
@@ -267,7 +271,6 @@ const ObjectsSearchForm = ({
                                         toValue={filters.priceTo}
                                         fromPlaceholder="От"
                                         toPlaceholder="До"
-                                        filledClass={filledInputClass}
                                         onFromChange={(priceFrom) =>
                                             patch({ priceFrom })
                                         }

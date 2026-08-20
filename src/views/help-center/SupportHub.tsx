@@ -1,7 +1,7 @@
 import TopSection from './components/TopSection'
 import BodySection from './components/BodySection'
 
-/** Хаб: карточки разделов (+ поиск) */
+/** Хаб: список статей (+ поиск) */
 const SupportHub = () => {
     return (
         <>

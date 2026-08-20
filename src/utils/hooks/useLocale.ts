@@ -1,24 +1,17 @@
 import { useEffect } from 'react'
-import i18n from 'i18next'
-import { useLocaleStore } from '@/store/localeStore'
+import dayjs from 'dayjs'
+import 'dayjs/locale/ru'
+import appConfig from '@/configs/app.config'
 
 const useLocale = () => {
-    const currentLang = useLocaleStore((state) => state.currentLang)
+    const locale = appConfig.locale
 
     useEffect(() => {
-        if (i18n.language !== currentLang) {
-            const formattedLang = currentLang.replace(
-                /-([a-z])/g,
-                function (g) {
-                    return g[1].toUpperCase()
-                },
-            )
-            i18n.changeLanguage(formattedLang)
-        }
-    }, [currentLang])
+        dayjs.locale(locale)
+    }, [locale])
 
     return {
-        locale: currentLang,
+        locale,
     }
 }
 

@@ -88,6 +88,8 @@ function Select<
         classNames,
         field,
         invalid,
+        noOptionsMessage,
+        loadingMessage,
         ...rest
     } = props
 
@@ -206,6 +208,12 @@ function Select<
                 ClearIndicator: DefaultClearIndicator,
                 ...components,
             }}
+            noOptionsMessage={
+                noOptionsMessage ??
+                (({ inputValue }) =>
+                    inputValue ? 'Ничего не найдено' : 'Нет доступных вариантов')
+            }
+            loadingMessage={loadingMessage ?? (() => 'Загрузка...')}
             {...field}
             {...rest}
         />

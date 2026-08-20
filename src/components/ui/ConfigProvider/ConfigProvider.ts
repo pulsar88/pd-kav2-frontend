@@ -20,7 +20,7 @@ export type Config = {
 export const defaultConfig: Config = {
     direction: 'ltr',
     mode: 'light',
-    locale: 'en',
+    locale: 'ru',
     controlSize: SIZES.MD,
 } as const
 

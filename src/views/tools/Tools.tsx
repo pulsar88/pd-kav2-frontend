@@ -55,7 +55,7 @@ const Tools = () => {
                                                 {tool.icon}
                                             </span>
                                         </div>
-                                        <h4 className="heading-text mt-3 font-bold">
+                                        <h4 className="heading-text mt-3 font-bold text-center">
                                             {tool.title}
                                         </h4>
                                         <p className="min-h-[50px] max-w-[280px] text-center text-gray-600 dark:text-gray-300">

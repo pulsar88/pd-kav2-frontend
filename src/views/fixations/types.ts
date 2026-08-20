@@ -1,9 +1,11 @@
 export type FixationStatus =
+    | 'pending'
+    | 'denied'
     | 'fixed'
-    | 'expired'
-    | 'rejected'
+    | 'registration'
+    | 'success'
+    | 'failed'
     | 'deleted'
-    | 'not_realized'
 
 export type FixationAgent = {
     email: string
@@ -44,16 +46,30 @@ export type FixationRelative = {
     relation: string
 }
 
+export type FixationObject = {
+    id: number
+    name: string
+    facing?: string | null
+    material?: string | null
+    building_state?: string | null
+    development_start?: string | null
+    development_end?: string | null
+    address?: string | null
+    external_id?: number
+}
+
 export type Fixation = {
     id: string
     fullName: string
     phone: string
     status: FixationStatus
+    statusLabel?: string
     createdAt: string
     expiresAt: string
     objectName: string
     projectName: string
     objectId: string
+    object?: FixationObject
     apartment?: string
     address?: string
     managerName?: string
@@ -74,4 +90,10 @@ export type Fixation = {
 export type GetFixationsResponse = {
     list: Fixation[]
     total: number
+    meta?: {
+        current_page: number
+        last_page: number
+        per_page: number
+        total: number
+    }
 }

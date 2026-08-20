@@ -61,10 +61,10 @@ const StepItem = (props: StepItemProps) => {
 
     const stepIconClass = classNames(
         `step-item-icon step-item-icon-${status}`,
-        status === COMPLETE && `bg-primary text-white`,
+        status === COMPLETE && `bg-primary text-neutral`,
         status === ERROR && `step-item-icon-error`,
         status === IN_PROGRESS &&
-            `text-primary dark:text-gray-100 border-primary step-item-icon-current`,
+            `text-neutral dark:text-gray-100 border-primary bg-primary/10 step-item-icon-current`,
     )
 
     const stepConnectClass = classNames(

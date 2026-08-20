@@ -4,9 +4,6 @@ export type AppConfig = {
     unAuthenticatedEntryPath: string
     locale: string
     accessTokenPersistStrategy: 'localStorage' | 'sessionStorage' | 'cookies'
-    /** Моки каталога и прочих разделов. Auth API не мокается. */
-    enableMock: boolean
-    activeNavTranslation: boolean
     defaultCountryCode: string
 }
 
@@ -18,10 +15,8 @@ const appConfig: AppConfig = {
     ),
     authenticatedEntryPath: '/home',
     unAuthenticatedEntryPath: '/sign-in',
-    locale: 'en',
+    locale: 'ru',
     accessTokenPersistStrategy: 'cookies',
-    enableMock: import.meta.env.VITE_ENABLE_MOCK !== 'false',
-    activeNavTranslation: false,
     defaultCountryCode: 'RU',
 }
 

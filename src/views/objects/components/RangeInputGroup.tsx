@@ -2,8 +2,10 @@ import classNames from 'classnames'
 import Input from '@/components/ui/Input'
 import InputGroup from '@/components/ui/InputGroup'
 
-const isFilled = (value: number | '' | undefined | null) =>
-    value !== '' && value !== undefined && value !== null
+const rangeInputClass =
+    'font-semibold text-gray-800 placeholder:font-semibold placeholder:text-gray-400 dark:text-gray-100'
+
+const rangeAddonClass = 'font-semibold text-gray-400 dark:text-gray-400'
 
 const formatPriceValue = (value: number | '' | undefined) => {
     if (value === '' || value === undefined || value === null) return ''
@@ -16,7 +18,6 @@ type RangeInputGroupProps = {
     fromPlaceholder?: string
     toPlaceholder?: string
     variant?: 'number' | 'price'
-    filledClass?: string
     onFromChange: (value: number | '') => void
     onToChange: (value: number | '') => void
 }
@@ -27,7 +28,6 @@ const RangeInputGroup = ({
     fromPlaceholder = 'От',
     toPlaceholder = 'До',
     variant = 'number',
-    filledClass,
     onFromChange,
     onToChange,
 }: RangeInputGroupProps) => {
@@ -48,24 +48,16 @@ const RangeInputGroup = ({
                     type="text"
                     inputMode="numeric"
                     placeholder={fromPlaceholder}
-                    className={classNames(
-                        baseInputClass,
-                        isFilled(fromValue) && 'relative z-10',
-                        isFilled(fromValue) && filledClass,
-                    )}
+                    className={classNames(baseInputClass, rangeInputClass)}
                     value={formatPriceValue(fromValue)}
                     onChange={(e) => onFromChange(parsePrice(e.target.value))}
                 />
-                <InputGroup.Addon>до</InputGroup.Addon>
+                <InputGroup.Addon className={rangeAddonClass}>до</InputGroup.Addon>
                 <Input
                     type="text"
                     inputMode="numeric"
                     placeholder={toPlaceholder}
-                    className={classNames(
-                        baseInputClass,
-                        isFilled(toValue) && 'relative z-10',
-                        isFilled(toValue) && filledClass,
-                    )}
+                    className={classNames(baseInputClass, rangeInputClass)}
                     value={formatPriceValue(toValue)}
                     onChange={(e) => onToChange(parsePrice(e.target.value))}
                 />
@@ -78,11 +70,7 @@ const RangeInputGroup = ({
             <Input
                 type="number"
                 placeholder={fromPlaceholder}
-                className={classNames(
-                    baseInputClass,
-                    isFilled(fromValue) && 'relative z-10',
-                    isFilled(fromValue) && filledClass,
-                )}
+                className={classNames(baseInputClass, rangeInputClass)}
                 value={fromValue ?? ''}
                 onChange={(e) =>
                     onFromChange(
@@ -90,15 +78,11 @@ const RangeInputGroup = ({
                     )
                 }
             />
-            <InputGroup.Addon>до</InputGroup.Addon>
+            <InputGroup.Addon className={rangeAddonClass}>до</InputGroup.Addon>
             <Input
                 type="number"
                 placeholder={toPlaceholder}
-                className={classNames(
-                    baseInputClass,
-                    isFilled(toValue) && 'relative z-10',
-                    isFilled(toValue) && filledClass,
-                )}
+                className={classNames(baseInputClass, rangeInputClass)}
                 value={toValue ?? ''}
                 onChange={(e) =>
                     onToChange(

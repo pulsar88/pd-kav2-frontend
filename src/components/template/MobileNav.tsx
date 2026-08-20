@@ -5,7 +5,6 @@ import NavToggle from '@/components/shared/NavToggle'
 import { DIR_RTL } from '@/constants/theme.constant'
 import withHeaderItem, { WithHeaderItemProps } from '@/utils/hoc/withHeaderItem'
 import navigationConfig from '@/configs/navigation.config'
-import appConfig from '@/configs/app.config'
 import { useThemeStore } from '@/store/themeStore'
 import { useRouteKeyStore } from '@/store/routeKeyStore'
 import { useSessionUser } from '@/store/authStore'
@@ -18,17 +17,11 @@ type MobileNavToggleProps = {
     toggled?: boolean
 }
 
-type MobileNavProps = {
-    translationSetup?: boolean
-}
-
 const MobileNavToggle = withHeaderItem<
     MobileNavToggleProps & WithHeaderItemProps
 >(NavToggle)
 
-const MobileNav = ({
-    translationSetup = appConfig.activeNavTranslation,
-}: MobileNavProps) => {
+const MobileNav = () => {
     const [isOpen, setIsOpen] = useState(false)
 
     const handleOpenDrawer = () => {
@@ -50,7 +43,7 @@ const MobileNav = ({
                 <MobileNavToggle toggled={isOpen} />
             </div>
             <Drawer
-                title="Navigation"
+                title="Меню"
                 isOpen={isOpen}
                 bodyClass={classNames('p-0')}
                 width={330}
@@ -66,7 +59,6 @@ const MobileNav = ({
                             routeKey={currentRouteKey}
                             userAuthority={userAuthority as string[]}
                             direction={direction}
-                            translationSetup={translationSetup}
                             onMenuItemClick={handleDrawerClose}
                         />
                     )}

@@ -7,6 +7,69 @@ import type {
     FlatCheckboardProperty,
     SectionColumn,
 } from './checkboard.types'
+import type { ObjectsSearchFilters, Premise, PremiseType, RealtyPropertyTypeCode } from './types'
+import { matchesRealtyRoomFilters } from './realtyPropertyQuery'
+import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
+
+const mapCheckboardTypeCodeToPremiseType = (code: string): PremiseType => {
+    const normalized = code.toLowerCase()
+    if (normalized === 'property' || normalized === 'apartment') {
+        return 'apartment'
+    }
+    if (normalized === 'apartments') {
+        return 'apartments'
+    }
+    return 'commercial'
+}
+
+export const buildPremiseFromCheckboardProperty = (
+    property: FlatCheckboardProperty,
+    options: {
+        propertyDetails?: Premise | null
+        complexId?: string
+        complexName?: string
+    } = {},
+): Premise => {
+    const { propertyDetails = null, complexId, complexName } = options
+    const externalId = Number(property.external_id)
+    const checkboardPropertyId = Number.isFinite(externalId)
+        ? externalId
+        : property.id
+    const typeCode =
+        propertyDetails?.typeCode ??
+        (normalizeRealtyPropertyTypeCode(property.type.code) ??
+            property.type.code.toLowerCase())
+
+    return {
+        id: propertyDetails?.id ?? String(property.id),
+        checkboardPropertyId,
+        externalId: checkboardPropertyId,
+        number: propertyDetails?.number ?? property.number,
+        section: propertyDetails?.section ?? property.sectionName,
+        type: propertyDetails?.type ?? mapCheckboardTypeCodeToPremiseType(property.type.code),
+        typeCode,
+        typeName: propertyDetails?.typeName ?? property.type.name,
+        rooms: propertyDetails?.rooms ?? property.rooms_count,
+        area: propertyDetails?.area ?? property.area,
+        goodArea: propertyDetails?.goodArea ?? property.good_area,
+        floor: propertyDetails?.floor ?? property.floor,
+        price:
+            propertyDetails?.price ??
+            (property.price > 0 ? property.price : undefined),
+        pricePerSqm: propertyDetails?.pricePerSqm,
+        layoutImage: propertyDetails?.layoutImage,
+        layout: propertyDetails?.layout,
+        complexId: propertyDetails?.complexId ?? complexId,
+        complexName: propertyDetails?.complexName ?? complexName,
+        address: propertyDetails?.address,
+        material: propertyDetails?.material,
+        facing: propertyDetails?.facing,
+        buildingState: propertyDetails?.buildingState,
+        houseStatus: propertyDetails?.houseStatus,
+        developmentStart: propertyDetails?.developmentStart,
+        deliveryDate: propertyDetails?.deliveryDate,
+    }
+}
 
 export const emptyCheckboardFilters: CheckboardFilters = {
     typeCode: '',
@@ -36,6 +99,7 @@ export const formatTypeShortLabel = (property: CheckboardProperty) => {
         pantry: 'Кл',
         office: 'Оф',
         property: 'Кв',
+        apartment: 'Ап',
         apartments: 'Ап',
     }
     return byCode[property.type.code] || property.type.name.slice(0, 2)
@@ -136,9 +200,14 @@ export const findBuildingPropertyById = (
     building: CheckboardBuilding,
     propertyId: number,
 ) =>
-    flattenBuildingProperties(building).find(
-        (property) => property.id === propertyId,
-    )
+    flattenBuildingProperties(building).find((property) => {
+        if (property.id === propertyId) {
+            return true
+        }
+
+        const externalId = Number(property.external_id)
+        return Number.isFinite(externalId) && externalId === propertyId
+    })
 
 export const hasActiveCheckboardFilters = (filters: CheckboardFilters) =>
     Object.values(filters).some(
@@ -268,7 +337,6 @@ export const collectStatuses = (building: CheckboardBuilding) => {
             name: string
             color: string
             text_color: string
-            accent_color: string
         }
     >()
     flattenBuildingProperties(building).forEach((property) => {
@@ -278,7 +346,6 @@ export const collectStatuses = (building: CheckboardBuilding) => {
                 name: property.status.name,
                 color: property.status.color,
                 text_color: property.status.text_color,
-                accent_color: property.status.accent_color,
             })
         }
     })
@@ -305,4 +372,56 @@ export const getBuildingStats = (
         total: matching.length,
         available: matching.filter((item) => item.status.is_available).length,
     }
+}
+
+const toFilterNumber = (value: number | '' | undefined) => {
+    if (value === '' || value === undefined || value === null) return undefined
+    return Number(value)
+}
+
+const matchesPremiseTypeFilter = (
+    typeCode: string,
+    selectedTypes: RealtyPropertyTypeCode[],
+) => {
+    if (selectedTypes.length === 0) return true
+
+    const normalizedCode = normalizeRealtyPropertyTypeCode(typeCode)
+
+    if (!normalizedCode) {
+        return false
+    }
+
+    return selectedTypes.includes(normalizedCode)
+}
+
+export const matchesObjectsSearchFilters = (
+    property: FlatCheckboardProperty,
+    filters: ObjectsSearchFilters,
+): boolean => {
+    const selectedTypes = filters.type || []
+    const priceFrom = toFilterNumber(filters.priceFrom)
+    const priceTo = toFilterNumber(filters.priceTo)
+    const areaFrom = toFilterNumber(filters.areaFrom)
+    const areaTo = toFilterNumber(filters.areaTo)
+    const floorFrom = toFilterNumber(filters.floorFrom)
+    const floorTo = toFilterNumber(filters.floorTo)
+
+    if (!matchesPremiseTypeFilter(property.type.code, selectedTypes)) {
+        return false
+    }
+
+    if (
+        !matchesRealtyRoomFilters(property, filters.rooms || [])
+    ) {
+        return false
+    }
+
+    if (priceFrom !== undefined && property.price < priceFrom) return false
+    if (priceTo !== undefined && property.price > priceTo) return false
+    if (areaFrom !== undefined && property.area < areaFrom) return false
+    if (areaTo !== undefined && property.area > areaTo) return false
+    if (floorFrom !== undefined && property.floor < floorFrom) return false
+    if (floorTo !== undefined && property.floor > floorTo) return false
+
+    return true
 }

@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import classNames from 'classnames'
 import { TbArrowDown, TbArrowUp } from 'react-icons/tb'
-import Pagination from '@/components/ui/Pagination'
 import Select from '@/components/ui/Select'
+import Pagination from '@/components/ui/Pagination'
+import Spinner from '@/components/ui/Spinner'
 import ImageGallery from '@/components/shared/ImageGallery'
-import type { ObjectsSearchFilters, Premise } from '../types'
+import type { Premise, ObjectsSearchFilters } from '../types'
 import {
+    getPremisePreviewSlides,
     parsePremiseSortKey,
     premiseSortFields,
-    sortPremises,
     toPremiseSortKey,
     type PremiseSortField,
-    type PremiseSortKey,
+    type PremiseSortState,
 } from '../utils'
 import PremiseResultItem from './PremiseResultItem'
 
@@ -19,7 +20,16 @@ type Option = { value: string | number; label: string }
 
 type ObjectsPremisesResultsProps = {
     results: Premise[]
-    searchFilters: ObjectsSearchFilters
+    total: number
+    pageIndex: number
+    pageSize: number
+    sortKey: PremiseSortState
+    isRefreshing?: boolean
+    filtersActive?: boolean
+    searchFilters?: ObjectsSearchFilters
+    onPageChange: (page: number) => void
+    onPageSizeChange: (size: number) => void
+    onSortChange: (sortKey: PremiseSortState) => void
 }
 
 const pageSizeOptions = [20, 50, 100].map((number) => ({
@@ -29,44 +39,43 @@ const pageSizeOptions = [20, 50, 100].map((number) => ({
 
 const ObjectsPremisesResults = ({
     results,
+    total,
+    pageIndex,
+    pageSize,
+    sortKey,
+    isRefreshing = false,
+    filtersActive = false,
     searchFilters,
+    onPageChange,
+    onPageSizeChange,
+    onSortChange,
 }: ObjectsPremisesResultsProps) => {
-    const [sortKey, setSortKey] = useState<PremiseSortKey>('price_asc')
-    const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(20)
     const [previewIndex, setPreviewIndex] = useState(-1)
-    const [previewSlides, setPreviewSlides] = useState<Array<{ src: string }>>(
-        [],
-    )
+    const [previewSlides, setPreviewSlides] = useState<
+        Array<{ src: string; title?: string }>
+    >([])
 
-    const { field: sortField, dir: sortDir } = parsePremiseSortKey(sortKey)
-
-    const sortedResults = useMemo(
-        () => sortPremises(results, sortKey),
-        [results, sortKey],
-    )
-
-    useEffect(() => {
-        setPageIndex(1)
-    }, [results, sortKey, pageSize])
-
-    const pageData = useMemo(() => {
-        const start = (pageIndex - 1) * pageSize
-        return sortedResults.slice(start, start + pageSize)
-    }, [sortedResults, pageIndex, pageSize])
+    const sortState = sortKey ? parsePremiseSortKey(sortKey) : null
+    const sortField = sortState?.field
+    const sortDir = sortState?.dir
 
     const handleFieldChange = (field: PremiseSortField) => {
-        if (field === sortField) {
-            setSortKey(
+        if (field === sortField && sortDir) {
+            onSortChange(
                 toPremiseSortKey(field, sortDir === 'asc' ? 'desc' : 'asc'),
             )
             return
         }
-        setSortKey(toPremiseSortKey(field, 'asc'))
+
+        onSortChange(toPremiseSortKey(field, 'asc'))
     }
 
     const handlePreviewLayout = (premise: Premise) => {
-        setPreviewSlides([{ src: premise.layoutImage }])
+        if (isRefreshing) return
+
+        const slides = getPremisePreviewSlides(premise)
+        if (slides.length === 0) return
+        setPreviewSlides(slides)
         setPreviewIndex(0)
     }
 
@@ -74,7 +83,9 @@ const ObjectsPremisesResults = ({
         <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <h4 className="mb-0 text-base font-semibold">
-                    Найдено помещений: {results.length}
+                    {filtersActive
+                        ? `Найдено помещений: ${total}`
+                        : `Всего помещений: ${total}`}
                 </h4>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -88,17 +99,18 @@ const ObjectsPremisesResults = ({
                                 <button
                                     key={item.value}
                                     type="button"
+                                    disabled={isRefreshing}
                                     title={
-                                        active
+                                        active && sortDir
                                             ? sortDir === 'asc'
                                                 ? 'По возрастанию · нажмите, чтобы изменить'
                                                 : 'По убыванию · нажмите, чтобы изменить'
                                             : undefined
                                     }
                                     className={classNames(
-                                        'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+                                        'inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                                         active
-                                            ? 'bg-primary text-white'
+                                            ? 'bg-primary text-neutral'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600',
                                     )}
                                     onClick={() =>
@@ -106,7 +118,7 @@ const ObjectsPremisesResults = ({
                                     }
                                 >
                                     <span>{item.label}</span>
-                                    {active ? (
+                                    {active && sortDir ? (
                                         sortDir === 'asc' ? (
                                             <TbArrowUp className="text-base" />
                                         ) : (
@@ -116,41 +128,71 @@ const ObjectsPremisesResults = ({
                                 </button>
                             )
                         })}
+                        <button
+                            type="button"
+                            disabled={!sortKey || isRefreshing}
+                            className="rounded-lg px-2.5 py-1.5 text-sm text-gray-600 transition-colors hover:bg-gray-100 disabled:cursor-default disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700"
+                            onClick={() => onSortChange(null)}
+                        >
+                            Сбросить
+                        </button>
                     </div>
                 </div>
             </div>
 
             {results.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500 dark:border-gray-700">
-                    По заданным параметрам ничего не найдено
+                    Помещения не найдены
                 </div>
             ) : (
                 <>
-                    <div className="flex flex-col gap-3">
-                        {pageData.map((premise) => (
+                    <div
+                        className={classNames(
+                            'relative flex flex-col gap-3 transition-opacity',
+                            isRefreshing && 'pointer-events-none opacity-60',
+                        )}
+                    >
+                        {isRefreshing ? (
+                            <div className="absolute inset-0 z-10 flex items-start justify-center rounded-2xl bg-white/20 pt-8 dark:bg-gray-900/20">
+                                <Spinner size={28} />
+                            </div>
+                        ) : null}
+                        {results.map((premise) => (
                             <PremiseResultItem
                                 key={premise.id}
                                 premise={premise}
+                                searchFilters={searchFilters}
                                 onPreviewLayout={() =>
                                     handlePreviewLayout(premise)
                                 }
-                                searchFilters={searchFilters}
                             />
                         ))}
                     </div>
-                    <div className="mt-4 flex items-center justify-between">
-                        <Pagination
-                            currentPage={pageIndex}
-                            pageSize={pageSize}
-                            total={sortedResults.length}
-                            onChange={setPageIndex}
-                        />
-                        <div style={{ minWidth: 130 }}>
+                    <div
+                        className={classNames(
+                            'mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between',
+                            isRefreshing && 'pointer-events-none opacity-60',
+                        )}
+                    >
+                        <div className="overflow-x-auto">
+                            <Pagination
+                                currentPage={pageIndex}
+                                pageSize={pageSize}
+                                total={total}
+                                pagerCount={5}
+                                onChange={onPageChange}
+                            />
+                        </div>
+                        <div
+                            className="shrink-0 self-end sm:self-auto"
+                            style={{ minWidth: 130 }}
+                        >
                             <Select
                                 instanceId="objects-page-size"
                                 size="sm"
                                 menuPlacement="top"
                                 isSearchable={false}
+                                isDisabled={isRefreshing}
                                 value={pageSizeOptions.filter(
                                     (option) => option.value === pageSize,
                                 )}
@@ -159,8 +201,7 @@ const ObjectsPremisesResults = ({
                                     const size = (option as Option | null)
                                         ?.value
                                     if (typeof size === 'number') {
-                                        setPageSize(size)
-                                        setPageIndex(1)
+                                        onPageSizeChange(size)
                                     }
                                 }}
                             />

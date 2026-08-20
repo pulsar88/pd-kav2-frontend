@@ -1,193 +1,147 @@
-import { profileData } from '@/mock/data/accountsData'
-import { checkboardByComplexId } from '@/mock/data/checkboardData'
-import { fixationsData } from '@/mock/data/fixationsData'
-import {
-    fixationClientsData,
-    fixationComplexesData,
-} from '@/mock/data/fixationWizardData'
+import ApiService from './ApiService'
+import endpointConfig from '@/configs/endpoint.config'
+import { getFixationsDashboardStats } from '@/views/fixations/fixationsDashboardMockData'
+import type { FixationsDashboardStats } from '@/views/fixations/dashboard.constants'
+import type { Complex } from '@/views/objects/types'
+import { apiGetRealtyPropertiesSummary } from '@/services/ObjectsService'
 import type {
-    CreateFixationClientPayload,
-    CreateFixationPayload,
-    FixationClient,
+    CreateFixationWizardPayload,
     FixationComplex,
     GetFixationClientsParams,
     GetFixationClientsResponse,
+    FixationManager,
 } from '@/views/fixations/createWizard.types'
+import {
+    mapCreateFixationPayloadToApiBody,
+    mapFixationCreateClientApiToClient,
+    mapFixationCreateManagerApiToManager,
+} from '@/views/fixations/fixationCreateMapper'
+import type {
+    FixationCreateClientsApiResponse,
+    FixationCreateManagersApiResponse,
+} from '@/views/fixations/fixationCreateApi.types'
+import { mapFixationApiItemToFixation, unwrapFixationApiResponse } from '@/views/fixations/fixationApiMapper'
+import {
+    buildFixationDetailsParams,
+    buildFixationsListParams,
+} from '@/views/fixations/fixationApiQuery'
+import type {
+    FixationApiItem,
+    FixationsApiResponse,
+    GetFixationsParams,
+} from '@/views/fixations/fixationApi.types'
 import type { Fixation, GetFixationsResponse } from '@/views/fixations/types'
-import { normalizeRuPhoneDigits } from '@/views/fixations/utils'
+import { toAxiosParams } from '@/views/objects/realtyPropertyQuery'
+
+const DEFAULT_CLIENTS_PAGE_SIZE = 20
 
 const delay = (ms = 200) =>
     new Promise((resolve) => {
         setTimeout(resolve, ms)
     })
 
-const DEFAULT_CLIENTS_PAGE_SIZE = 20
-
-export async function apiGetFixations(): Promise<GetFixationsResponse> {
+export async function apiGetFixationsDashboardStats(
+    month: string,
+): Promise<FixationsDashboardStats> {
     await delay()
+    return getFixationsDashboardStats(month)
+}
+
+export async function apiGetFixations(
+    params: GetFixationsParams = {},
+): Promise<GetFixationsResponse> {
+    const response = await ApiService.fetchDataWithAxios<FixationsApiResponse>({
+        url: endpointConfig.fixations,
+        method: 'get',
+        params: buildFixationsListParams(params),
+    })
+
     return {
-        list: [...fixationsData],
-        total: fixationsData.length,
+        list: response.data.map(mapFixationApiItemToFixation),
+        total: response.meta.total,
+        meta: response.meta,
     }
 }
 
 export async function apiGetFixation(id: string): Promise<Fixation | null> {
-    await delay()
-    return fixationsData.find((item) => item.id === id) || null
+    const response = await ApiService.fetchDataWithAxios<
+        FixationApiItem | { data?: FixationApiItem | null }
+    >({
+        url: endpointConfig.fixation(id),
+        method: 'get',
+        params: buildFixationDetailsParams(),
+    })
+
+    const item = unwrapFixationApiResponse(response)
+    if (!item) {
+        return null
+    }
+
+    return mapFixationApiItemToFixation(item)
 }
 
 export async function apiGetFixationClients(
     params: GetFixationClientsParams = {},
 ): Promise<GetFixationClientsResponse> {
-    await delay()
     const page = Math.max(1, params.page ?? 1)
-    const limit = Math.max(1, params.limit ?? DEFAULT_CLIENTS_PAGE_SIZE)
-    const query = params.q?.trim() || ''
-    const queryLower = query.toLowerCase()
-    const queryDigits = normalizeRuPhoneDigits(query)
+    const pageSize = Math.max(1, params.page_size ?? DEFAULT_CLIENTS_PAGE_SIZE)
+    const search = params.q?.trim()
 
-    const filtered = fixationClientsData.filter((client) => {
-        if (!query) return true
-
-        const nameMatch = client.fullName.toLowerCase().includes(queryLower)
-        const phoneDigits = normalizeRuPhoneDigits(client.phone)
-        const phoneMatch = Boolean(
-            queryDigits && phoneDigits.includes(queryDigits),
-        )
-
-        return nameMatch || phoneMatch
-    })
-
-    const start = (page - 1) * limit
+    const response =
+        await ApiService.fetchDataWithAxios<FixationCreateClientsApiResponse>({
+            url: endpointConfig.clients,
+            method: 'get',
+            params: toAxiosParams({
+                page,
+                page_size: pageSize,
+                with: 'phones',
+                ...(search ? { search } : {}),
+            }),
+        })
 
     return {
-        list: filtered.slice(start, start + limit),
-        total: filtered.length,
+        list: response.data.map(mapFixationCreateClientApiToClient),
+        total: response.meta.total,
     }
 }
 
-export async function apiCreateFixationClient(
-    data: CreateFixationClientPayload,
-): Promise<FixationClient> {
-    await delay()
-    const fullName = [data.lastName, data.firstName, data.middleName]
-        .map((part) => part?.trim())
-        .filter(Boolean)
-        .join(' ')
+export async function apiGetFixationManagers(): Promise<FixationManager[]> {
+    const response =
+        await ApiService.fetchDataWithAxios<FixationCreateManagersApiResponse>(
+            {
+                url: endpointConfig.managers,
+                method: 'get',
+            },
+        )
 
-    const client: FixationClient = {
-        id: `c${Date.now()}`,
-        fullName,
-        phone: data.phone,
-    }
-
-    fixationClientsData.unshift(client)
-    return client
+    return response.data.map(mapFixationCreateManagerApiToManager)
 }
 
-export async function apiGetFixationComplexes(): Promise<FixationComplex[]> {
-    await delay()
-    return [...fixationComplexesData]
+const mapComplexToFixationComplex = (item: Complex): FixationComplex => ({
+    id: item.id,
+    name: item.name,
+    address: item.address?.trim() || '',
+    apartments: [],
+    managers: [],
+})
+
+export async function apiGetFixationHouses(): Promise<FixationComplex[]> {
+    const response = await apiGetRealtyPropertiesSummary({
+        per_page: 1000,
+    })
+
+    return response.items.map(mapComplexToFixationComplex)
 }
 
 export async function apiCreateFixation(
-    data: CreateFixationPayload,
-): Promise<Fixation> {
-    await delay()
-    const client = fixationClientsData.find((item) => item.id === data.clientId)
-    const complex = fixationComplexesData.find(
-        (item) => item.id === data.complexId,
-    )
-    const apartment = complex?.apartments.find(
-        (item) => item.id === data.apartmentId,
-    )
-    const checkboardApartment =
-        !apartment && data.apartmentId
-            ? Object.values(
-                  checkboardByComplexId[data.complexId]?.sections ?? [],
-              )
-                  .flatMap((section) =>
-                      Array.isArray(section.properties)
-                          ? section.properties
-                          : Object.values(section.properties).flat(),
-                  )
-                  .find((item) => String(item.id) === data.apartmentId)
-            : null
-    const now = new Date()
-    const expires = new Date(now)
-    expires.setMonth(expires.getMonth() + 1)
-
-    const manager = data.managerId
-        ? complex?.managers.find((item) => item.id === data.managerId)
-        : undefined
-    const relatives = (data.relatives || [])
-        .map((relative) => {
-            const client = fixationClientsData.find(
-                (item) => item.id === relative.clientId,
-            )
-            if (!client || client.id === data.clientId || !relative.relation) {
-                return null
-            }
-
-            return {
-                id: client.id,
-                fullName: client.fullName,
-                phone: client.phone,
-                relation: relative.relation,
-            }
-        })
-        .filter((item): item is NonNullable<typeof item> => Boolean(item))
-
-    const fixation: Fixation = {
-        id: String(Date.now()),
-        fullName: client?.fullName || 'Клиент',
-        phone: client?.phone || '—',
-        status: 'fixed',
-        createdAt: now.toISOString(),
-        expiresAt: expires.toISOString(),
-        objectName: complex?.address || '—',
-        projectName: complex?.name || '—',
-        objectId:
-            apartment?.id ||
-            (checkboardApartment ? String(checkboardApartment.id) : null) ||
-            complex?.id ||
-            '—',
-        apartment:
-            apartment || checkboardApartment
-                ? `кв. ${apartment?.number || checkboardApartment?.number}`
-                : undefined,
-        address: complex?.address,
-        managerName: manager?.fullName,
-        managerPhone: manager?.phone,
-        managerPhoto: manager?.photo,
-        note: data.note,
-        desiredArea: data.desiredArea,
-        desiredRooms: data.desiredRooms,
-        paymentFormat: data.paymentFormat,
-        budget: data.budget,
-        meetingDate: data.meetingDate,
-        relatives: relatives.length > 0 ? relatives : undefined,
-        agent: {
-            email: profileData.email,
-            fullName: profileData.fullName,
-            phone: profileData.phone,
-            agency: profileData.agency,
-        },
-        crm: {
-            leadCreated: false,
-            leadExternalId: null,
-        },
-        history: [
-            {
-                id: `h-${Date.now()}`,
-                type: 'created',
-                title: 'Фиксация создана',
-                description: data.note || undefined,
-                createdAt: now.toISOString(),
-            },
-        ],
-    }
-
-    fixationsData.unshift(fixation)
-    return fixation
+    data: CreateFixationWizardPayload,
+): Promise<void> {
+    await ApiService.fetchDataWithAxios({
+        url: endpointConfig.fixations,
+        method: 'post',
+        data: mapCreateFixationPayloadToApiBody(data),
+    })
 }
+
+// TODO(api): отдельный POST клиента — если появится endpoint, можно вернуть
+// export async function apiCreateFixationClient(data: CreateFixationClientPayload) { ... }

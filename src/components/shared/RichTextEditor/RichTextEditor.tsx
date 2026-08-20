@@ -17,6 +17,11 @@ import ToolButtonTextColor from './toolButtons/ToolButtonTextColor'
 import ToolButtonSpacing from './toolButtons/ToolButtonSpacing'
 import FontSize from './extensions/FontSize'
 import BlockSpacing from './extensions/BlockSpacing'
+import {
+    focusEditorAtPointer,
+    proseMirrorSurfaceClass,
+    shouldManualFocusRichTextEditor,
+} from './focusEditorAtPointer'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TextStyle from '@tiptap/extension-text-style'
@@ -105,7 +110,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
               ],
               editorProps: {
                   attributes: {
-                      class: 'm-2 focus:outline-hidden [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100',
+                      class: `m-2 focus:outline-hidden ${proseMirrorSurfaceClass} [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100`,
                   },
               },
               content,
@@ -167,15 +172,28 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                 )}
             </div>
 
-            <EditorContent
-                ref={ref}
-                className={classNames(
-                    'max-h-[600px] overflow-auto px-2 prose prose-p:text-sm dark:prose-invert dark:prose-p:text-gray-400 max-w-full prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100',
-                    editorContentClass,
-                )}
-                editor={editor}
-                {...rest}
-            />
+            <div
+                className="overflow-auto px-2"
+                onMouseDown={(event) => {
+                    if (event.button !== 0) return
+                    if (!shouldManualFocusRichTextEditor(editor, event.target)) {
+                        return
+                    }
+
+                    event.preventDefault()
+                    focusEditorAtPointer(editor, event)
+                }}
+            >
+                <EditorContent
+                    ref={ref}
+                    className={classNames(
+                        'max-h-[600px] prose prose-p:text-sm dark:prose-invert dark:prose-p:text-gray-400 max-w-full prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:min-h-[320px] [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100',
+                        editorContentClass,
+                    )}
+                    editor={editor}
+                    {...rest}
+                />
+            </div>
         </div>
     )
 }

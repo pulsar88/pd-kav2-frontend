@@ -44,9 +44,17 @@ export const getApiErrorMessage = (errors: unknown, fallback = 'Произошл
     if (data?.error) return data.error
 
     if (data?.errors && typeof data.errors === 'object') {
-        const first = Object.values(data.errors)[0]
-        if (Array.isArray(first) && first[0]) return first[0]
-        if (typeof first === 'string') return first
+        const messages = Object.values(data.errors).flatMap((value) => {
+            if (Array.isArray(value)) {
+                return value.filter(Boolean)
+            }
+
+            return value ? [value] : []
+        })
+
+        if (messages.length > 0) {
+            return messages.join(' ')
+        }
     }
 
     if (err?.message) return err.message

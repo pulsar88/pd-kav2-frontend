@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import Alert from '@/components/ui/Alert'
 import Button from '@/components/ui/Button'
-import Input from '@/components/ui/Input'
 import { FormItem, Form } from '@/components/ui/Form'
 import PasswordInput from '@/components/shared/PasswordInput'
 import ActionLink from '@/components/shared/ActionLink'
@@ -18,16 +17,12 @@ type ResetPasswordProps = {
 }
 
 type ResetPasswordFormSchema = {
-    code: string
-    uniquePart: string
     newPassword: string
     confirmPassword: string
 }
 
 const validationSchema = z
     .object({
-        code: z.string().min(1, 'Введите код из сообщения'),
-        uniquePart: z.string().min(1, 'Отсутствует ключ сброса'),
         newPassword: z
             .string()
             .min(8, 'Минимум 8 символов')
@@ -48,9 +43,10 @@ export const ResetPasswordBase = ({
     const [searchParams] = useSearchParams()
     const navigate = useNavigate()
 
-    const uniqueFromQuery =
+    const uniquePart =
         searchParams.get('unique_part') || searchParams.get('uniquePart') || ''
-    const codeFromQuery = searchParams.get('code') || ''
+    const code = searchParams.get('code') || ''
+    const hasResetParams = Boolean(uniquePart && code)
 
     const {
         handleSubmit,
@@ -60,8 +56,6 @@ export const ResetPasswordBase = ({
     } = useForm<ResetPasswordFormSchema>({
         resolver: zodResolver(validationSchema),
         defaultValues: {
-            code: codeFromQuery,
-            uniquePart: uniqueFromQuery,
             newPassword: '',
             confirmPassword: '',
         },
@@ -69,6 +63,13 @@ export const ResetPasswordBase = ({
     })
 
     const onResetPassword = async (values: ResetPasswordFormSchema) => {
+        if (!hasResetParams) {
+            setMessage(
+                'Ссылка для сброса пароля недействительна или устарела',
+            )
+            return
+        }
+
         setSubmitting(true)
         setMessage('')
 
@@ -76,8 +77,8 @@ export const ResetPasswordBase = ({
             await apiResetPassword({
                 password: values.newPassword,
                 password_confirmation: values.confirmPassword,
-                unique_part: values.uniquePart,
-                code: values.code,
+                unique_part: uniquePart,
+                code,
             })
             setResetComplete(true)
         } catch (errors) {
@@ -103,7 +104,7 @@ export const ResetPasswordBase = ({
                     <>
                         <h2 className="mb-2">Новый пароль</h2>
                         <p className="font-semibold heading-text">
-                            Введите код из сообщения и придумайте новый пароль
+                            Придумайте новый пароль для входа в аккаунт
                         </p>
                     </>
                 )}
@@ -115,58 +116,25 @@ export const ResetPasswordBase = ({
                 </Alert>
             ) : null}
 
-            {!resetComplete ? (
-                <Form onSubmit={handleSubmit(onResetPassword)}>
-                    <FormItem
-                        asterisk
-                        label="Код подтверждения"
-                        errorMode="reserved"
-                        invalid={Boolean(errors.code)}
-                        errorMessage={errors.code?.message}
+            {!resetComplete && !hasResetParams ? (
+                <>
+                    <Alert showIcon className="mb-4" type="danger">
+                        Ссылка для сброса пароля недействительна или устарела.
+                        Запросите восстановление ещё раз.
+                    </Alert>
+                    <Button
+                        block
+                        variant="solid"
+                        type="button"
+                        onClick={() => navigate('/forgot-password')}
                     >
-                        <Controller
-                            name="code"
-                            control={control}
-                            render={({ field }) => (
-                                <Input
-                                    placeholder="Код из SMS / письма"
-                                    autoComplete="one-time-code"
-                                    {...field}
-                                />
-                            )}
-                        />
-                    </FormItem>
+                        Восстановить пароль
+                    </Button>
+                </>
+            ) : null}
 
-                    {!uniqueFromQuery ? (
-                        <FormItem
-                            asterisk
-                            label="Ключ сброса"
-                            errorMode="reserved"
-                            invalid={Boolean(errors.uniquePart)}
-                            errorMessage={errors.uniquePart?.message}
-                        >
-                            <Controller
-                                name="uniquePart"
-                                control={control}
-                                render={({ field }) => (
-                                    <Input
-                                        placeholder="unique_part из письма"
-                                        autoComplete="off"
-                                        {...field}
-                                    />
-                                )}
-                            />
-                        </FormItem>
-                    ) : (
-                        <Controller
-                            name="uniquePart"
-                            control={control}
-                            render={({ field }) => (
-                                <input type="hidden" {...field} />
-                            )}
-                        />
-                    )}
-
+            {!resetComplete && hasResetParams ? (
+                <Form onSubmit={handleSubmit(onResetPassword)}>
                     <FormItem
                         asterisk
                         label="Новый пароль"
@@ -212,8 +180,6 @@ export const ResetPasswordBase = ({
                         variant="solid"
                         type="submit"
                         disabled={
-                            !(watch('code') || '') ||
-                            !(watch('uniquePart') || '') ||
                             (watch('newPassword') || '').length < 8 ||
                             watch('newPassword') !== watch('confirmPassword')
                         }
@@ -221,7 +187,9 @@ export const ResetPasswordBase = ({
                         Сохранить пароль
                     </Button>
                 </Form>
-            ) : (
+            ) : null}
+
+            {resetComplete ? (
                 <Button
                     block
                     variant="solid"
@@ -230,7 +198,7 @@ export const ResetPasswordBase = ({
                 >
                     Войти
                 </Button>
-            )}
+            ) : null}
 
             {!resetComplete ? (
                 <div className="mt-6 text-center text-sm">

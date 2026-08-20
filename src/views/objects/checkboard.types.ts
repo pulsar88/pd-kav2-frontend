@@ -14,7 +14,6 @@ export type CheckboardPropertyStatus = {
     code: string
     color: string
     text_color: string
-    accent_color: string
     is_available: boolean
     is_booked: boolean
     is_sold: boolean

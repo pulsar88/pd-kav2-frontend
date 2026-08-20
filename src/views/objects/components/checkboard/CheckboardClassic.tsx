@@ -16,6 +16,7 @@ import {
     getSectionFloors,
 } from '../../checkboardUtils'
 import DualHorizontalScroll from './DualHorizontalScroll'
+import CheckboardPropertyCellTooltip from './CheckboardPropertyCellTooltip'
 
 type CheckboardClassicProps = {
     building: CheckboardBuilding
@@ -27,11 +28,12 @@ type CheckboardClassicProps = {
 
 type HoverTarget = { floor: number; columnKey: string } | null
 
-const CELL = 'minmax(2.75rem, 2.75rem)'
+const CELL_SIZE_PX = 35
+const CELL = 'minmax(35px, 35px)'
+const CELL_CLASS = 'size-[35px]'
 const FLOOR = '3.25rem'
 const GRID_GAP_PX = 6
-/** h-10 (40px) + gap-1.5 (6px) — шаг строки этажа для выравнивания секций */
-const FLOOR_ROW_PITCH_PX = 40 + GRID_GAP_PX
+const FLOOR_ROW_PITCH_PX = CELL_SIZE_PX + GRID_GAP_PX
 
 const buildBlockColumns = (columns: SectionColumn[]) =>
     `${FLOOR} ${columns.map(() => CELL).join(' ')} ${FLOOR}`
@@ -143,7 +145,8 @@ const ClassicBlock = ({
                                     <div
                                         key={`${floor}-${column.key}`}
                                         className={classNames(
-                                            'h-10 rounded-lg transition-colors',
+                                            CELL_CLASS,
+                                            'rounded-lg transition-colors',
                                             highlighted
                                                 ? 'bg-primary/15 dark:bg-primary/20'
                                                 : 'bg-gray-50 dark:bg-gray-900/50',
@@ -165,33 +168,37 @@ const ClassicBlock = ({
                                 selectedPropertyId === property.id
 
                             return (
-                                <button
+                                <CheckboardPropertyCellTooltip
                                     key={property.id}
-                                    type="button"
-                                    data-property-id={property.id}
-                                    title={`${property.type.name} №${property.number} · ${property.status.name}`}
-                                    className={classNames(
-                                        'relative z-0 flex h-10 items-center justify-center rounded-lg border text-xs font-semibold transition-[opacity,filter,box-shadow]',
-                                        !active && DIMMED_CELL_CLASS,
-                                        isSelected &&
-                                            'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
-                                        exact &&
-                                            !isSelected &&
-                                            'z-[1] shadow-md ring-2 ring-primary/70',
-                                    )}
-                                    style={{
-                                        backgroundColor: property.status.color,
-                                        color: property.status.text_color,
-                                        borderColor:
-                                            property.status.accent_color,
-                                    }}
-                                    onMouseEnter={setCellHover}
-                                    onClick={() =>
-                                        onPropertySelect?.(property.id)
-                                    }
+                                    property={property}
+                                    wrapperClass="flex shrink-0"
                                 >
-                                    {getCellLabel(property, labelMode)}
-                                </button>
+                                    <button
+                                        type="button"
+                                        data-property-id={property.id}
+                                        className={classNames(
+                                            CELL_CLASS,
+                                            'relative z-0 flex shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold leading-none transition-[opacity,filter,box-shadow]',
+                                            !active && DIMMED_CELL_CLASS,
+                                            isSelected &&
+                                                'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
+                                            exact &&
+                                                !isSelected &&
+                                                'z-[1] shadow-md ring-2 ring-primary/70',
+                                        )}
+                                        style={{
+                                            backgroundColor:
+                                                property.status.color,
+                                            color: property.status.text_color,
+                                        }}
+                                        onMouseEnter={setCellHover}
+                                        onClick={() =>
+                                            onPropertySelect?.(property.id)
+                                        }
+                                    >
+                                        {getCellLabel(property, labelMode)}
+                                    </button>
+                                </CheckboardPropertyCellTooltip>
                             )
                         })}
                         <div

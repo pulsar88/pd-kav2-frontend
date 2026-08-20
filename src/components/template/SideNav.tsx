@@ -18,7 +18,6 @@ import {
 import type { Mode } from '@/@types/theme'
 
 type SideNavProps = {
-    translationSetup?: boolean
     background?: boolean
     className?: string
     contentClass?: string
@@ -36,7 +35,6 @@ const sideNavCollapseStyle = {
 }
 
 const SideNav = ({
-    translationSetup = appConfig.activeNavTranslation,
     background = true,
     className,
     contentClass,
@@ -64,7 +62,10 @@ const SideNav = ({
         >
             <Link
                 to={appConfig.authenticatedEntryPath}
-                className="side-nav-header flex flex-col justify-center"
+                className={classNames(
+                    'side-nav-header flex flex-col justify-center',
+                    sideNavCollapse ? 'items-center' : 'items-start',
+                )}
                 style={{ height: HEADER_HEIGHT }}
             >
                 <Logo
@@ -72,7 +73,7 @@ const SideNav = ({
                     mode={mode || defaultMode}
                     type={sideNavCollapse ? 'streamline' : 'full'}
                     className={classNames(
-                        sideNavCollapse && 'ltr:ml-[11.5px] ltr:mr-[11.5px]',
+                        sideNavCollapse && 'mx-auto my-0',
                         sideNavCollapse
                             ? SIDE_NAV_CONTENT_GUTTER
                             : LOGO_X_GUTTER,
@@ -86,7 +87,6 @@ const SideNav = ({
                         navigationTree={navigationConfig}
                         routeKey={currentRouteKey}
                         direction={direction}
-                        translationSetup={translationSetup}
                         userAuthority={userAuthority || []}
                     />
                 </ScrollBar>

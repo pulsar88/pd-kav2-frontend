@@ -109,7 +109,6 @@ export type PhoneInputProps = {
     className?: string
     disabled?: boolean
     invalid?: boolean
-    completeClassName?: string
     countryCode?: string
     onBlur?: () => void
     onChange?: (formattedFullPhone: string) => void
@@ -121,7 +120,6 @@ const PhoneInput = ({
     className,
     disabled,
     invalid,
-    completeClassName = 'border-primary ring-1 ring-primary bg-primary/5 text-primary',
     countryCode = 'RU',
     onBlur,
     onChange,
@@ -144,11 +142,6 @@ const PhoneInput = ({
 
     const inputValue = toInputDisplay(country, nationalDigits)
 
-    const isComplete =
-        country.value === 'RU'
-            ? nationalDigits.length === 10
-            : nationalDigits.length >= 6
-
     const placeholder =
         country.value === 'RU'
             ? `${country.dialCode} 912 345 67 89`
@@ -166,7 +159,16 @@ const PhoneInput = ({
             return
         }
 
-        emitChange(country, extractNationalDigits(raw, country))
+        const nextDigits = extractNationalDigits(raw, country)
+        if (
+            country.value === 'RU' &&
+            nextDigits.length > 0 &&
+            nextDigits[0] !== '9'
+        ) {
+            return
+        }
+
+        emitChange(country, nextDigits)
     }
 
     return (
@@ -283,7 +285,6 @@ const PhoneInput = ({
                     disabled={disabled}
                     invalid={invalid}
                     value={inputValue}
-                    className={classNames(isComplete && completeClassName)}
                     onBlur={onBlur}
                     onChange={(e) => handlePhoneChange(e.target.value)}
                     onPaste={(e) => {
@@ -291,26 +292,18 @@ const PhoneInput = ({
                         handlePhoneChange(e.clipboardData.getData('text'))
                     }}
                     onKeyDown={(e) => {
-                        // Не даём Backspace/Delete убрать код страны
                         const dialLen = country.dialCode.length
                         const input = e.currentTarget
                         const start = input.selectionStart ?? 0
                         const end = input.selectionEnd ?? 0
 
+                        if (start !== end) return
+
                         if (
-                            (e.key === 'Backspace' && start <= dialLen && start === end) ||
-                            (e.key === 'Backspace' && start < dialLen) ||
+                            (e.key === 'Backspace' && start <= dialLen) ||
                             (e.key === 'Delete' && start < dialLen)
                         ) {
-                            if (nationalDigits.length === 0) {
-                                e.preventDefault()
-                            } else if (start <= dialLen) {
-                                e.preventDefault()
-                                emitChange(
-                                    country,
-                                    nationalDigits.slice(0, -1),
-                                )
-                            }
+                            e.preventDefault()
                         }
                     }}
                 />

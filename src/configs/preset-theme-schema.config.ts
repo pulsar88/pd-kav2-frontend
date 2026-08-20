@@ -41,20 +41,20 @@ const darkTheme: ThemeVariables = {
     },
 }
 
-const greenTheme: ThemeVariables = {
+const grayTheme: ThemeVariables = {
     light: {
-        primary: '#0CAF60',
-        primaryDeep: '#088d50',
-        primaryMild: '#34c779',
-        primarySubtle: '#0CAF601a',
-        neutral: '#ffffff',
+        primary: '#f4f6f8',
+        primaryDeep: '#dfe3e8',
+        primaryMild: '#e8ecf0',
+        primarySubtle: '#f4f6f81a',
+        neutral: '#1f2937',
     },
     dark: {
-        primary: '#0CAF60',
-        primaryDeep: '#088d50',
-        primaryMild: '#34c779',
-        primarySubtle: '#0CAF601a',
-        neutral: '#ffffff',
+        primary: '#f4f6f8',
+        primaryDeep: '#dfe3e8',
+        primaryMild: '#ffffff',
+        primarySubtle: '#f4f6f81a',
+        neutral: '#1f2937',
     },
 }
 
@@ -126,12 +126,48 @@ const slateTheme: ThemeVariables = {
     },
 }
 
+const roseTheme: ThemeVariables = {
+    light: {
+        primary: '#e11d48',
+        primaryDeep: '#be123c',
+        primaryMild: '#fb7185',
+        primarySubtle: '#e11d481a',
+        neutral: '#ffffff',
+    },
+    dark: {
+        primary: '#fb7185',
+        primaryDeep: '#e11d48',
+        primaryMild: '#fda4af',
+        primarySubtle: '#fb71851a',
+        neutral: '#ffffff',
+    },
+}
+
+const tealTheme: ThemeVariables = {
+    light: {
+        primary: '#0d9488',
+        primaryDeep: '#0f766e',
+        primaryMild: '#2dd4bf',
+        primarySubtle: '#0d94881a',
+        neutral: '#ffffff',
+    },
+    dark: {
+        primary: '#2dd4bf',
+        primaryDeep: '#14b8a6',
+        primaryMild: '#5eead4',
+        primarySubtle: '#2dd4bf1a',
+        neutral: '#ffffff',
+    },
+}
+
 const presetThemeSchemaConfig: Record<string, ThemeVariables> = {
+    gray: grayTheme,
     default: defaultTheme,
     dark: darkTheme,
-    green: greenTheme,
     purple: purpleTheme,
     orange: orangeTheme,
+    rose: roseTheme,
+    teal: tealTheme,
     stone: stoneTheme,
     slate: slateTheme,
 }

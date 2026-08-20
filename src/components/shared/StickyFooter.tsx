@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, ReactNode } from 'react'
 import classNames from 'classnames'
-import useDebounce from '@/utils/hooks/useDebounce'
 import type { HTMLAttributes } from 'react'
 
 interface StickyFooterProps
@@ -10,60 +9,57 @@ interface StickyFooterProps
     children?: ReactNode | ((isSticky: boolean) => ReactNode)
 }
 
+/**
+ * Sticky-футер без «прыжков»: position всегда sticky,
+ * а IntersectionObserver смотрит на sentinel ниже блока,
+ * а не на сам футер (иначе смена классов снова меняет intersection).
+ */
 const StickyFooter = (props: StickyFooterProps) => {
     const { children, className, stickyClass, defaultClass, ...rest } = props
 
-    const [isSticky, setIsSticky] = useState(false)
-    const ref = useRef<HTMLDivElement>(null)
-
-    function handleDebounceFn(val: boolean) {
-        setIsSticky(val)
-    }
-
-    const debounceFn = useDebounce(handleDebounceFn, 100)
+    const [isSticky, setIsSticky] = useState(true)
+    const sentinelRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        const cachedRef = ref.current
+        const sentinel = sentinelRef.current
+        if (!sentinel) return
+
         const observer = new IntersectionObserver(
-            ([e]) => {
-                console.log(
-                    'e.intersectionRatio < 1',
-                    e.intersectionRatio,
-                    e.intersectionRatio < 1,
-                )
-                if (!(e.intersectionRatio < 1)) {
-                    window.scrollTo({
-                        top: document.body.scrollHeight - 1,
-                        behavior: 'smooth',
-                    })
-                }
-                debounceFn(e.intersectionRatio < 1)
+            ([entry]) => {
+                // Sentinel виден → доскроллили до конца → «обычный» вид.
+                // Sentinel скрыт → футер прилипает к низу → sticky-стили.
+                setIsSticky(!entry.isIntersecting)
             },
             {
-                threshold: [1],
+                threshold: 0,
             },
         )
 
-        observer.observe(cachedRef as Element)
+        observer.observe(sentinel)
 
-        return function () {
-            observer.unobserve(cachedRef as Element)
+        return () => {
+            observer.disconnect()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     return (
-        <div
-            ref={ref}
-            className={classNames(
-                'static -bottom-[1px]',
-                className,
-                isSticky ? classNames(stickyClass, 'sticky') : defaultClass,
-            )}
-            {...rest}
-        >
-            {typeof children === 'function' ? children(isSticky) : children}
-        </div>
+        <>
+            <div
+                className={classNames(
+                    'sticky bottom-0 z-10',
+                    className,
+                    isSticky ? stickyClass : defaultClass,
+                )}
+                {...rest}
+            >
+                {typeof children === 'function' ? children(isSticky) : children}
+            </div>
+            <div
+                ref={sentinelRef}
+                className="pointer-events-none h-px w-full"
+                aria-hidden
+            />
+        </>
     )
 }
 

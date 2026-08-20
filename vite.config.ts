@@ -1,36 +1,63 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path';
+import path from 'path'
 import dynamicImport from 'vite-plugin-dynamic-import'
 
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), dynamicImport()],
-  assetsInclude: ['**/*.md'],
-  resolve: {
-    alias: {
-      '@': path.join(__dirname, 'src'),
-    },
-  },
-  server: {
-    // localhost — secure context, webpush/SW работают без HTTPS
-    headers: {
-      'Service-Worker-Allowed': '/',
-    },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false
-      }
+const resolveRemoteOrigin = (apiBaseUrl?: string) => {
+    if (!apiBaseUrl) {
+        return 'http://localhost:3000'
     }
-  },
-  preview: {
-    headers: {
-      'Service-Worker-Allowed': '/',
-    },
-  },
-  build: {
-    outDir: 'build'
-  }
+
+    try {
+        return new URL(apiBaseUrl).origin
+    } catch {
+        return 'http://localhost:3000'
+    }
+}
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, process.cwd(), '')
+    const remoteOrigin = resolveRemoteOrigin(env.VITE_API_BASE_URL)
+
+    return {
+        plugins: [react(), dynamicImport()],
+        assetsInclude: ['**/*.md'],
+        resolve: {
+            alias: {
+                '@': path.join(__dirname, 'src'),
+            },
+        },
+        server: {
+            headers: {
+                'Service-Worker-Allowed': '/',
+            },
+            proxy: {
+                '/api': {
+                    target: remoteOrigin,
+                    changeOrigin: true,
+                    secure: true,
+                },
+                '/broadcasting': {
+                    target: remoteOrigin,
+                    changeOrigin: true,
+                    secure: true,
+                },
+                '/soketi': {
+                    target: remoteOrigin,
+                    changeOrigin: true,
+                    secure: true,
+                    ws: true,
+                },
+            },
+        },
+        preview: {
+            headers: {
+                'Service-Worker-Allowed': '/',
+            },
+        },
+        build: {
+            outDir: 'build',
+        },
+    }
 })

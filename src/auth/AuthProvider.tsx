@@ -5,6 +5,7 @@ import { useSessionUser, useToken } from '@/store/authStore'
 import {
     apiAuthCheck,
     apiCheckPhone,
+    apiGetCurrentUser,
     apiRegister,
     apiRegisterAgency,
     apiSendOtp,
@@ -13,6 +14,8 @@ import {
     apiSignOut,
 } from '@/services/AuthService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { disconnectEcho } from '@/services/broadcast/echo'
+import { clearFavoritesStore } from '@/store/favoritesStore'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
 import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
@@ -88,10 +91,21 @@ function AuthProvider({ children }: AuthProviderProps) {
     }
 
     const handleSignOut = () => {
+        disconnectEcho()
+        clearFavoritesStore()
         setToken('')
         setTokenState('')
         setUser({})
         setSessionSignedIn(false)
+    }
+
+    const loadCurrentUser = async () => {
+        try {
+            const currentUser = await apiGetCurrentUser()
+            setUser(currentUser)
+        } catch {
+            // оставляем данные из fallback / persist
+        }
     }
 
     useEffect(() => {
@@ -116,6 +130,7 @@ function AuthProvider({ children }: AuthProviderProps) {
 
                 setTokenState(token)
                 setSessionSignedIn(true)
+                await loadCurrentUser()
             } catch {
                 if (!cancelled) {
                     handleSignOut()
@@ -131,8 +146,9 @@ function AuthProvider({ children }: AuthProviderProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
     }, [])
 
-    const finishAuth = (accessToken: string, nextUser?: User) => {
+    const finishAuth = async (accessToken: string, nextUser?: User) => {
         handleSignIn({ accessToken }, nextUser)
+        await loadCurrentUser()
         redirect()
 
         void preparePushPromptAfterAuth()
@@ -156,7 +172,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         try {
             const resp = await apiSignIn(values)
             if (resp?.token) {
-                return finishAuth(resp.token, {
+                return await finishAuth(resp.token, {
                     phone: values.phone,
                     userName: user.userName || '',
                 })
@@ -177,7 +193,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         try {
             const resp = await apiRegister(values)
             if (resp?.token) {
-                return finishAuth(resp.token, {
+                return await finishAuth(resp.token, {
                     userName: values.name,
                     phone: values.phone,
                 })
@@ -234,7 +250,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         try {
             const resp = await apiSignInByCode(values)
             if (resp?.token) {
-                return finishAuth(resp.token, {
+                return await finishAuth(resp.token, {
                     phone: values.phone,
                 })
             }
@@ -260,7 +276,7 @@ function AuthProvider({ children }: AuthProviderProps) {
                 : await apiRegister(values)
 
             if (resp?.token) {
-                return finishAuth(resp.token, {
+                return await finishAuth(resp.token, {
                     userName: values.name,
                     phone: values.phone,
                 })

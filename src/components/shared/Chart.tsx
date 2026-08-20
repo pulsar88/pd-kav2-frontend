@@ -97,9 +97,52 @@ const Chart = (props: ChartProps) => {
 
     if (customOptions) {
         options = { ...options, ...customOptions }
+
+        if (notDonut.includes(type as ChartType) && customOptions.xaxis) {
+            options.xaxis = {
+                ...chartDefaultOption.xaxis,
+                ...customOptions.xaxis,
+                categories: customOptions.xaxis.categories ?? xAxis,
+            }
+        }
+
+        if (type === 'donut' && customOptions.plotOptions?.pie) {
+            const defaultPie = chartDefaultOption.plotOptions?.pie
+            const customPie = customOptions.plotOptions.pie
+
+            options.plotOptions = {
+                ...options.plotOptions,
+                pie: {
+                    ...defaultPie,
+                    ...customPie,
+                    donut: {
+                        ...defaultPie?.donut,
+                        ...customPie.donut,
+                        labels: {
+                            ...defaultPie?.donut?.labels,
+                            ...customPie.donut?.labels,
+                            total: {
+                                ...defaultPie?.donut?.labels?.total,
+                                ...customPie.donut?.labels?.total,
+                            },
+                        },
+                    },
+                },
+            }
+        }
     }
 
     if (type === 'donut') {
+        options.plotOptions ??= {}
+        options.plotOptions.pie ??= {}
+        options.plotOptions.pie.donut ??= {}
+        options.plotOptions.pie.donut.labels ??= {}
+        options.plotOptions.pie.donut.labels.total ??= {
+            show: true,
+            showAlways: true,
+            label: '',
+        }
+
         if (donutTitle) {
             options.plotOptions.pie.donut.labels.total.label = donutTitle
         }

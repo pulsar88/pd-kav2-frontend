@@ -11,6 +11,7 @@ import type {
     AuthStatusResponse,
     AuthTokenResponse,
     CheckPhoneCredential,
+    CurrentUserResponse,
     ForgotPassword,
     ForgotPasswordResponse,
     ResetPassword,
@@ -19,7 +20,29 @@ import type {
     SignInCredential,
     SignUpAgencyCredential,
     SignUpCredential,
+    UpdateUserPayload,
+    User,
 } from '@/@types/auth'
+
+export const resolveProfilePictureUrl = (
+    profilePicture: CurrentUserResponse['profile_picture'],
+) => profilePicture?.src ?? ''
+
+export const mapCurrentUserToUser = (
+    data: CurrentUserResponse,
+    previousAvatar?: string | null,
+): User => ({
+    userId: String(data.id),
+    userName: data.name,
+    email: data.email ?? '',
+    phone: data.phone,
+    countryCode: data.country_code,
+    authority: data.roles,
+    avatar:
+        data.profile_picture !== undefined
+            ? resolveProfilePictureUrl(data.profile_picture)
+            : previousAvatar || '',
+})
 
 export async function apiRegisterSendCode(data: CheckPhoneCredential) {
     const response = await ApiService.fetchDataWithAxios<
@@ -114,6 +137,55 @@ export async function apiAuthCheck() {
         method: 'get',
     })
     return unwrapApiData(response)
+}
+
+export async function apiGetCurrentUser(): Promise<User> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<CurrentUserResponse>
+    >({
+        url: endpointConfig.usersCurrent,
+        method: 'get',
+    })
+    return mapCurrentUserToUser(unwrapApiData(response))
+}
+
+export async function apiUpdateUser(
+    userId: string | number,
+    data: UpdateUserPayload,
+    previousAvatar?: string | null,
+): Promise<User> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<CurrentUserResponse>
+    >({
+        url: endpointConfig.usersUpdate(userId),
+        method: 'put',
+        data,
+    })
+    return mapCurrentUserToUser(unwrapApiData(response), previousAvatar)
+}
+
+export async function apiUploadProfilePicture(file: File): Promise<User> {
+    const formData = new FormData()
+    formData.append('profile_picture', file)
+
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<CurrentUserResponse>
+    >({
+        url: endpointConfig.userProfilePicture,
+        method: 'post',
+        data: formData,
+    })
+    return mapCurrentUserToUser(unwrapApiData(response))
+}
+
+export async function apiDeleteProfilePicture(): Promise<User> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<CurrentUserResponse>
+    >({
+        url: endpointConfig.userProfilePicture,
+        method: 'delete',
+    })
+    return mapCurrentUserToUser(unwrapApiData(response))
 }
 
 export async function apiSendOtp(data: SendOtpCredential) {

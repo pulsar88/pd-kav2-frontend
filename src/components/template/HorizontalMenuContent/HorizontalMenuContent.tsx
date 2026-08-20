@@ -13,7 +13,6 @@ type HorizontalMenuContentProps = {
     routeKey: string
     navigationTree?: NavigationTree[]
     direction?: Direction
-    translationSetup?: boolean
     userAuthority: string[]
 }
 
@@ -21,11 +20,10 @@ const HorizontalMenuContent = (props: HorizontalMenuContentProps) => {
     const {
         routeKey,
         navigationTree = [],
-        translationSetup,
         userAuthority,
     } = props
 
-    const { t } = useTranslation(!translationSetup)
+    const { t } = useTranslation()
     const { activedRoute } = useMenuActive(navigationTree, routeKey)
 
     return (

@@ -1,7 +1,6 @@
 import { useNavigate, useParams } from 'react-router'
 import useSWR from 'swr'
 import Button from '@/components/ui/Button'
-import Avatar from '@/components/ui/Avatar'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
 import Loading from '@/components/shared/Loading'
@@ -23,12 +22,11 @@ import {
 import type { ReactNode } from 'react'
 import type { FixationHistoryType } from './types'
 import {
-    fixationStatusMap,
     formatFixationDate,
     formatFixationDateTime,
-    formatFixationKinship,
     getFixationExpiryAccentClass,
     getFixationHistoryStyle,
+    getFixationStatusDisplay,
 } from './utils'
 
 const InfoRow = ({
@@ -119,21 +117,6 @@ const FixationExpiryDate = ({ value }: { value: string }) => (
     </span>
 )
 
-const getInitials = (value?: string) =>
-    (value || '')
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() || '')
-        .join('') || '—'
-
-const formatBudgetValue = (value?: string) => {
-    const digits = (value || '').replace(/\D/g, '')
-    if (!digits) return 'Не указано'
-
-    return `${new Intl.NumberFormat('ru-RU').format(Number(digits))} ₽`
-}
-
 const fixationHistoryIconMap: Record<
     FixationHistoryType,
     typeof TbPlus
@@ -150,12 +133,30 @@ const fixationHistoryIconMap: Record<
     object_changed: TbBuilding,
 }
 
+const fixationObjectFields = [
+    { key: 'name', label: 'Название' },
+    { key: 'facing', label: 'Отделка' },
+    { key: 'material', label: 'Материал' },
+    { key: 'building_state', label: 'Состояние здания' },
+    { key: 'development_start', label: 'Начало строительства' },
+    { key: 'development_end', label: 'Окончание строительства' },
+    { key: 'address', label: 'Адрес' },
+] as const
+
+const formatObjectFieldValue = (value: unknown) => {
+    if (value == null || value === '') {
+        return '—'
+    }
+
+    return String(value)
+}
+
 const FixationDetails = () => {
     const { id } = useParams()
     const navigate = useNavigate()
 
     const { data, isLoading } = useSWR(
-        id ? ['/api/fixations', id] : null,
+        id ? ['/api/v2/fixations', id] : null,
         () => apiGetFixation(id || ''),
         {
             revalidateOnFocus: false,
@@ -164,7 +165,7 @@ const FixationDetails = () => {
         },
     )
 
-    const status = data ? fixationStatusMap[data.status] : null
+    const status = data ? getFixationStatusDisplay(data) : null
 
     return (
         <Container>
@@ -241,25 +242,12 @@ const FixationDetails = () => {
                                     <SummaryStat
                                         label="Менеджер"
                                         value={
-                                            <div className="flex items-center gap-3">
-                                                <Avatar
-                                                    size={40}
-                                                    src={data.managerPhoto}
-                                                    alt={data.managerName}
-                                                >
-                                                    {getInitials(
-                                                        data.managerName,
-                                                    )}
-                                                </Avatar>
-                                                <div className="min-w-0">
-                                                    <div className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                                                        {data.managerName ||
-                                                            '—'}
-                                                    </div>
-                                                    <div className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">
-                                                        {data.managerPhone ||
-                                                            '—'}
-                                                    </div>
+                                            <div>
+                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                                    {data.managerName || '—'}
+                                                </div>
+                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
+                                                    {data.managerPhone || '—'}
                                                 </div>
                                             </div>
                                         }
@@ -296,18 +284,14 @@ const FixationDetails = () => {
                                     />
                                     <InfoRow
                                         label="Объект"
-                                        value={data.objectName}
-                                    />
-                                    <InfoRow
-                                        label="Проект"
-                                        value={data.projectName}
+                                        value={data.object?.name || '—'}
                                     />
                                     <InfoRow
                                         label="Адрес"
                                         value={data.address}
                                     />
                                     <InfoRow
-                                        label="Квартира"
+                                        label="Помещение"
                                         value={data.apartment}
                                     />
                                     <InfoRow
@@ -347,132 +331,40 @@ const FixationDetails = () => {
                                     />
                                 </SectionCard>
 
-                                <SectionCard title="Предпочтения">
-                                    <InfoRow
-                                        label="Желаемая площадь"
-                                        value={
-                                            data.desiredArea
-                                                ? `${data.desiredArea} м²`
-                                                : 'Не указано'
-                                        }
-                                    />
-                                    <InfoRow
-                                        label="Кол-во комнат"
-                                        value={
-                                            data.desiredRooms || 'Не указано'
-                                        }
-                                    />
-                                    <InfoRow
-                                        label="Формат оплаты"
-                                        value={
-                                            data.paymentFormat || 'Не указано'
-                                        }
-                                    />
-                                    <InfoRow
-                                        label="Бюджет"
-                                        value={formatBudgetValue(data.budget)}
-                                    />
-                                    <InfoRow
-                                        label="Планируемая дата встречи"
-                                        value={
-                                            data.meetingDate
-                                                ? formatFixationDate(
-                                                      data.meetingDate,
-                                                  )
-                                                : 'Не указано'
-                                        }
-                                    />
-                                    <div className="mt-3">
-                                        <h5 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                            Комментарий
-                                        </h5>
-                                        <div className="max-h-29 overflow-y-auto whitespace-pre-wrap break-words text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {data.note || 'Не указано'}
-                                        </div>
-                                    </div>
-                                </SectionCard>
-
                                 <SectionCard title="Объект">
-                                    <InfoRow
-                                        label="Объект"
-                                        value={data.objectName}
-                                    />
-                                    <InfoRow
-                                        label="Проект"
-                                        value={data.projectName}
-                                    />
-                                    <InfoRow
-                                        label="ID объекта"
-                                        value={data.objectId}
-                                    />
-                                    <InfoRow
-                                        label="Адрес"
-                                        value={data.address}
-                                    />
-                                </SectionCard>
-
-                                <SectionCard title="Родственники">
-                                    {data.relatives?.length ? (
-                                        <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
-                                            {data.relatives.map((relative) => (
-                                                <div
-                                                    key={relative.id}
-                                                    className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                                                >
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                            {relative.fullName}
-                                                        </p>
-                                                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                                            {relative.phone}
-                                                        </p>
-                                                    </div>
-                                                    <span className="shrink-0 text-right text-sm text-gray-600 dark:text-gray-300">
-                                                        {formatFixationKinship(
-                                                            relative.relation,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    {data.object ? (
+                                        fixationObjectFields.map(({ key, label }) => (
+                                            <InfoRow
+                                                key={key}
+                                                label={label}
+                                                value={formatObjectFieldValue(
+                                                    data.object?.[key],
+                                                )}
+                                            />
+                                        ))
                                     ) : (
                                         <p className="text-sm text-gray-500 dark:text-gray-400">
-                                            Не указано
+                                            Объект не указан
                                         </p>
                                     )}
                                 </SectionCard>
 
                                 <SectionCard title="Контакты агента">
                                     <InfoRow
+                                        label="ФИО"
+                                        value={data.agent.fullName}
+                                    />
+                                    <InfoRow
+                                        label="Номер"
+                                        value={data.agent.phone}
+                                    />
+                                    <InfoRow
                                         label="Email"
                                         value={data.agent.email}
                                     />
                                     <InfoRow
-                                        label="Имя"
-                                        value={data.agent.fullName}
-                                    />
-                                    <InfoRow
-                                        label="Телефон"
-                                        value={data.agent.phone}
-                                    />
-                                    <InfoRow
                                         label="Агентство"
                                         value={data.agent.agency}
-                                    />
-                                </SectionCard>
-
-                                <SectionCard title="CRM">
-                                    <InfoRow
-                                        label="Лид создан"
-                                        value={
-                                            data.crm.leadCreated ? 'Да' : 'Нет'
-                                        }
-                                    />
-                                    <InfoRow
-                                        label="ID лида"
-                                        value={
-                                            data.crm.leadExternalId ?? '—'
-                                        }
                                     />
                                 </SectionCard>
                             </Masonry>
