@@ -111,5 +111,6 @@ export const downloadSchedulePdf = (result: MortgageResult) => {
     }
 
     // Открывает PDF в новой вкладке без диалога печати
-    pdfMake.createPdf(docDefinition).open()
+    // pdfMake.createPdf(docDefinition).open()
+    pdfMake.createPdf(docDefinition).download('grafik-platezhey.pdf')
 }
