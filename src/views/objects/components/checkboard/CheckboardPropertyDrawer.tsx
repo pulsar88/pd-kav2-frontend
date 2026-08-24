@@ -16,13 +16,24 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
-import { TbHeart, TbHeartFilled, TbLayoutGrid, TbPlus, TbZoomIn } from 'react-icons/tb'
+import {
+    TbChevronDown,
+    TbHeart,
+    TbHeartFilled,
+    TbLayoutGrid,
+    TbPlus,
+    TbZoomIn,
+} from 'react-icons/tb'
 import type { FlatCheckboardProperty } from '../../checkboard.types'
 import type { Premise } from '../../types'
-import { buildPremiseFromCheckboardProperty, formatCheckboardPrice } from '../../checkboardUtils'
+import {
+    buildPremiseFromCheckboardProperty,
+    formatCheckboardPrice,
+} from '../../checkboardUtils'
 import { useThemeStore } from '@/store/themeStore'
 import presetThemeSchemaConfig from '@/configs/preset-theme-schema.config'
 import { hexToRgba } from '@/utils/hetToRgba'
+import { useCommonStore } from '@/store/commonStore'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -34,15 +45,11 @@ type CheckboardPropertyDrawerProps = {
     onClose: () => void
 }
 
-const InfoRow = ({
-    label,
-    value,
-}: {
-    label: string
-    value: ReactNode
-}) => (
+const InfoRow = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="flex items-start justify-between gap-4 py-2">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+            {label}
+        </span>
         <div className="max-w-[60%] text-right text-sm font-medium text-gray-900 dark:text-gray-100">
             {value || '—'}
         </div>
@@ -87,8 +94,6 @@ const LayoutImagePlaceholder = () => (
     </div>
 )
 
-
-
 const FloorPlanPathOverlay = ({
     path,
     width,
@@ -106,12 +111,7 @@ const FloorPlanPathOverlay = ({
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"
     >
-        <path
-            d={path}
-            fill={hexToRgba(color)}
-            stroke={color}
-            strokeWidth={4}
-        />
+        <path d={path} fill={hexToRgba(color)} stroke={color} strokeWidth={4} />
     </svg>
 )
 
@@ -137,10 +137,10 @@ const FloorPlanGallerySlide = ({
                 position: 'relative',
                 ...(hasSize
                     ? {
-                            maxWidth: `min(${slide.width}px, 100%)`,
-                            maxHeight: `min(${slide.height}px, 100%)`,
-                            aspectRatio: `${slide.width} / ${slide.height}`,
-                        }
+                          maxWidth: `min(${slide.width}px, 100%)`,
+                          maxHeight: `min(${slide.height}px, 100%)`,
+                          aspectRatio: `${slide.width} / ${slide.height}`,
+                      }
                     : null),
             }}
         >
@@ -152,11 +152,11 @@ const FloorPlanGallerySlide = ({
                     display: 'block',
                     ...(hasSize
                         ? {
-                                width: '100%',
-                                height: 'auto',
-                                maxWidth: undefined,
-                                maxHeight: undefined,
-                            }
+                              width: '100%',
+                              height: 'auto',
+                              maxWidth: undefined,
+                              maxHeight: undefined,
+                          }
                         : null),
                 }}
             />
@@ -172,10 +172,7 @@ const FloorPlanGallerySlide = ({
     )
 }
 
-const formatSectionValue = (
-    section?: string,
-    sectionName?: string,
-) => {
+const formatSectionValue = (section?: string, sectionName?: string) => {
     const raw = section ?? sectionName
     if (!raw) return undefined
 
@@ -205,6 +202,8 @@ const CheckboardPropertyDrawer = ({
     const mode = useThemeStore((state) => state.mode)
     const primaryColor =
         presetThemeSchemaConfig[schema]?.[mode]?.primary ?? '#3b82f6'
+    const showFloorPlan = useCommonStore((state) => state.showFloorPlan)
+    const setShowFloorPlan = useCommonStore((state) => state.setShowFloorPlan)
 
     const favoritePremise = useMemo(() => {
         if (!property) return null
@@ -308,11 +307,7 @@ const CheckboardPropertyDrawer = ({
                                         : 'text-gray-600 dark:text-gray-300',
                                 )}
                                 icon={
-                                    isFavorite ? (
-                                        <TbHeartFilled />
-                                    ) : (
-                                        <TbHeart />
-                                    )
+                                    isFavorite ? <TbHeartFilled /> : <TbHeart />
                                 }
                                 onClick={(event) => {
                                     event.stopPropagation()
@@ -352,8 +347,14 @@ const CheckboardPropertyDrawer = ({
                                         params.set('complexId', complexId)
                                     }
 
-                                    params.set('propertyId', String(property.id))
-                                    params.set('apartmentNumber', display.number)
+                                    params.set(
+                                        'propertyId',
+                                        String(property.id),
+                                    )
+                                    params.set(
+                                        'apartmentNumber',
+                                        display.number,
+                                    )
                                     if (display.hasRooms) {
                                         params.set(
                                             'rooms',
@@ -398,7 +399,9 @@ const CheckboardPropertyDrawer = ({
                                                         type="button"
                                                         className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
                                                         onClick={() =>
-                                                            setPreviewIndex(index)
+                                                            setPreviewIndex(
+                                                                index,
+                                                            )
                                                         }
                                                     >
                                                         <img
@@ -428,56 +431,77 @@ const CheckboardPropertyDrawer = ({
                             </div>
                         </div>
                         <div>
-                            <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                План этажа
-                            </h5>
-                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-                                {propertyDetails?.floorPlanImage ? (
-                                    <button
-                                        type="button"
-                                        className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
-                                        onClick={() =>
-                                            setFloorPlanPreviewIndex(0)
-                                        }
-                                    >
-                                        <div className="relative h-full w-full">
-                                            <img
-                                                src={
-                                                    propertyDetails.floorPlanImage
-                                                }
-                                                alt={`План этажа, помещение №${display.number}`}
-                                                className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
-                                                loading="lazy"
-                                                onLoad={(event) => {
-                                                    const img =
-                                                        event.currentTarget
-                                                    setFloorPlanSize({
-                                                        width: img.naturalWidth,
-                                                        height: img.naturalHeight,
-                                                    })
-                                                }}
-                                            />
-                                            {floorPlanSize &&
-                                            propertyDetails.floorPath ? (
-                                                <FloorPlanPathOverlay
-                                                    path={
-                                                        propertyDetails.floorPath
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between gap-3 py-3 text-left"
+                                onClick={() => setShowFloorPlan(!showFloorPlan)}
+                            >
+                                <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    План этажа
+                                </h5>
+                                <TbChevronDown
+                                    className={classNames(
+                                        'shrink-0 text-lg text-gray-400 transition-transform duration-200',
+                                        showFloorPlan && 'rotate-180',
+                                    )}
+                                />
+                            </button>
+                            {showFloorPlan ? (
+                                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                                    {propertyDetails?.floorPlanImage ? (
+                                        <button
+                                            type="button"
+                                            className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
+                                            onClick={() =>
+                                                setFloorPlanPreviewIndex(0)
+                                            }
+                                        >
+                                            <div
+                                                key={propertyDetails.id}
+                                                className="relative h-full w-full"
+                                            >
+                                                <img
+                                                    src={
+                                                        propertyDetails.floorPlanImage
                                                     }
-                                                    width={floorPlanSize.width}
-                                                    height={floorPlanSize.height}
-                                                    color={primaryColor}
+                                                    alt={`План этажа, помещение №${display.number}`}
+                                                    className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
+                                                    loading="lazy"
+                                                    onLoad={(event) => {
+                                                        const img =
+                                                            event.currentTarget
+                                                        setFloorPlanSize({
+                                                            width: img.naturalWidth,
+                                                            height: img.naturalHeight,
+                                                        })
+                                                    }}
                                                 />
-                                            ) : null}
-                                        </div>
-                                        <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                                            <TbZoomIn className="text-sm" />
-                                            Увеличить
-                                        </span>
-                                    </button>
-                                ) : (
-                                    <LayoutImagePlaceholder />
-                                )}
-                            </div>
+                                                {floorPlanSize &&
+                                                propertyDetails.floorPath ? (
+                                                    <FloorPlanPathOverlay
+                                                        path={
+                                                            propertyDetails.floorPath
+                                                        }
+                                                        width={
+                                                            floorPlanSize.width
+                                                        }
+                                                        height={
+                                                            floorPlanSize.height
+                                                        }
+                                                        color={primaryColor}
+                                                    />
+                                                ) : null}
+                                            </div>
+                                            <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                                <TbZoomIn className="text-sm" />
+                                                Увеличить
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <LayoutImagePlaceholder />
+                                    )}
+                                </div>
+                            ) : null}
                         </div>
 
                         <div>
@@ -573,9 +597,9 @@ const CheckboardPropertyDrawer = ({
                             alt: `План этажа, помещение №${display?.number ?? ''}`,
                             ...(floorPlanSize
                                 ? {
-                                        width: floorPlanSize.width,
-                                        height: floorPlanSize.height,
-                                    }
+                                      width: floorPlanSize.width,
+                                      height: floorPlanSize.height,
+                                  }
                                 : null),
                         },
                     ]}
