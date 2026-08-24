@@ -135,11 +135,36 @@ export async function apiGetFixationHouses(): Promise<FixationComplex[]> {
 
 export async function apiCreateFixation(
     data: CreateFixationWizardPayload,
-): Promise<void> {
-    await ApiService.fetchDataWithAxios({
+): Promise<{data: Fixation}> {
+    const response = await ApiService.fetchDataWithAxios<{data:Fixation}>({
         url: endpointConfig.fixations,
         method: 'post',
         data: mapCreateFixationPayloadToApiBody(data),
+    })
+
+    return response
+}
+
+/**
+ * Устанавливает дополнительных клиентов для фиксации
+ * @param fixationId - id фиксации
+ * @param clients - массив клиентов
+ * @param clients.client_id - id клиента
+ * @param clients.relation - отношение к клиенту
+ * @returns void
+ */
+export async function apiSetRelatedClientsForFixation({
+    fixationId,
+    clients,
+}: {
+    fixationId: string
+    clients: { client_id: number; relation: number }[]
+}
+): Promise<void> {
+    await ApiService.fetchDataWithAxios({
+        url: endpointConfig.fixationRelatedClients(fixationId),
+        method: 'post',
+        data: {clients: clients},
     })
 }
 

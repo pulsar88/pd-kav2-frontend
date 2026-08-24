@@ -30,6 +30,8 @@ const endpointConfig = {
         `/v2/realty_objects/${complexId}/chess`,
     fixations: '/v2/fixations',
     fixation: (fixationId: string | number) => `/v2/fixations/${fixationId}`,
+    fixationRelatedClients: (fixationId: string | number) =>
+        `/v2/fixations/${fixationId}/related_clients`,
     clients: '/v2/clients',
     managers: '/v2/managers',
     realtyCollectionDefault: '/v2/realty_collections/default',

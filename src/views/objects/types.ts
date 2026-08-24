@@ -77,6 +77,7 @@ export type Premise = {
     layoutName?: string
     layoutImage?: string
     floorPlanImage?: string
+    floorPath?: string
     complexImage?: string
     promoText?: string
     description?: string

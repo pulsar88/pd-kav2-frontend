@@ -49,8 +49,10 @@ export const mapCreateFixationPayloadToApiBody = (
             name: payload.client.firstName?.trim() || payload.client.fullName,
             second_name: payload.client.secondName?.trim() || undefined,
             last_name: payload.client.lastName?.trim() || undefined,
-            phone: serializeRuPhoneForApi(payload.client.phone),
-            country_code: payload.client.countryCode || 'RU',
+            phones: [{
+                phone: serializeRuPhoneForApi(payload.client.phone),
+                country_code: payload.client.countryCode || 'RU',
+            }]
         }
     } else if (payload.clientId != null) {
         body.client_id = payload.clientId
@@ -60,24 +62,24 @@ export const mapCreateFixationPayloadToApiBody = (
     // if (payload.propertyId != null) {
     //     body.property_id = payload.propertyId
     // }
-    // if (payload.note?.trim()) {
-    //     body.note = payload.note.trim()
-    // }
-    // if (payload.desiredArea) {
-    //     body.desired_area = payload.desiredArea
-    // }
-    // if (payload.desiredRooms) {
-    //     body.desired_rooms = payload.desiredRooms
-    // }
-    // if (payload.paymentFormat) {
-    //     body.payment_format = payload.paymentFormat
-    // }
-    // if (payload.budget?.trim()) {
-    //     body.budget = payload.budget.trim()
-    // }
-    // if (payload.meetingDate) {
-    //     body.meeting_date = payload.meetingDate
-    // }
+    if (payload.note?.trim()) {
+        body.comment = payload.note.trim()
+    }
+    if (payload.desiredArea) {
+        body.preferred_area = payload.desiredArea
+    }
+    if (payload.desiredRooms) {
+        body.preferred_rooms_count = payload.desiredRooms
+    }
+    if (payload.paymentFormat) {
+        body.preferred_payment = payload.paymentFormat
+    }
+    if (payload.budget?.trim()) {
+        body.budget = payload.budget.trim()
+    }
+    if (payload.meetingDate) {
+        body.meeting_date = payload.meetingDate
+    }
     // if (payload.relatives?.length) {
     //     body.relatives = payload.relatives.map((relative) => ({
     //         client_id: Number(relative.clientId),

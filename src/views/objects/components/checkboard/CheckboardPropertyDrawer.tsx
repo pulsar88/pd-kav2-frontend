@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
+import {
+    ImageSlide,
+    isImageSlide,
+    type RenderSlideProps,
+} from 'yet-another-react-lightbox'
 import Drawer from '@/components/ui/Drawer'
 import { Button, Carousel } from '@/components/ui'
 import ImageGallery from '@/components/shared/ImageGallery'
@@ -15,6 +20,9 @@ import { TbHeart, TbHeartFilled, TbLayoutGrid, TbPlus, TbZoomIn } from 'react-ic
 import type { FlatCheckboardProperty } from '../../checkboard.types'
 import type { Premise } from '../../types'
 import { buildPremiseFromCheckboardProperty, formatCheckboardPrice } from '../../checkboardUtils'
+import { useThemeStore } from '@/store/themeStore'
+import presetThemeSchemaConfig from '@/configs/preset-theme-schema.config'
+import { hexToRgba } from '@/utils/hetToRgba'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -79,6 +87,91 @@ const LayoutImagePlaceholder = () => (
     </div>
 )
 
+
+
+const FloorPlanPathOverlay = ({
+    path,
+    width,
+    height,
+    color = '#3b82f6',
+}: {
+    path: string
+    width: number
+    height: number
+    color: string
+}) => (
+    <svg
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+    >
+        <path
+            d={path}
+            fill={hexToRgba(color)}
+            stroke={color}
+            strokeWidth={4}
+        />
+    </svg>
+)
+
+const FloorPlanGallerySlide = ({
+    slide,
+    offset,
+    rect,
+    floorPath,
+    color,
+}: RenderSlideProps & {
+    floorPath: string
+    color: string
+}) => {
+    if (!isImageSlide(slide)) {
+        return null
+    }
+
+    const hasSize = Boolean(slide.width && slide.height)
+
+    return (
+        <div
+            style={{
+                position: 'relative',
+                ...(hasSize
+                    ? {
+                            maxWidth: `min(${slide.width}px, 100%)`,
+                            maxHeight: `min(${slide.height}px, 100%)`,
+                            aspectRatio: `${slide.width} / ${slide.height}`,
+                        }
+                    : null),
+            }}
+        >
+            <ImageSlide
+                slide={slide}
+                offset={offset}
+                rect={rect}
+                style={{
+                    display: 'block',
+                    ...(hasSize
+                        ? {
+                                width: '100%',
+                                height: 'auto',
+                                maxWidth: undefined,
+                                maxHeight: undefined,
+                            }
+                        : null),
+                }}
+            />
+            {hasSize ? (
+                <FloorPlanPathOverlay
+                    path={floorPath}
+                    width={slide.width!}
+                    height={slide.height!}
+                    color={color}
+                />
+            ) : null}
+        </div>
+    )
+}
+
 const formatSectionValue = (
     section?: string,
     sectionName?: string,
@@ -102,7 +195,16 @@ const CheckboardPropertyDrawer = ({
     const { smaller } = useResponsive()
     const isMobile = smaller.md
     const [previewIndex, setPreviewIndex] = useState(-1)
+    const [floorPlanPreviewIndex, setFloorPlanPreviewIndex] = useState(-1)
+    const [floorPlanSize, setFloorPlanSize] = useState<{
+        width: number
+        height: number
+    } | null>(null)
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
+    const schema = useThemeStore((state) => state.themeSchema)
+    const mode = useThemeStore((state) => state.mode)
+    const primaryColor =
+        presetThemeSchemaConfig[schema]?.[mode]?.primary ?? '#3b82f6'
 
     const favoritePremise = useMemo(() => {
         if (!property) return null
@@ -160,17 +262,21 @@ const CheckboardPropertyDrawer = ({
 
         return getImageUrls(property)
     }, [property, propertyDetails?.layoutImage])
+
     const hasImages = imageUrls.length > 0
     const slides = imageUrls.map((src) => ({ src }))
 
     useEffect(() => {
         if (!isOpen) {
             setPreviewIndex(-1)
+            setFloorPlanPreviewIndex(-1)
         }
     }, [isOpen])
 
     useEffect(() => {
         setPreviewIndex(-1)
+        setFloorPlanPreviewIndex(-1)
+        setFloorPlanSize(null)
     }, [property?.id])
 
     return (
@@ -321,6 +427,58 @@ const CheckboardPropertyDrawer = ({
                                 )}
                             </div>
                         </div>
+                        <div>
+                            <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                План этажа
+                            </h5>
+                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                                {propertyDetails?.floorPlanImage ? (
+                                    <button
+                                        type="button"
+                                        className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
+                                        onClick={() =>
+                                            setFloorPlanPreviewIndex(0)
+                                        }
+                                    >
+                                        <div className="relative h-full w-full">
+                                            <img
+                                                src={
+                                                    propertyDetails.floorPlanImage
+                                                }
+                                                alt={`План этажа, помещение №${display.number}`}
+                                                className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
+                                                loading="lazy"
+                                                onLoad={(event) => {
+                                                    const img =
+                                                        event.currentTarget
+                                                    setFloorPlanSize({
+                                                        width: img.naturalWidth,
+                                                        height: img.naturalHeight,
+                                                    })
+                                                }}
+                                            />
+                                            {floorPlanSize &&
+                                            propertyDetails.floorPath ? (
+                                                <FloorPlanPathOverlay
+                                                    path={
+                                                        propertyDetails.floorPath
+                                                    }
+                                                    width={floorPlanSize.width}
+                                                    height={floorPlanSize.height}
+                                                    color={primaryColor}
+                                                />
+                                            ) : null}
+                                        </div>
+                                        <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                            <TbZoomIn className="text-sm" />
+                                            Увеличить
+                                        </span>
+                                    </button>
+                                ) : (
+                                    <LayoutImagePlaceholder />
+                                )}
+                            </div>
+                        </div>
 
                         <div>
                             <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -403,6 +561,40 @@ const CheckboardPropertyDrawer = ({
                     index={previewIndex}
                     slides={slides}
                     onClose={() => setPreviewIndex(-1)}
+                />
+            ) : null}
+
+            {propertyDetails?.floorPlanImage ? (
+                <ImageGallery
+                    index={floorPlanPreviewIndex}
+                    slides={[
+                        {
+                            src: propertyDetails.floorPlanImage,
+                            alt: `План этажа, помещение №${display?.number ?? ''}`,
+                            ...(floorPlanSize
+                                ? {
+                                        width: floorPlanSize.width,
+                                        height: floorPlanSize.height,
+                                    }
+                                : null),
+                        },
+                    ]}
+                    render={{
+                        slide: (props) => {
+                            if (!propertyDetails.floorPath) {
+                                return undefined
+                            }
+
+                            return (
+                                <FloorPlanGallerySlide
+                                    {...props}
+                                    floorPath={propertyDetails.floorPath}
+                                    color={primaryColor}
+                                />
+                            )
+                        },
+                    }}
+                    onClose={() => setFloorPlanPreviewIndex(-1)}
                 />
             ) : null}
         </>

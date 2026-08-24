@@ -19,6 +19,7 @@ import {
     apiGetFixationClients,
     apiGetFixationHouses,
     apiGetFixationManagers,
+    apiSetRelatedClientsForFixation,
 } from '@/services/FixationsService'
 import { apiGetCheckboard } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -105,7 +106,7 @@ const CLIENTS_PAGE_SIZES = [20, 50, 100]
  * 2. раскомментировать маппинг в fixationCreateMapper.ts
  * 3. раскомментировать поля в CreateFixationApiBody
  */
-const WIZARD_EXTENDED_FIELDS_ENABLED = false
+const WIZARD_EXTENDED_FIELDS_ENABLED = true
 
 const STEP_INDEX: Record<
     Exclude<WizardStep, 'client-create' | 'note'>,
@@ -126,7 +127,7 @@ const STEP_BY_INDEX: Record<
 }
 
 const STEP_META: Record<
-    Exclude<WizardStep, 'client-create' | 'note'>,
+    Exclude<WizardStep, 'client-create'>,
     { title: string; description: string }
 > = {
     client: {
@@ -137,10 +138,10 @@ const STEP_META: Record<
         title: 'Дом и менеджер',
         description: 'Выберите дом и менеджера',
     },
-    // note: {
-    //     title: 'Предпочтения',
-    //     description: 'Добавьте пожелания к фиксации при необходимости',
-    // },
+    note: {
+        title: 'Предпочтения',
+        description: 'Добавьте пожелания к фиксации при необходимости',
+    },
     confirm: {
         title: 'Подтверждение',
         description: 'Проверьте данные перед созданием фиксации',
@@ -252,30 +253,30 @@ const closeOpenSelectMenus = () => {
 }
 
 const desiredAreaOptions: SelectOption[] = [
-    { value: '0-30', label: '0-30' },
-    { value: '30-50', label: '30-50' },
-    { value: '50-70', label: '50-70' },
-    { value: '70-90', label: '70-90' },
-    { value: '90+', label: '90+' },
+    { value: '10', label: '0-30' },
+    { value: '20', label: '30-50' },
+    { value: '30', label: '50-70' },
+    { value: '40', label: '70-90' },
+    { value: '50', label: '90+' },
 ]
 
 const desiredRoomsOptions: SelectOption[] = [
-    { value: 'Студия', label: 'Студия' },
-    { value: '1 / 1+', label: '1 / 1+' },
-    { value: '2 / 2+', label: '2 / 2+' },
-    { value: '3 / 3+', label: '3 / 3+' },
-    { value: '4 / 4+', label: '4 / 4+' },
-    { value: 'Другое', label: 'Другое' },
+    { value: '10', label: 'Студия' },
+    { value: '20', label: '1 / 1+' },
+    { value: '30', label: '2 / 2+' },
+    { value: '40', label: '3 / 3+' },
+    { value: '50', label: '4 / 4+' },
+    { value: '1000', label: 'Другое' },
 ]
 
 const paymentFormatOptions: SelectOption[] = [
-    { value: 'Наличные', label: 'Наличные' },
-    { value: 'Ипотека', label: 'Ипотека' },
-    { value: 'Рассрочка', label: 'Рассрочка' },
-    { value: 'Материнский капитал', label: 'Материнский капитал' },
-    { value: 'Сертификаты', label: 'Сертификаты' },
-    { value: 'Трейд-ин', label: 'Трейд-ин' },
-    { value: 'Неизвестно', label: 'Неизвестно' },
+    { value: '10', label: 'Наличные' },
+    { value: '20', label: 'Ипотека' },
+    { value: '30', label: 'Рассрочка' },
+    { value: '40', label: 'Материнский капитал' },
+    { value: '50', label: 'Сертификаты' },
+    { value: '60', label: 'Трейд-ин' },
+    { value: '1000', label: 'Неизвестно' },
 ]
 
 const clientCreateSchema = z.object({
@@ -963,9 +964,9 @@ const FixationsCreateWizardDialog = ({
     const preferencesSummary = useMemo(() => {
         const parts: string[] = []
 
-        if (desiredArea) parts.push(`Площадь: ${desiredArea} м²`)
-        if (desiredRooms) parts.push(`Комнат: ${desiredRooms}`)
-        if (paymentFormat) parts.push(`Оплата: ${paymentFormat}`)
+        if (desiredArea) parts.push(`Площадь: ${desiredAreaOptions.find((item) => item.value === desiredArea)?.label} м²`)
+        if (desiredRooms) parts.push(`Комнат: ${desiredRoomsOptions.find((item) => item.value === desiredRooms)?.label}`)
+        if (paymentFormat) parts.push(`Оплата: ${paymentFormatOptions.find((item) => item.value === paymentFormat)?.label}`)
         if (budget.trim()) {
             parts.push(`Бюджет: ${formatBudgetValue(budget)} ₽`)
         }
@@ -1004,7 +1005,7 @@ const FixationsCreateWizardDialog = ({
 
         try {
             setIsSubmitting(true)
-            await apiCreateFixation({
+            const fixation = await apiCreateFixation({
                 objectId: Number(selectedComplex.id),
                 managerId: Number(selectedManager.id),
                 ...(selectedClient.isNew
@@ -1017,13 +1018,38 @@ const FixationsCreateWizardDialog = ({
                 //     clientId: relative.client.id,
                 //     relation: relative.relation,
                 // })),
-                // note: note.trim() || undefined,
-                // desiredArea: desiredArea || undefined,
-                // desiredRooms: desiredRooms || undefined,
-                // paymentFormat: paymentFormat || undefined,
-                // budget: budget.trim() || undefined,
-                // meetingDate: meetingDate || undefined,
+                note: note.trim() || undefined,
+                desiredArea: desiredArea || undefined,
+                desiredRooms: desiredRooms || undefined,
+                paymentFormat: paymentFormat || undefined,
+                budget: budget.trim() || undefined,
+                meetingDate: meetingDate ? formatYMDToDMY(meetingDate) : undefined,
             })
+
+            if(fixation.data && fixation.data.id && selectedRelatives.length > 0) {
+                try {
+                    await apiSetRelatedClientsForFixation({
+                        fixationId: fixation.data.id,
+                        clients: selectedRelatives.map((relative) => ({
+                            client_id: Number(relative.client.id),
+                            relation: Number(relative.relation),
+                        })),
+                    })
+                } catch {
+                    await mutate((key) =>
+                        Array.isArray(key) && key[0] === '/api/v2/fixations',
+                    )
+                    toast.push(
+                        <Notification type="warning">
+                            Фиксация создана, но не удалось добавить родственников
+                        </Notification>,
+                        { placement: 'top-center' },
+                    )
+                    onClose()
+                    return
+                }
+            }
+
             await mutate((key) =>
                 Array.isArray(key) && key[0] === '/api/v2/fixations',
             )

@@ -85,6 +85,7 @@ type RealtyPropertyApi = {
     number: string
     section: string
     floor: number
+    floor_path?: string
     area: number
     good_area: number
     type: RealtyPropertyTypeApi
@@ -363,6 +364,7 @@ export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => 
         layoutName: resolvePremiseLayoutName(item),
         layoutImage: resolvePresetImageUrl(item.preset),
         floorPlanImage: resolveFloorPlanImageUrl(item.realty_floor),
+        floorPath: item.floor_path?.trim() || undefined,
         promoText: item.project?.promo_text?.trim() || undefined,
         ...objectFields,
         complexId:

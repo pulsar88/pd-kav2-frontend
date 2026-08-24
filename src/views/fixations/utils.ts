@@ -1,13 +1,13 @@
 import type { Fixation, FixationHistoryType, FixationStatus } from './types'
 
 export const fixationKinshipOptions = [
-    { value: 'spouse', label: 'Супруг / супруга' },
-    { value: 'child', label: 'Сын / дочь' },
-    { value: 'parent', label: 'Отец / мать' },
-    { value: 'sibling', label: 'Брат / сестра' },
-    { value: 'grandparent', label: 'Дедушка / бабушка' },
-    { value: 'grandchild', label: 'Внук / внучка' },
-    { value: 'other', label: 'Иной родственник' },
+    { value: '10', label: 'Супруг / супруга' },
+    { value: '20', label: 'Отец / мать' },
+    { value: '30', label: 'Сын / дочь' },
+    { value: '40', label: 'Дедушка / бабушка' },
+    { value: '50', label: 'Внук / внучка' },
+    { value: '60', label: 'Брат / сестра' },
+    // { value: 'other', label: 'Иной родственник' },
 ] as const
 
 export const fixationKinshipLabel: Record<string, string> = Object.fromEntries(
