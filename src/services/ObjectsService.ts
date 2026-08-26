@@ -28,13 +28,19 @@ type RealtyObjectApi = {
     name: string
     facing?: string
     material?: string
-    building_state?: string
+    building_state?: BuildingState | null
     development_start?: string
     development_end?: string
     address?: string
     external_id?: number
     image?: RealtyPropertyImageApi | string | null
     project?: RealtyProjectApi | null
+}
+
+type BuildingState = {
+    value: string
+    code: string
+    name: string
 }
 
 type RealtyPropertyTypeApi = {
@@ -62,7 +68,7 @@ type RealtyObjectBriefApi = {
     address?: string
     facing?: string
     material?: string
-    building_state?: string
+    building_state?: BuildingState | null
     development_start?: string
     development_end?: string
     image?: RealtyPropertyImageApi | string | null
@@ -311,16 +317,16 @@ const mapRealtyPropertySummaryToComplex = (
 })
 
 const mapBuildingStateToHouseStatus = (
-    state?: string,
+    state?: BuildingState | null,
 ): HouseStatus | undefined => {
-    if (!state) return undefined
+    if (!state?.code) return undefined
 
-    switch (state.toUpperCase()) {
+    switch (state.code) {
+        case 'HAND_OVER':
+            return 'commissioned'
         case 'UNFINISHED':
             return 'under_construction'
-        case 'FINISHED':
-        case 'COMMISSIONED':
-        case 'BUILT':
+        case 'BUILT': 
             return 'commissioned'
         default:
             return undefined
@@ -334,7 +340,7 @@ const mapRealtyObjectFields = (realtyObject?: RealtyObjectBriefApi | null) => ({
     address: realtyObject?.address?.trim() || undefined,
     facing: realtyObject?.facing?.trim() || undefined,
     material: realtyObject?.material?.trim() || undefined,
-    buildingState: realtyObject?.building_state?.trim() || undefined,
+    buildingState: realtyObject?.building_state?.name?.trim() || undefined,
     houseStatus: mapBuildingStateToHouseStatus(realtyObject?.building_state),
     developmentStart: realtyObject?.development_start?.trim() || undefined,
     deliveryDate: realtyObject?.development_end?.trim() || undefined,

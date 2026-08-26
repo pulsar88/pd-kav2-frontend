@@ -59,12 +59,18 @@ export type FixationApiAgency = {
     fix_days?: number
 }
 
+export type FixationApiBuildingState = {
+    value: string
+    code: string
+    name: string
+}
+
 export type FixationApiObject = {
     id: number
     name: string
     facing?: string | null
     material?: string | null
-    building_state?: string | null
+    building_state?: FixationApiBuildingState | null
     development_start?: string | null
     development_end?: string | null
     address?: string | null
