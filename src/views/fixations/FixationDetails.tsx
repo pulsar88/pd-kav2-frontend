@@ -435,7 +435,9 @@ const FixationDetails = () => {
                                                     key={key}
                                                     label={label}
                                                     value={formatObjectFieldValue(
-                                                        data.object?.[key],
+                                                        key === 'building_state'
+                                                            ? data.object?.building_state?.name
+                                                            : data.object?.[key],
                                                     )}
                                                 />
                                             ),
