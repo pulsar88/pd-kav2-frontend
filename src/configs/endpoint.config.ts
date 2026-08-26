@@ -47,6 +47,16 @@ const endpointConfig = {
     newsArticles: '/v2/news/articles',
     newsEvents: '/v2/news/events',
     newsItem: (newsId: string | number) => `/v2/news/${newsId}`,
+    agencies: '/v2/agencies',
+    agencyRequests: '/v2/user/agency/requests',
+    agencyRequest: (requestId: string | number) =>
+        `/v2/user/agency/requests/${requestId}`,
+    agencyRequestApprove: (requestId: string | number) =>
+        `/v2/user/agency/requests/${requestId}/approve`,
+    agencyRequestReject: (requestId: string | number) =>
+        `/v2/user/agency/requests/${requestId}/reject`,
+    agencyRequestCancel: (requestId: string | number) =>
+        `/v2/user/agency/requests/${requestId}/cancel`,
 }
 
 export default endpointConfig

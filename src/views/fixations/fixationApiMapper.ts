@@ -1,8 +1,10 @@
 import type {
+    FixationApiAdditionalClient,
     FixationApiClient,
     FixationApiItem,
+    FixationApiPreferenceOption,
 } from './fixationApi.types'
-import type { Fixation, FixationStatus } from './types'
+import type { Fixation, FixationRelative, FixationStatus } from './types'
 import { formatFixationPhone } from './utils'
 
 const resolveApiStatus = (item: FixationApiItem): FixationStatus => {
@@ -24,7 +26,7 @@ const resolveClientName = (client?: FixationApiClient) => {
         return '—'
     }
 
-    const fullName = [client.last_name, client.name, client.second_name]
+    const fullName = [client.second_name, client.name, client.last_name]
         .map((part) => part?.trim())
         .filter(Boolean)
         .join(' ')
@@ -58,6 +60,64 @@ const resolveManagerPhone = (item: FixationApiItem) => {
     return formatFixationPhone(raw)
 }
 
+const resolvePreferenceLabel = (
+    option?: FixationApiPreferenceOption | null,
+) => {
+    const name = option?.name?.trim()
+    if (name) return name
+
+    const code = option?.code?.trim()
+    if (code) return code
+
+    if (option?.value != null && option.value !== '') {
+        return String(option.value)
+    }
+
+    return undefined
+}
+
+const formatBudget = (budget?: number | string | null) => {
+    if (budget == null || budget === '') return undefined
+
+    const numeric = typeof budget === 'number' ? budget : Number(String(budget).replace(/\s/g, ''))
+    if (!Number.isFinite(numeric)) {
+        return String(budget)
+    }
+
+    return new Intl.NumberFormat('ru-RU').format(numeric)
+}
+
+const resolveRelationLabel = (client: FixationApiAdditionalClient) => {
+    const option = client.relation?.relation
+    if (!option) return '—'
+
+    const name = option.name?.trim()
+    if (name) return name
+
+    const code = option.code?.trim()
+    if (code) return code
+
+    if (option.value != null && option.value !== '') {
+        return String(option.value)
+    }
+
+    return '—'
+}
+
+const mapAdditionalClients = (
+    item: FixationApiItem,
+): FixationRelative[] | undefined => {
+    const clients = item.additional_clients ?? item.additionalClients
+    if (!clients?.length) return undefined
+
+    return clients.map((client) => ({
+        id: String(client.id),
+        fullName: resolveClientName(client),
+        phone: resolveClientPhone(client),
+        relation: resolveRelationLabel(client),
+    }))
+}
+
 export const unwrapFixationApiResponse = (
     response: FixationApiItem | { data?: FixationApiItem | null },
 ): FixationApiItem | null => {
@@ -80,6 +140,9 @@ export const mapFixationApiItemToFixation = (
     item: FixationApiItem,
 ): Fixation => {
     const object = item.object
+    const note = item.comment?.trim() || undefined
+    const budget = formatBudget(item.budget)
+    const meetingDate = item.meeting_date?.trim() || undefined
 
     return {
         id: String(item.id),
@@ -96,6 +159,13 @@ export const mapFixationApiItemToFixation = (
         address: object?.address?.trim() || undefined,
         managerName: item.manager?.name?.trim(),
         managerPhone: resolveManagerPhone(item),
+        note,
+        desiredArea: resolvePreferenceLabel(item.preferred_area),
+        desiredRooms: resolvePreferenceLabel(item.preferred_rooms_count),
+        paymentFormat: resolvePreferenceLabel(item.preferred_payment),
+        budget,
+        meetingDate,
+        relatives: mapAdditionalClients(item),
         agent: {
             email: item.agent?.email?.trim() || '—',
             fullName: item.agent?.name?.trim() || '—',

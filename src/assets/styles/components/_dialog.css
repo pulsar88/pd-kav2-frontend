@@ -19,5 +19,9 @@
   
   .dialog-overlay-before-close {
     opacity: 0;
-  }  
+  }
+
+  .dialog-open {
+    @apply overflow-hidden;
+  }
 }

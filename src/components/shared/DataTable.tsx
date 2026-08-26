@@ -12,7 +12,7 @@ import Select from '@/components/ui/Select'
 import Checkbox from '@/components/ui/Checkbox'
 import TableRowSkeleton from './loaders/TableRowSkeleton'
 import Loading from './Loading'
-import FileNotFound from '@/assets/svg/FileNotFound'
+import { TbFolderOff } from 'react-icons/tb'
 import {
     useReactTable,
     getCoreRowModel,
@@ -35,7 +35,7 @@ export type OnSortParam = { order: 'asc' | 'desc' | ''; key: string | number }
 type DataTableProps<T> = {
     columns: ColumnDef<T>[]
     customNoDataIcon?: ReactNode
-    data?: unknown[]
+    data?: T[]
     loading?: boolean
     noData?: boolean
     instanceId?: string
@@ -230,9 +230,8 @@ function DataTable<T>(props: DataTableProps<T>) {
     }, [columnsProp, selectable, loading, checkboxChecked])
 
     const table = useReactTable({
-        data,
-        // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-        columns: finalColumns as ColumnDef<unknown | object | any[], any>[],
+        data: data || [],
+        columns: finalColumns,
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
@@ -318,7 +317,7 @@ function DataTable<T>(props: DataTableProps<T>) {
                 </THead>
                 {loading && data.length === 0 ? (
                     <TableRowSkeleton
-                        columns={(finalColumns as Array<T>).length}
+                        columns={finalColumns.length}
                         rows={pagingData.pageSize}
                         avatarInColumns={skeletonAvatarColumns}
                         avatarProps={skeletonAvatarProps}
@@ -336,9 +335,9 @@ function DataTable<T>(props: DataTableProps<T>) {
                                             customNoDataIcon
                                         ) : (
                                             <>
-                                                <FileNotFound />
+                                                <TbFolderOff className="text-4xl opacity-20" />
                                                 <span className="font-semibold">
-                                                    No data found!
+                                                    Данных не найдено
                                                 </span>
                                             </>
                                         )}

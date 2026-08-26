@@ -111,14 +111,6 @@ export async function apiGetDefaultRealtyCollection(
     return cachedDefaultCollection
 }
 
-const resolveDefaultCollectionId = async (): Promise<number> => {
-    const collection = await apiGetDefaultRealtyCollection()
-    if (!collection) {
-        throw new Error('Подборка недвижимости не найдена')
-    }
-    return collection.id
-}
-
 export async function apiGetRealtyCollectionProperties(
     collectionId: number,
     params: {
@@ -233,7 +225,7 @@ export async function apiGetDefaultCollectionProperties(): Promise<{
 
 export async function apiCheckRealtyCollectionProperties(
     ids: Array<string | number>,
-    collectionId?: number,
+    collectionId: string | number = 'default',
 ): Promise<string[]> {
     const numericIds = ids
         .map((id) => Number(id))
@@ -243,14 +235,11 @@ export async function apiCheckRealtyCollectionProperties(
         return []
     }
 
-    const resolvedCollectionId =
-        collectionId ?? (await resolveDefaultCollectionId())
-
     const response = await ApiService.fetchDataWithAxios<
         | { exists_ids: number[] }
         | { data: { exists_ids: number[] } }
     >({
-        url: endpointConfig.realtyCollectionCheckProperties(resolvedCollectionId),
+        url: endpointConfig.realtyCollectionCheckProperties(collectionId),
         method: 'post',
         data: { ids: numericIds },
     })

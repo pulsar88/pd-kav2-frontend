@@ -200,6 +200,8 @@ const ChangePassword = () => {
                 isOpen={confirmationOpen}
                 type="warning"
                 title="Обновить пароль"
+                confirmText="Обновить"
+                cancelText="Отмена"
                 confirmButtonProps={{
                     loading: isSubmitting,
                     onClick: handlePostSubmit,

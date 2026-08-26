@@ -100,3 +100,14 @@ export async function apiCreateSupportHubArticle({
 
     return mapNewsApiItemToArticleDetail(item)
 }
+
+export async function apiDeleteSupportHubArticle({
+    id,
+}: {
+    id: string
+}): Promise<void> {
+    await ApiService.fetchDataWithAxios({
+        url: endpointConfig.newsItem(id),
+        method: 'delete',
+    })
+}

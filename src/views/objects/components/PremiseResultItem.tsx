@@ -402,7 +402,7 @@ const PremiseResultItem = ({
                             type="button"
                             className={classNames(
                                 collapsedPlanClass(open),
-                                'group block',
+                                'group block dark:bg-white',
                             )}
                             onClick={onPreviewLayout}
                         >
@@ -553,7 +553,7 @@ const PremiseResultItem = ({
                                         </div>
                                         <button
                                             type="button"
-                                            className="group flex flex-1 items-center justify-center p-3"
+                                            className="group flex flex-1 items-center justify-center p-3 bg-white"
                                             onClick={onPreviewLayout}
                                         >
                                             <img

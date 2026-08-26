@@ -6,10 +6,9 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import DataTable from '@/components/shared/DataTable'
 import { apiGetFixations } from '@/services/FixationsService'
-import useSWR from 'swr'
 import { TbCalendarPlus, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
-import type { Fixation } from '../types'
+import type { Fixation, GetFixationsResponse } from '../types'
 import {
     fixationStatusMap,
     formatFixationDate,
@@ -27,7 +26,11 @@ import FixationExtendRequestDialog, {
 } from './FixationExtendRequestDialog'
 import FixationsTableTools from './FixationsTableTools'
 
-const FixationsTable = () => {
+type FixationsTableProps = {
+    refreshKey?: number
+}
+
+const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
     const navigate = useNavigate()
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(20)
@@ -37,20 +40,33 @@ const FixationsTable = () => {
     const [extendFixation, setExtendFixation] = useState<Fixation | null>(null)
     const [isExtendOpen, setIsExtendOpen] = useState(false)
     const [isExtendSubmitting, setIsExtendSubmitting] = useState(false)
-
-    const { data, isLoading } = useSWR(
-        ['/api/v2/fixations', pageIndex, pageSize],
-        () =>
-            apiGetFixations({
-                page: pageIndex,
-                page_size: pageSize,
-            }),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
+    const [data, setData] = useState<GetFixationsResponse | undefined>(
+        undefined,
     )
+    const [isLoading, setIsLoading] = useState(true)
+
+    useEffect(() => {
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetFixations({
+            page: pageIndex,
+            page_size: pageSize,
+        })
+            .then((response) => {
+                if (!cancelled) setData(response)
+            })
+            .catch(() => {
+                if (!cancelled) setData(undefined)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [pageIndex, pageSize, refreshKey])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0

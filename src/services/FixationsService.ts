@@ -9,7 +9,10 @@ import type {
     FixationComplex,
     GetFixationClientsParams,
     GetFixationClientsResponse,
-    FixationManager,
+    GetFixationHousesParams,
+    GetFixationHousesResponse,
+    GetFixationManagersParams,
+    GetFixationManagersResponse,
 } from '@/views/fixations/createWizard.types'
 import {
     mapCreateFixationPayloadToApiBody,
@@ -34,11 +37,35 @@ import type { Fixation, GetFixationsResponse } from '@/views/fixations/types'
 import { toAxiosParams } from '@/views/objects/realtyPropertyQuery'
 
 const DEFAULT_CLIENTS_PAGE_SIZE = 20
+const DEFAULT_MANAGERS_PAGE_SIZE = 20
+const DEFAULT_HOUSES_PER_PAGE = 20
 
 const delay = (ms = 200) =>
     new Promise((resolve) => {
         setTimeout(resolve, ms)
     })
+
+const toListMeta = (
+    meta:
+        | {
+              current_page?: number
+              last_page?: number
+              per_page?: number
+              total?: number
+          }
+        | undefined,
+    fallback: {
+        page: number
+        perPage: number
+        total: number
+    },
+) => ({
+    current_page: meta?.current_page ?? fallback.page,
+    // Without meta assume a single page to avoid infinite reload loops
+    last_page: meta?.last_page ?? 1,
+    per_page: meta?.per_page ?? fallback.perPage,
+    total: meta?.total ?? fallback.total,
+})
 
 export async function apiGetFixationsDashboardStats(
     month: string,
@@ -105,16 +132,37 @@ export async function apiGetFixationClients(
     }
 }
 
-export async function apiGetFixationManagers(): Promise<FixationManager[]> {
+export async function apiGetFixationManagers(
+    params: GetFixationManagersParams = {},
+): Promise<GetFixationManagersResponse> {
+    const page = Math.max(1, params.page ?? 1)
+    const pageSize = Math.max(1, params.page_size ?? DEFAULT_MANAGERS_PAGE_SIZE)
+
     const response =
         await ApiService.fetchDataWithAxios<FixationCreateManagersApiResponse>(
             {
                 url: endpointConfig.managers,
                 method: 'get',
+                params: toAxiosParams({
+                    page,
+                    page_size: pageSize,
+                    ...(params.object_id != null
+                        ? { object_id: params.object_id }
+                        : {}),
+                }),
             },
         )
 
-    return response.data.map(mapFixationCreateManagerApiToManager)
+    const list = response.data.map(mapFixationCreateManagerApiToManager)
+
+    return {
+        list,
+        meta: toListMeta(response.meta, {
+            page,
+            perPage: pageSize,
+            total: list.length,
+        }),
+    }
 }
 
 const mapComplexToFixationComplex = (item: Complex): FixationComplex => ({
@@ -125,12 +173,25 @@ const mapComplexToFixationComplex = (item: Complex): FixationComplex => ({
     managers: [],
 })
 
-export async function apiGetFixationHouses(): Promise<FixationComplex[]> {
+export async function apiGetFixationHouses(
+    params: GetFixationHousesParams = {},
+): Promise<GetFixationHousesResponse> {
+    const page = Math.max(1, params.page ?? 1)
+    const perPage = Math.max(1, params.per_page ?? DEFAULT_HOUSES_PER_PAGE)
+
     const response = await apiGetRealtyPropertiesSummary({
-        per_page: 1000,
+        page,
+        per_page: perPage,
     })
 
-    return response.items.map(mapComplexToFixationComplex)
+    return {
+        list: response.items.map(mapComplexToFixationComplex),
+        meta: toListMeta(response.meta, {
+            page,
+            perPage,
+            total: response.items.length,
+        }),
+    }
 }
 
 export async function apiCreateFixation(

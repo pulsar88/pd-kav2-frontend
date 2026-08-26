@@ -40,7 +40,7 @@ export type FixationCreateManagersApiResponse = {
 
 export type CreateFixationApiBody = {
     object_id: number
-    manager_id: number
+    manager_id?: number
     client_id?: number
     client?: {
         name: string

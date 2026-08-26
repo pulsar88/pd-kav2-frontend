@@ -84,7 +84,7 @@ export const mapUpdateArticlePayloadToApiBody = (
     payload: UpdateSupportHubArticlePayload,
 ): UpdateNewsApiBody => ({
     ...buildArticlePayloadFields(payload),
-    type: payload.type,
+    type: String(payload.type),
 })
 
 const buildArticlePayloadFields = (

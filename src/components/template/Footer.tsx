@@ -14,9 +14,9 @@ const FooterContent = () => {
     return (
         <div className="flex items-center justify-between flex-auto w-full">
             <span>
-                Copyright &copy; {`${new Date().getFullYear()}`}{' '}
-                <span className="font-semibold">{`${APP_NAME}`}</span> All
-                rights reserved.
+                {`${new Date().getFullYear()}`}{' '}
+                <span className="font-semibold">{`${APP_NAME}`}</span>. Все
+                права защищены.
             </span>
             <div className="">
                 <a
@@ -24,7 +24,7 @@ const FooterContent = () => {
                     href="/#"
                     onClick={(e) => e.preventDefault()}
                 >
-                    Term & Conditions
+                    Условия использования
                 </a>
                 <span className="mx-2 text-muted"> | </span>
                 <a
@@ -32,7 +32,7 @@ const FooterContent = () => {
                     href="/#"
                     onClick={(e) => e.preventDefault()}
                 >
-                    Privacy & Policy
+                    Политика конфиденциальности
                 </a>
             </div>
         </div>

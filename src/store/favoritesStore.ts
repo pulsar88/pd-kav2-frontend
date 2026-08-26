@@ -44,20 +44,22 @@ export const useFavoritesStore = create<FavoritesState & FavoritesAction>(
         },
         removePremise: async (propertyId) => {
             const exists = get().isFavorite(propertyId)
-            if (!exists) return
-
-            set((state) => ({
-                favoriteIds: state.favoriteIds.filter(
-                    (id) => id !== propertyId,
-                ),
-            }))
+            if (exists) {
+                set((state) => ({
+                    favoriteIds: state.favoriteIds.filter(
+                        (id) => id !== propertyId,
+                    ),
+                }))
+            }
 
             try {
                 await apiRemoveRealtyCollectionProperty(propertyId)
             } catch (error) {
-                set((state) => ({
-                    favoriteIds: [...state.favoriteIds, propertyId],
-                }))
+                if (exists) {
+                    set((state) => ({
+                        favoriteIds: [...state.favoriteIds, propertyId],
+                    }))
+                }
                 throw error
             }
         },

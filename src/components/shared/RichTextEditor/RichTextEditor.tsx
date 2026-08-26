@@ -15,6 +15,9 @@ import ToolButtonBulletList from './toolButtons/ToolButtonBulletList'
 import ToolButtonFontSize from './toolButtons/ToolButtonFontSize'
 import ToolButtonTextColor from './toolButtons/ToolButtonTextColor'
 import ToolButtonSpacing from './toolButtons/ToolButtonSpacing'
+import ToolButtonAlignLeft from './toolButtons/ToolButtonAlignLeft'
+import ToolButtonAlignCenter from './toolButtons/ToolButtonAlignCenter'
+import ToolButtonAlignRight from './toolButtons/ToolButtonAlignRight'
 import FontSize from './extensions/FontSize'
 import BlockSpacing from './extensions/BlockSpacing'
 import {
@@ -24,6 +27,7 @@ import {
 } from './focusEditorAtPointer'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import TextAlign from '@tiptap/extension-text-align'
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import type { Editor, EditorContentProps, JSONContent } from '@tiptap/react'
@@ -107,6 +111,9 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                   Color,
                   FontSize,
                   BlockSpacing,
+                  TextAlign.configure({
+                      types: ['heading', 'paragraph'],
+                  }),
               ],
               editorProps: {
                   attributes: {
@@ -164,6 +171,9 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                         <ToolButtonTextColor editor={editor} />
                         <ToolButtonFontSize editor={editor} />
                         <ToolButtonSpacing editor={editor} />
+                        <ToolButtonAlignLeft editor={editor} />
+                        <ToolButtonAlignCenter editor={editor} />
+                        <ToolButtonAlignRight editor={editor} />
                         <ToolButtonBulletList editor={editor} />
                         <ToolButtonOrderedList editor={editor} />
                         <ToolButtonCodeBlock editor={editor} />

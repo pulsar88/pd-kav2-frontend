@@ -16,7 +16,7 @@ import {
 export const mapFixationCreateClientApiToClient = (
     item: FixationCreateClientApi,
 ): FixationClient => {
-    const fullName = [item.last_name, item.name, item.second_name]
+    const fullName = [item.second_name, item.name, item.last_name]
         .map((part) => part?.trim())
         .filter(Boolean)
         .join(' ')
@@ -41,14 +41,17 @@ export const mapCreateFixationPayloadToApiBody = (
 ): CreateFixationApiBody => {
     const body: CreateFixationApiBody = {
         object_id: payload.objectId,
-        manager_id: payload.managerId,
+    }
+
+    if (payload.managerId != null) {
+        body.manager_id = payload.managerId
     }
 
     if (payload.client?.isNew) {
         body.client = {
             name: payload.client.firstName?.trim() || payload.client.fullName,
-            second_name: payload.client.secondName?.trim() || undefined,
-            last_name: payload.client.lastName?.trim() || undefined,
+            second_name: payload.client.lastName?.trim() || undefined,
+            last_name: payload.client.secondName?.trim() || undefined,
             phones: [{
                 phone: serializeRuPhoneForApi(payload.client.phone),
                 country_code: payload.client.countryCode || 'RU',

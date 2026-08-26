@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import Loading from '@/components/shared/Loading'
+import Card from '@/components/ui/Card'
 import EditArticleHeader from './components/EditArticleHeader'
 import EditArticleBody from './components/EditArticleBody'
+import ArticleEditorHints from './components/ArticleEditorHints'
 import ArticleFormActions from './components/ArticleFormActions'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
@@ -11,37 +13,56 @@ import {
     apiUpdateSupportHubArticle,
 } from '@/services/HelpCenterService'
 import { useNavigate, useParams } from 'react-router'
-import useSWR, { useSWRConfig } from 'swr'
-import {
-    isPublicationListKey,
-    publicationItemKey,
-} from './helpCenterQuery'
+import { PAGE_CONTAINER_GUTTER_X } from '@/constants/theme.constant'
+import classNames from '@/utils/classNames'
 import { usePublicationKind } from './publicationKind'
 import type { GetSupportHubArticleResponse } from './types'
 
 const EditArticle = () => {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { mutate } = useSWRConfig()
     const kind = usePublicationKind()
     const [title, setTitle] = useState('')
     const [previewText, setPreviewText] = useState('')
     const [content, setContent] = useState('')
     const [articleCode, setArticleCode] = useState<string>()
     const [isSaving, setIsSaving] = useState(false)
+    const [data, setData] = useState<GetSupportHubArticleResponse | null>(null)
+    const [isLoading, setIsLoading] = useState(Boolean(id))
 
     const itemPath = id ? `${kind.basePath}/${id}` : kind.basePath
 
-    const { data, isLoading } = useSWR(
-        id ? publicationItemKey(id) : null,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ([_, params]) =>
-            apiGetSupportHubArticle<GetSupportHubArticleResponse>(params),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-        },
-    )
+    useEffect(() => {
+        if (!id) {
+            setData(null)
+            setIsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetSupportHubArticle<GetSupportHubArticleResponse>({ id })
+            .then((article) => {
+                if (!cancelled) {
+                    setData(article)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setData(null)
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoading(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
 
     useEffect(() => {
         if (!data) return
@@ -88,14 +109,6 @@ const EditArticle = () => {
                 <Notification type="success">{kind.updateSuccess}</Notification>,
                 { placement: 'top-end' },
             )
-            await mutate(isPublicationListKey(kind.listEndpoint), undefined, {
-                revalidate: true,
-            })
-            if (id) {
-                await mutate(publicationItemKey(id), undefined, {
-                    revalidate: true,
-                })
-            }
             navigate(itemPath)
         } catch (error) {
             toast.push(
@@ -110,32 +123,44 @@ const EditArticle = () => {
     }
 
     return (
-        <>
-            <div className="mx-auto w-full min-w-0 max-w-[1200px] pt-6">
-                <Loading loading={isLoading}>
+        <div
+            className={classNames(
+                'flex h-full min-h-[calc(100dvh-10rem)] flex-col py-6',
+                PAGE_CONTAINER_GUTTER_X,
+            )}
+        >
+            <Card
+                className="flex min-h-0 w-full flex-1 flex-col"
+                bodyClass="flex min-h-0 flex-1 flex-col gap-4"
+            >
+                <Loading loading={isLoading} className="flex flex-1 flex-col gap-4">
                     {data ? (
-                        <div className="flex flex-col gap-4">
-                            <EditArticleHeader
-                                title={title}
-                                previewText={previewText}
-                                onTitleChange={setTitle}
-                                onPreviewTextChange={setPreviewText}
-                            />
+                        <>
+                            <div className="shrink-0 space-y-4">
+                                <ArticleEditorHints />
+                                <EditArticleHeader
+                                    title={title}
+                                    previewText={previewText}
+                                    onTitleChange={setTitle}
+                                    onPreviewTextChange={setPreviewText}
+                                />
+                            </div>
                             <EditArticleBody
+                                fillHeight
                                 content={content}
                                 onChange={setContent}
                             />
-                        </div>
+                        </>
                     ) : null}
                 </Loading>
-            </div>
+            </Card>
             <ArticleFormActions
                 saveLabel="Сохранить"
                 isSaving={isSaving}
                 onBack={() => navigate(itemPath)}
                 onSave={() => void handleSave()}
             />
-        </>
+        </div>
     )
 }
 

@@ -39,7 +39,7 @@ const PrimaryColor = () => {
                 bordered: true,
             }}
         >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {primaryColorOptions.map((option) => {
                     const color =
                         presetThemeSchemaConfig[option.key]?.[mode]?.primary
@@ -63,7 +63,8 @@ const PrimaryColor = () => {
                                     option.key === 'gray'
                                         ? 'border-gray-300'
                                         : 'border-white',
-                                    isSelected && 'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800',
+                                    isSelected &&
+                                        'ring-2 ring-offset-2 ring-primary dark:ring-offset-gray-800',
                                 )}
                                 style={{ backgroundColor: color }}
                             >

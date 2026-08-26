@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
-import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
 import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
 import RangeInputGroup from './RangeInputGroup'
-import type { ObjectsSearchFilters, RealtyPropertyTypeCode } from '../types'
+import type {
+    ObjectsSearchFilters,
+    RealtyPropertiesFilters,
+    RealtyPropertyTypeCode,
+} from '../types'
 import { hasActiveObjectsSearchFilters } from '../filtersQuery'
 
 type Option = { value: string; label: string }
@@ -64,14 +67,21 @@ const ObjectsSearchForm = ({
         }
     }
 
-    const { data: filterOptions } = useSWR(
-        '/api/v2/realty_properties/filters',
-        () => apiGetRealtyPropertiesFilters(),
-        {
-            revalidateOnFocus: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    const [filterOptions, setFilterOptions] = useState<
+        RealtyPropertiesFilters | undefined
+    >()
+
+    useEffect(() => {
+        let cancelled = false
+
+        void apiGetRealtyPropertiesFilters().then((result) => {
+            if (!cancelled) setFilterOptions(result)
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
         (item) => ({

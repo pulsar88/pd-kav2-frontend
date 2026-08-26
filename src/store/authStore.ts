@@ -55,11 +55,8 @@ export const useSessionUser = create<AuthState & AuthAction>()(
                     },
                 })),
             setUser: (payload) =>
-                set((state) => ({
-                    user: {
-                        ...state.user,
-                        ...payload,
-                    },
+                set(() => ({
+                    user: payload || initialState.user,
                 })),
         }),
         { name: 'sessionUser', storage: createJSONStorage(() => localStorage) },

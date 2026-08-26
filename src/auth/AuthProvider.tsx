@@ -1,6 +1,7 @@
 import { useEffect, useRef, useImperativeHandle, useState } from 'react'
 import AuthContext from './AuthContext'
 import appConfig from '@/configs/app.config'
+import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
 import { useSessionUser, useToken } from '@/store/authStore'
 import {
     apiAuthCheck,
@@ -36,6 +37,7 @@ import type {
 } from '@/@types/auth'
 import type { ReactNode, Ref } from 'react'
 import type { NavigateFunction } from 'react-router'
+import { mutate } from 'swr'
 
 type AuthProviderProps = { children: ReactNode }
 
@@ -70,13 +72,19 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const navigatorRef = useRef<IsolatedNavigatorRef>(null)
 
-    const redirect = () => {
+    const redirect = (authority?: string[]) => {
         const search = window.location.search
         const params = new URLSearchParams(search)
         const redirectUrl = params.get(REDIRECT_URL_KEY)
+        const roles = authority ?? user.authority ?? []
 
         navigatorRef.current?.navigate(
-            redirectUrl ? redirectUrl : appConfig.authenticatedEntryPath,
+            redirectUrl
+                ? redirectUrl
+                : getAuthenticatedEntryPath(
+                      roles,
+                      appConfig.authenticatedEntryPath,
+                  ),
         )
     }
 
@@ -93,6 +101,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     const handleSignOut = () => {
         disconnectEcho()
         clearFavoritesStore()
+        void mutate(() => true, undefined, { revalidate: false })
         setToken('')
         setTokenState('')
         setUser({})
@@ -103,8 +112,10 @@ function AuthProvider({ children }: AuthProviderProps) {
         try {
             const currentUser = await apiGetCurrentUser()
             setUser(currentUser)
+            return currentUser
         } catch {
             // оставляем данные из fallback / persist
+            return null
         }
     }
 
@@ -148,8 +159,8 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const finishAuth = async (accessToken: string, nextUser?: User) => {
         handleSignIn({ accessToken }, nextUser)
-        await loadCurrentUser()
-        redirect()
+        const currentUser = await loadCurrentUser()
+        redirect(currentUser?.authority ?? nextUser?.authority)
 
         void preparePushPromptAfterAuth()
             .then(({ shouldPrompt }) => {

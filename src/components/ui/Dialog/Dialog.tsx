@@ -60,7 +60,7 @@ const Dialog = (props: DialogProps) => {
             typeof currentSize.width !== 'undefined' &&
             currentSize.width <= width
         ) {
-            contentStyle.content.width = 'auto'
+            contentStyle.content.width = '100%'
         }
     }
 

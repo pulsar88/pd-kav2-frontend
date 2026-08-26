@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react'
 import ArticleCard from './ArticleCard'
-import { apiGetSupportHubArticles } from '@/services/HelpCenterService'
+import {
+    apiDeleteSupportHubArticle,
+    apiGetSupportHubArticles,
+} from '@/services/HelpCenterService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import NoDataFound from '@/assets/svg/NoDataFound'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import Notification from '@/components/ui/Notification'
 import Pagination from '@/components/ui/Pagination'
 import Spinner from '@/components/ui/Spinner'
 import Select from '@/components/ui/Select'
-import useSWR from 'swr'
+import toast from '@/components/ui/toast'
 import { TbArrowNarrowLeft, TbPlus } from 'react-icons/tb'
 import { useNavigate } from 'react-router'
+import { CONTENT_MANAGER } from '@/constants/roles.constant'
+import { useSessionUser } from '@/store/authStore'
+import useAuthority from '@/utils/hooks/useAuthority'
 import { DEFAULT_HELP_CENTER_PAGE_SIZE } from '../helpCenterApiQuery'
-import { publicationListKey } from '../helpCenterQuery'
 import { usePublicationKind } from '../publicationKind'
+import type { GetSupportHubArticlesResponse } from '../types'
 
 type Option = {
     value: number
@@ -30,31 +39,86 @@ type ArticleListProps = {
 const ArticleList = ({ query = '' }: ArticleListProps) => {
     const navigate = useNavigate()
     const kind = usePublicationKind()
+    const userAuthority = useSessionUser((state) => state.user.authority) ?? []
+    const canManageContent = useAuthority(userAuthority, [CONTENT_MANAGER])
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(DEFAULT_HELP_CENTER_PAGE_SIZE)
+    const [data, setData] = useState<GetSupportHubArticlesResponse | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [reloadToken, setReloadToken] = useState(0)
 
     useEffect(() => {
         setPageIndex(1)
     }, [query, pageSize, kind.kind])
 
-    const { data, isLoading } = useSWR(
-        publicationListKey(kind.listEndpoint, query, pageIndex, pageSize),
-        () =>
-            apiGetSupportHubArticles(
-                {
-                    query,
-                    page: pageIndex,
-                    page_size: pageSize,
-                },
-                kind.listEndpoint,
-            ),
-        {
-            revalidateOnFocus: false,
-        },
-    )
+    useEffect(() => {
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetSupportHubArticles(
+            {
+                query,
+                page: pageIndex,
+                page_size: pageSize,
+            },
+            kind.listEndpoint,
+        )
+            .then((response) => {
+                if (!cancelled) {
+                    setData(response)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setData(null)
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoading(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [query, pageIndex, pageSize, kind.listEndpoint, reloadToken])
 
     const articles = data?.list ?? []
     const totalCount = data?.total ?? 0
+    const deleteTarget = articles.find((article) => article.id === deleteId)
+
+    const handleDelete = async () => {
+        if (!deleteId) return
+
+        setIsDeleting(true)
+        try {
+            await apiDeleteSupportHubArticle({ id: deleteId })
+            toast.push(
+                <Notification type="success">{kind.deleteSuccess}</Notification>,
+                { placement: 'top-end' },
+            )
+            setDeleteId(null)
+
+            const remainingOnPage = articles.length - 1
+            if (remainingOnPage <= 0 && pageIndex > 1) {
+                setPageIndex((page) => page - 1)
+            } else {
+                setReloadToken((token) => token + 1)
+            }
+        } catch (error) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(error, kind.deleteError)}
+                </Notification>,
+                { placement: 'top-end' },
+            )
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     return (
         <div>
@@ -78,15 +142,17 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                 ) : (
                     <h3 className="mb-0">{kind.listHeading}</h3>
                 )}
-                <Button
-                    variant="solid"
-                    size="sm"
-                    className="shrink-0"
-                    icon={<TbPlus />}
-                    onClick={() => navigate(`${kind.basePath}/create`)}
-                >
-                    {kind.createLabel}
-                </Button>
+                {canManageContent ? (
+                    <Button
+                        variant="solid"
+                        size="sm"
+                        className="shrink-0"
+                        icon={<TbPlus />}
+                        onClick={() => navigate(`${kind.basePath}/create`)}
+                    >
+                        {kind.createLabel}
+                    </Button>
+                ) : null}
             </div>
 
             {isLoading ? (
@@ -116,7 +182,7 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                         >
                             {kind.showAllLabel}
                         </button>
-                    ) : (
+                    ) : canManageContent ? (
                         <Button
                             className="mt-4"
                             variant="solid"
@@ -125,13 +191,13 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                         >
                             {kind.createLabel}
                         </Button>
-                    )}
+                    ) : null}
                 </div>
             ) : null}
 
             {!isLoading && articles.length > 0 ? (
                 <>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {articles.map((article) => (
                             <ArticleCard
                                 key={article.id}
@@ -139,6 +205,8 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                                 title={article.title}
                                 previewText={article.previewText}
                                 timeToRead={article.timeToRead}
+                                canManage={canManageContent}
+                                onDelete={setDeleteId}
                             />
                         ))}
                     </div>
@@ -177,6 +245,34 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                     </div>
                 </>
             ) : null}
+
+            <ConfirmDialog
+                isOpen={Boolean(deleteId)}
+                type="danger"
+                title={kind.deleteConfirmTitle}
+                confirmText="Удалить"
+                cancelText="Отмена"
+                confirmButtonProps={{
+                    loading: isDeleting,
+                    customColorClass: () =>
+                        'bg-error hover:bg-error/90 active:bg-error border-error',
+                }}
+                onCancel={() => setDeleteId(null)}
+                onClose={() => setDeleteId(null)}
+                onConfirm={() => {
+                    void handleDelete()
+                }}
+            >
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {deleteTarget?.title ? (
+                        <>
+                            «{deleteTarget.title}». {kind.deleteConfirmText}
+                        </>
+                    ) : (
+                        kind.deleteConfirmText
+                    )}
+                </p>
+            </ConfirmDialog>
         </div>
     )
 }

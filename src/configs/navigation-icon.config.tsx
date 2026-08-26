@@ -10,6 +10,7 @@ import {
     PiHeartDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
+import { TbUserCheck } from 'react-icons/tb'
 
 export type NavigationIcons = Record<string, JSX.Element>
 
@@ -23,6 +24,7 @@ const navigationIcon: NavigationIcons = {
     help: <PiQuestionDuotone />,
     news: <PiNewspaperDuotone />,
     events: <PiCalendarDuotone />,
+    agencyRequests: <TbUserCheck />,
 }
 
 export default navigationIcon

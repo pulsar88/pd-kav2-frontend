@@ -1,45 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
-
 import { useNavigate, useParams } from 'react-router'
-
-import useSWR from 'swr'
-
 import classNames from '@/utils/classNames'
-
 import Button from '@/components/ui/Button'
-
 import Tabs from '@/components/ui/Tabs'
-
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
-
 import Container from '@/components/shared/Container'
-
 import Loading from '@/components/shared/Loading'
-
 import {
     apiGetCheckboard,
     apiGetRealtyObject,
     apiGetRealtyProperty,
 } from '@/services/ObjectsService'
-
 import { TbArrowLeft } from 'react-icons/tb'
-
-import type { CheckboardCellLabel } from './checkboard.types'
-import type { Complex, ObjectsSearchFilters } from './types'
-
+import type {
+    CheckboardBuilding,
+    CheckboardCellLabel,
+} from './checkboard.types'
+import type { Complex, ObjectsSearchFilters, Premise } from './types'
 import {
     collectStatuses,
     findBuildingPropertyById,
     flattenBuildingProperties,
     matchesObjectsSearchFilters,
 } from './checkboardUtils'
-
 import CheckboardClassic from './components/checkboard/CheckboardClassic'
-
 import CheckboardLegend from './components/checkboard/CheckboardLegend'
-
 import CheckboardPlus from './components/checkboard/CheckboardPlus'
-
 import CheckboardPropertyDrawer from './components/checkboard/CheckboardPropertyDrawer'
 import ComplexAboutTab from './components/checkboard/ComplexAboutTab'
 import ObjectsSearchForm from './components/ObjectsSearchForm'
@@ -74,68 +60,105 @@ const syncSearchStateInUrl = (
 
 const ComplexCheckboard = () => {
     const { id } = useParams()
-
     const navigate = useNavigate()
     const initialFilters = useMemo(() => createEmptyObjectsSearchFilters(), [])
-
     const [view, setView] = useState('classic')
-
     const [labelMode, setLabelMode] = useState<CheckboardCellLabel>('rooms')
-
     const [draftFilters, setDraftFilters] =
         useState<ObjectsSearchFilters>(initialFilters)
-
     const [appliedFilters, setAppliedFilters] =
         useState<ObjectsSearchFilters>(initialFilters)
     const [activeStatusCode, setActiveStatusCode] = useState('')
-
     const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(
         null,
     )
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false)
-
-    const { data, isLoading } = useSWR(
-        id ? ['/api/v2/realty_objects/chess', id] : null,
-
-        () => apiGetCheckboard(id || ''),
-
-        {
-            revalidateOnFocus: false,
-
-            revalidateIfStale: false,
-
-            revalidateOnReconnect: false,
-        },
+    const [data, setData] = useState<CheckboardBuilding | null | undefined>()
+    const [isLoading, setIsLoading] = useState(Boolean(id))
+    const [complexInfo, setComplexInfo] = useState<Complex | null | undefined>()
+    const [isComplexInfoLoading, setIsComplexInfoLoading] = useState(
+        Boolean(id),
     )
+    const [propertyDetails, setPropertyDetails] = useState<
+        Premise | null | undefined
+    >()
+    const [isPropertyDetailsLoading, setIsPropertyDetailsLoading] =
+        useState(false)
 
-    const { data: complexInfo, isLoading: isComplexInfoLoading } = useSWR(
-        id ? ['/api/v2/realty_objects', id] : null,
-        () => apiGetRealtyObject(id || ''),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    useEffect(() => {
+        if (!id) {
+            setData(undefined)
+            setIsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetCheckboard(id)
+            .then((result) => {
+                if (!cancelled) setData(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
+
+    useEffect(() => {
+        if (!id) {
+            setComplexInfo(undefined)
+            setIsComplexInfoLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsComplexInfoLoading(true)
+
+        void apiGetRealtyObject(id)
+            .then((result) => {
+                if (!cancelled) setComplexInfo(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsComplexInfoLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
+
+    useEffect(() => {
+        if (selectedPropertyId == null) {
+            setPropertyDetails(undefined)
+            setIsPropertyDetailsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsPropertyDetailsLoading(true)
+
+        void apiGetRealtyProperty(selectedPropertyId)
+            .then((result) => {
+                if (!cancelled) setPropertyDetails(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsPropertyDetailsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [selectedPropertyId])
 
     const selectedProperty = useMemo(() => {
         if (!data || selectedPropertyId == null) return null
 
         return findBuildingPropertyById(data, selectedPropertyId) ?? null
     }, [data, selectedPropertyId])
-
-    const { data: propertyDetails, isLoading: isPropertyDetailsLoading } =
-        useSWR(
-            selectedPropertyId != null
-                ? ['/api/v2/realty_properties', selectedPropertyId]
-                : null,
-            () => apiGetRealtyProperty(selectedPropertyId!),
-            {
-                revalidateOnFocus: false,
-                revalidateIfStale: false,
-                revalidateOnReconnect: false,
-            },
-        )
 
     useEffect(() => {
         if (selectedPropertyId == null) return
@@ -252,30 +275,23 @@ const ComplexCheckboard = () => {
 
     const stats = useMemo(() => {
         if (!data) {
-            return { total: 0, available: 0 }
+            return { total: 0 }
         }
 
         if (!activePropertyIds) {
             return {
                 total: allProperties.length,
-                available: allProperties.filter(
-                    (property) => property.status.is_available,
-                ).length,
             }
         }
 
         let total = 0
-        let available = 0
 
         allProperties.forEach((property) => {
             if (!activePropertyIds.has(property.id)) return
             total += 1
-            if (property.status.is_available) {
-                available += 1
-            }
         })
 
-        return { total, available }
+        return { total }
     }, [activePropertyIds, allProperties, data])
 
     const statuses = useMemo(() => (data ? collectStatuses(data) : []), [data])
@@ -394,12 +410,6 @@ const ComplexCheckboard = () => {
                                     Всего:{' '}
                                     <span className="ml-1 text-base tabular-nums">
                                         {stats.total}
-                                    </span>
-                                </span>
-                                <span className="inline-flex items-center rounded-lg bg-[#a4f4cf] px-2.5 py-1 text-sm font-semibold text-[#006045]">
-                                    Свободно:{' '}
-                                    <span className="ml-1 text-base tabular-nums">
-                                        {stats.available}
                                     </span>
                                 </span>
                             </div>

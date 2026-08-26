@@ -44,5 +44,5 @@ export type UpdateNewsApiBody = {
     code: string
     preview_text: string
     content: string
-    type: number
+    type: string
 }

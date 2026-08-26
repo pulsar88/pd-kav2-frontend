@@ -370,7 +370,6 @@ export const getBuildingStats = (
         : list
     return {
         total: matching.length,
-        available: matching.filter((item) => item.status.is_available).length,
     }
 }
 

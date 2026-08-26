@@ -77,16 +77,43 @@ export type FixationApiCrmStatus = {
     external_id?: string | null
 }
 
+export type FixationApiPreferenceOption = {
+    value?: number | string
+    code?: string
+    name?: string
+}
+
+export type FixationApiRelationOption = {
+    value?: number | string
+    code?: string
+    name?: string
+}
+
+export type FixationApiAdditionalClient = FixationApiClient & {
+    relation?: {
+        relation?: FixationApiRelationOption
+    }
+}
+
 export type FixationApiItem = {
     id: number
     status: FixationApiStatusRelation
     max_fix_days?: number
     fixed_till?: string
+    comment?: string | null
+    budget?: number | string | null
+    meeting_date?: string | null
+    preferred_rooms_count?: FixationApiPreferenceOption | null
+    preferred_area?: FixationApiPreferenceOption | null
+    preferred_payment?: FixationApiPreferenceOption | null
     created_at: string
     agent?: FixationApiAgent
     client?: FixationApiClient
+    additional_clients?: FixationApiAdditionalClient[]
+    additionalClients?: FixationApiAdditionalClient[]
     manager?: FixationApiManager
     initialManager?: FixationApiManager
+    initial_manager?: FixationApiManager
     agency?: FixationApiAgency
     object?: FixationApiObject
     crm_status?: FixationApiCrmStatus

@@ -7,6 +7,7 @@ import { useSessionUser } from '@/store/authStore'
 import { useRouteKeyStore } from '@/store/routeKeyStore'
 import navigationConfig from '@/configs/navigation.config'
 import appConfig from '@/configs/app.config'
+import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
 import { Link } from 'react-router'
 import {
     SIDE_NAV_WIDTH,
@@ -48,7 +49,11 @@ const SideNav = ({
 
     const currentRouteKey = useRouteKeyStore((state) => state.currentRouteKey)
 
-    const userAuthority = useSessionUser((state) => state.user.authority)
+    const userAuthority = useSessionUser((state) => state.user.authority) ?? []
+    const entryPath = getAuthenticatedEntryPath(
+        userAuthority,
+        appConfig.authenticatedEntryPath,
+    )
 
     return (
         <div
@@ -61,7 +66,7 @@ const SideNav = ({
             )}
         >
             <Link
-                to={appConfig.authenticatedEntryPath}
+                to={entryPath}
                 className={classNames(
                     'side-nav-header flex flex-col justify-center',
                     sideNavCollapse ? 'items-center' : 'items-start',

@@ -51,7 +51,7 @@ const StatusIcon = ({ status }: { status: StatusType }) => {
         case 'warning':
             return (
                 <Avatar
-                    className="text-amber-600 bg-amber-100 dark:text-amber-100"
+                    className="text-amber-600 bg-amber-100 dark:bg-amber-500/20 dark:text-amber-100"
                     shape="circle"
                 >
                     <span className="text-2xl">
@@ -62,7 +62,7 @@ const StatusIcon = ({ status }: { status: StatusType }) => {
         case 'danger':
             return (
                 <Avatar
-                    className="text-red-600 bg-red-100 dark:text-red-100"
+                    className="text-red-600 bg-red-100 dark:bg-red-500/20 dark:text-red-100"
                     shape="circle"
                 >
                     <span className="text-2xl">

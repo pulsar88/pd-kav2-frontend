@@ -15,6 +15,7 @@ import classNames from '@/utils/classNames'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { apiCheckRealtyCollectionProperties } from '@/services/RealtyCollectionsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
     TbChevronDown,
@@ -198,12 +199,15 @@ const CheckboardPropertyDrawer = ({
         height: number
     } | null>(null)
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
+    const setFavoriteIds = useFavoritesStore((state) => state.setFavoriteIds)
     const schema = useThemeStore((state) => state.themeSchema)
     const mode = useThemeStore((state) => state.mode)
     const primaryColor =
         presetThemeSchemaConfig[schema]?.[mode]?.primary ?? '#3b82f6'
     const showFloorPlan = useCommonStore((state) => state.showFloorPlan)
     const setShowFloorPlan = useCommonStore((state) => state.setShowFloorPlan)
+    const [isFavoriteChecking, setIsFavoriteChecking] = useState(false)
+    const [isFavoriteToggling, setIsFavoriteToggling] = useState(false)
 
     const favoritePremise = useMemo(() => {
         if (!property) return null
@@ -220,6 +224,52 @@ const CheckboardPropertyDrawer = ({
             ? state.favoriteIds.includes(favoritePremise.id)
             : false,
     )
+
+    useEffect(() => {
+        if (!isOpen || !favoritePremise) {
+            setIsFavoriteChecking(false)
+            return
+        }
+
+        const propertyId = favoritePremise.id
+        let cancelled = false
+        setIsFavoriteChecking(true)
+
+        void apiCheckRealtyCollectionProperties([propertyId])
+            .then((existsIds) => {
+                if (cancelled) return
+
+                const exists = existsIds.includes(propertyId)
+                const currentIds = useFavoritesStore.getState().favoriteIds
+                const alreadyInStore = currentIds.includes(propertyId)
+
+                if (exists && !alreadyInStore) {
+                    setFavoriteIds([...currentIds, propertyId])
+                } else if (!exists && alreadyInStore) {
+                    setFavoriteIds(
+                        currentIds.filter((id) => id !== propertyId),
+                    )
+                }
+            })
+            .catch((error) => {
+                if (cancelled) return
+                toast.push(
+                    <Notification type="danger">
+                        {getApiErrorMessage(
+                            error,
+                            'Не удалось проверить избранное',
+                        )}
+                    </Notification>,
+                )
+            })
+            .finally(() => {
+                if (!cancelled) setIsFavoriteChecking(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen, favoritePremise?.id, setFavoriteIds])
 
     const display = useMemo(() => {
         if (!property) return null
@@ -306,14 +356,28 @@ const CheckboardPropertyDrawer = ({
                                         ? 'text-rose-500 hover:text-rose-600'
                                         : 'text-gray-600 dark:text-gray-300',
                                 )}
+                                loading={isFavoriteChecking || isFavoriteToggling}
+                                disabled={
+                                    !favoritePremise ||
+                                    isFavoriteChecking ||
+                                    isFavoriteToggling
+                                }
                                 icon={
                                     isFavorite ? <TbHeartFilled /> : <TbHeart />
                                 }
                                 onClick={(event) => {
                                     event.stopPropagation()
-                                    if (!favoritePremise) return
-                                    void togglePremise(favoritePremise).catch(
-                                        (error) => {
+                                    if (
+                                        !favoritePremise ||
+                                        isFavoriteChecking ||
+                                        isFavoriteToggling
+                                    ) {
+                                        return
+                                    }
+
+                                    setIsFavoriteToggling(true)
+                                    void togglePremise(favoritePremise)
+                                        .catch((error) => {
                                             toast.push(
                                                 <Notification type="danger">
                                                     {getApiErrorMessage(
@@ -322,8 +386,10 @@ const CheckboardPropertyDrawer = ({
                                                     )}
                                                 </Notification>,
                                             )
-                                        },
-                                    )
+                                        })
+                                        .finally(() => {
+                                            setIsFavoriteToggling(false)
+                                        })
                                 }}
                             >
                                 {isFavorite
@@ -384,7 +450,7 @@ const CheckboardPropertyDrawer = ({
                             <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 Изображения
                             </h5>
-                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
                                 {hasImages ? (
                                     <Carousel
                                         opts={{ loop: imageUrls.length > 1 }}
@@ -447,7 +513,7 @@ const CheckboardPropertyDrawer = ({
                                 />
                             </button>
                             {showFloorPlan ? (
-                                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-white">
                                     {propertyDetails?.floorPlanImage ? (
                                         <button
                                             type="button"
@@ -488,7 +554,7 @@ const CheckboardPropertyDrawer = ({
                                                         height={
                                                             floorPlanSize.height
                                                         }
-                                                        color={primaryColor}
+                                                        color="#7ae061ff"
                                                     />
                                                 ) : null}
                                             </div>
@@ -613,7 +679,7 @@ const CheckboardPropertyDrawer = ({
                                 <FloorPlanGallerySlide
                                     {...props}
                                     floorPath={propertyDetails.floorPath}
-                                    color={primaryColor}
+                                    color="#7ae061ff"
                                 />
                             )
                         },

@@ -11,6 +11,7 @@ import type { FixationCreateInitialSelection } from './createWizard.types'
 const Fixations = () => {
     const [searchParams, setSearchParams] = useSearchParams()
     const [isCreateOpen, setIsCreateOpen] = useState(false)
+    const [tableRefreshKey, setTableRefreshKey] = useState(0)
 
     const initialSelection = useMemo<FixationCreateInitialSelection | null>(
         () => {
@@ -85,13 +86,14 @@ const Fixations = () => {
                             Создать фиксацию
                         </Button>
                     </div>
-                    <FixationsTable />
+                    <FixationsTable refreshKey={tableRefreshKey} />
                 </div>
             </AdaptiveCard>
             <FixationsCreateWizardDialog
                 isOpen={isCreateOpen}
                 initialSelection={initialSelection}
                 onClose={handleCloseCreate}
+                onSuccess={() => setTableRefreshKey((key) => key + 1)}
             />
         </Container>
     )

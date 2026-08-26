@@ -6,9 +6,12 @@ import Steps from '@/components/ui/Steps'
 import Table from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Select, { Option as SelectMenuOption } from '@/components/ui/Select'
+import Spinner from '@/components/ui/Spinner'
 import Pagination from '@/components/ui/Pagination'
 import CloseButton from '@/components/ui/CloseButton'
 import AsyncSelect from 'react-select/async'
+import { components } from 'react-select'
+import type { GroupBase, MenuListProps } from 'react-select'
 import DatePicker from '@/components/ui/DatePicker'
 import { Form, FormItem } from '@/components/ui/Form'
 import PhoneInput from '@/components/shared/PhoneInput'
@@ -21,10 +24,9 @@ import {
     apiGetFixationManagers,
     apiSetRelatedClientsForFixation,
 } from '@/services/FixationsService'
-import { apiGetCheckboard } from '@/services/ObjectsService'
+import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
-import useSWR, { useSWRConfig } from 'swr'
 import { z } from 'zod'
 import 'dayjs/locale/ru'
 import debounce from 'lodash/debounce'
@@ -47,7 +49,10 @@ import {
     collectStatuses,
     findBuildingPropertyById,
 } from '@/views/objects/checkboardUtils'
-import type { CheckboardCellLabel } from '@/views/objects/checkboard.types'
+import type {
+    CheckboardBuilding,
+    CheckboardCellLabel,
+} from '@/views/objects/checkboard.types'
 import type {
     FixationApartment,
     FixationClient,
@@ -78,6 +83,7 @@ type FixationsCreateWizardDialogProps = {
     isOpen: boolean
     initialSelection?: FixationCreateInitialSelection | null
     onClose: () => void
+    onSuccess?: () => void
 }
 
 type ClientCreateSchema = {
@@ -109,22 +115,37 @@ const CLIENTS_PAGE_SIZES = [20, 50, 100]
 const WIZARD_EXTENDED_FIELDS_ENABLED = true
 
 const STEP_INDEX: Record<
-    Exclude<WizardStep, 'client-create' | 'note'>,
+    Exclude<WizardStep, 'client-create'>,
     number
-> = {
-    client: 0,
-    complex: 1,
-    confirm: 2,
-}
+> = WIZARD_EXTENDED_FIELDS_ENABLED
+    ? {
+          client: 0,
+          complex: 1,
+          note: 2,
+          confirm: 3,
+      }
+    : {
+          client: 0,
+          complex: 1,
+          note: 2,
+          confirm: 2,
+      }
 
 const STEP_BY_INDEX: Record<
     number,
-    Exclude<WizardStep, 'client-create' | 'note'>
-> = {
-    0: 'client',
-    1: 'complex',
-    2: 'confirm',
-}
+    Exclude<WizardStep, 'client-create'>
+> = WIZARD_EXTENDED_FIELDS_ENABLED
+    ? {
+          0: 'client',
+          1: 'complex',
+          2: 'note',
+          3: 'confirm',
+      }
+    : {
+          0: 'client',
+          1: 'complex',
+          2: 'confirm',
+      }
 
 const STEP_META: Record<
     Exclude<WizardStep, 'client-create'>,
@@ -136,7 +157,7 @@ const STEP_META: Record<
     },
     complex: {
         title: 'Дом и менеджер',
-        description: 'Выберите дом и менеджера',
+        description: 'Выберите дом и при необходимости менеджера',
     },
     note: {
         title: 'Предпочтения',
@@ -181,6 +202,34 @@ const formatSelectedPremiseLabel = (premise: FixationApartment) => {
     return parts.join(' · ')
 }
 
+const formatPremiseInterestComment = (premise: FixationApartment) => {
+    const details = [`№${premise.number}`]
+
+    if (premise.rooms && premise.rooms > 0) {
+        details.push(`${premise.rooms}-комн.`)
+    }
+
+    return `Интересует помещение ${details.join(', ')}`
+}
+
+const buildFixationComment = (
+    premise: FixationApartment | null,
+    note: string,
+) => {
+    const parts: string[] = []
+
+    if (premise) {
+        parts.push(formatPremiseInterestComment(premise))
+    }
+
+    const trimmedNote = note.trim()
+    if (trimmedNote) {
+        parts.push(trimmedNote)
+    }
+
+    return parts.length > 0 ? parts.join('\n') : undefined
+}
+
 type PremiseSelectionControlsProps = {
     selectedApartment: FixationApartment | null
     onClearSelection: () => void
@@ -218,6 +267,8 @@ const PremiseSelectionControls = ({
 }
 
 const SELECT_MENU_CLOSE_SCROLL_PX = 56
+const HOUSES_PER_PAGE = 20
+const MANAGERS_PER_PAGE = 20
 
 const selectMenuProps = {
     menuPortalTarget:
@@ -230,6 +281,39 @@ const selectMenuProps = {
             zIndex: 60,
         }),
     },
+}
+
+type InfiniteSelectProps = {
+    isLoadingMore?: boolean
+}
+
+const mergeById = <T extends { id: string }>(prev: T[], next: T[]): T[] => {
+    if (next.length === 0) return prev
+
+    const seen = new Set(prev.map((item) => item.id))
+    const uniqueNext = next.filter((item) => !seen.has(item.id))
+
+    return uniqueNext.length > 0 ? [...prev, ...uniqueNext] : prev
+}
+
+const InfiniteSelectMenuList = (
+    props: MenuListProps<SelectOption, false, GroupBase<SelectOption>>,
+) => {
+    const isLoadingMore = Boolean(
+        (props.selectProps as InfiniteSelectProps).isLoadingMore,
+    )
+
+    return (
+        <>
+            <components.MenuList {...props} />
+            {isLoadingMore ? (
+                <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
+                    <Spinner size={14} />
+                    Загрузка...
+                </div>
+            ) : null}
+        </>
+    )
 }
 
 const isSelectControlFocused = () => {
@@ -364,13 +448,19 @@ const FixationsCreateWizardDialog = ({
     isOpen,
     initialSelection = null,
     onClose,
+    onSuccess,
 }: FixationsCreateWizardDialogProps) => {
-    const { mutate } = useSWRConfig()
     const [step, setStep] = useState<WizardStep>('client')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isCreatingClient, setIsCreatingClient] = useState(false)
     const initialSelectionAppliedRef = useRef(false)
     const selectMenuScrollAnchorRef = useRef<number | null>(null)
+    const complexesPageRef = useRef(1)
+    const complexesHasMoreRef = useRef(false)
+    const complexesLoadingMoreRef = useRef(false)
+    const managersPageRef = useRef(1)
+    const managersHasMoreRef = useRef(false)
+    const managersLoadingMoreRef = useRef(false)
 
     const [clients, setClients] = useState<FixationClient[]>([])
     const [clientsTotal, setClientsTotal] = useState(0)
@@ -381,7 +471,9 @@ const FixationsCreateWizardDialog = ({
     const [managers, setManagers] = useState<FixationManager[]>([])
     const [isClientsLoading, setIsClientsLoading] = useState(false)
     const [isComplexesLoading, setIsComplexesLoading] = useState(false)
+    const [isComplexesLoadingMore, setIsComplexesLoadingMore] = useState(false)
     const [isManagersLoading, setIsManagersLoading] = useState(false)
+    const [isManagersLoadingMore, setIsManagersLoadingMore] = useState(false)
 
     const [clientPhoneQuery, setClientPhoneQuery] = useState('')
     const [clientSearchQuery, setClientSearchQuery] = useState('')
@@ -439,6 +531,18 @@ const FixationsCreateWizardDialog = ({
         setClientsPageIndex(1)
         setClientsPageSize(20)
         setHasClientsLoaded(false)
+        setComplexes([])
+        setManagers([])
+        setIsComplexesLoading(false)
+        setIsComplexesLoadingMore(false)
+        setIsManagersLoading(false)
+        setIsManagersLoadingMore(false)
+        complexesPageRef.current = 1
+        complexesHasMoreRef.current = false
+        complexesLoadingMoreRef.current = false
+        managersPageRef.current = 1
+        managersHasMoreRef.current = false
+        managersLoadingMoreRef.current = false
         setDesiredArea('')
         setDesiredRooms('')
         setPaymentFormat('')
@@ -567,38 +671,154 @@ const FixationsCreateWizardDialog = ({
             return
         }
 
+        let cancelled = false
+
         const loadComplexes = async () => {
             setIsComplexesLoading(true)
+            complexesPageRef.current = 1
+            complexesHasMoreRef.current = false
+            complexesLoadingMoreRef.current = false
+
             try {
-                const response = await apiGetFixationHouses()
-                setComplexes(response || [])
+                const response = await apiGetFixationHouses({
+                    page: 1,
+                    per_page: HOUSES_PER_PAGE,
+                })
+                if (cancelled) return
+
+                let list = response.list || []
+                const currentPage = response.meta.current_page
+                const lastPage = response.meta.last_page
+                const more = currentPage < lastPage
+
+                if (
+                    initialSelection?.complexId &&
+                    !list.some((item) => item.id === initialSelection.complexId)
+                ) {
+                    try {
+                        const selectedObject = await apiGetRealtyObject(
+                            initialSelection.complexId,
+                        )
+                        if (selectedObject && !cancelled) {
+                            list = [
+                                {
+                                    id: selectedObject.id,
+                                    name: selectedObject.name,
+                                    address:
+                                        selectedObject.address?.trim() || '',
+                                    apartments: [],
+                                    managers: [],
+                                },
+                                ...list,
+                            ]
+                        }
+                    } catch {
+                        // keep first page as-is if preselected object fetch fails
+                    }
+                }
+
+                if (cancelled) return
+
+                setComplexes(list)
+                complexesPageRef.current = currentPage
+                complexesHasMoreRef.current = more
             } catch {
-                setComplexes([])
+                if (!cancelled) {
+                    setComplexes([])
+                    complexesPageRef.current = 1
+                    complexesHasMoreRef.current = false
+                }
             } finally {
-                setIsComplexesLoading(false)
+                if (!cancelled) {
+                    setIsComplexesLoading(false)
+                }
             }
         }
 
         void loadComplexes()
+
+        return () => {
+            cancelled = true
+        }
     }, [isOpen, step, initialSelection?.complexId, complexes.length])
 
+    const handleComplexesMenuScrollToBottom = useCallback(async () => {
+        if (
+            complexesLoadingMoreRef.current ||
+            !complexesHasMoreRef.current ||
+            isComplexesLoading
+        ) {
+            return
+        }
+
+        complexesLoadingMoreRef.current = true
+        setIsComplexesLoadingMore(true)
+
+        const nextPage = complexesPageRef.current + 1
+
+        try {
+            const response = await apiGetFixationHouses({
+                page: nextPage,
+                per_page: HOUSES_PER_PAGE,
+            })
+            const currentPage = response.meta.current_page
+            const lastPage = response.meta.last_page
+            const more = currentPage < lastPage
+
+            setComplexes((prev) => mergeById(prev, response.list || []))
+            complexesPageRef.current = currentPage
+            complexesHasMoreRef.current = more
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : 'Не удалось загрузить список домов'
+            toast.push(<Notification type="danger">{message}</Notification>, {
+                placement: 'top-center',
+            })
+        } finally {
+            complexesLoadingMoreRef.current = false
+            setIsComplexesLoadingMore(false)
+        }
+    }, [isComplexesLoading])
+
     useEffect(() => {
-        if (!isOpen || step !== 'complex' || managers.length > 0) {
+        if (!isOpen || step !== 'complex' || !selectedComplex?.id) {
+            if (!selectedComplex?.id) {
+                setManagers([])
+                managersPageRef.current = 1
+                managersHasMoreRef.current = false
+            }
             return
         }
 
         let cancelled = false
+        const objectId = selectedComplex.id
 
         const loadManagers = async () => {
             setIsManagersLoading(true)
+            setManagers([])
+            managersPageRef.current = 1
+            managersHasMoreRef.current = false
+            managersLoadingMoreRef.current = false
+
             try {
-                const response = await apiGetFixationManagers()
+                const response = await apiGetFixationManagers({
+                    page: 1,
+                    page_size: MANAGERS_PER_PAGE,
+                    object_id: objectId,
+                })
                 if (!cancelled) {
-                    setManagers(response || [])
+                    setManagers(response.list || [])
+                    managersPageRef.current = response.meta.current_page
+                    managersHasMoreRef.current =
+                        response.meta.current_page < response.meta.last_page
                 }
             } catch {
                 if (!cancelled) {
                     setManagers([])
+                    managersPageRef.current = 1
+                    managersHasMoreRef.current = false
                 }
             } finally {
                 if (!cancelled) {
@@ -612,7 +832,49 @@ const FixationsCreateWizardDialog = ({
         return () => {
             cancelled = true
         }
-    }, [isOpen, step, managers.length])
+    }, [isOpen, step, selectedComplex?.id])
+
+    const handleManagersMenuScrollToBottom = useCallback(async () => {
+        if (
+            managersLoadingMoreRef.current ||
+            !managersHasMoreRef.current ||
+            isManagersLoading ||
+            !selectedComplex?.id
+        ) {
+            return
+        }
+
+        managersLoadingMoreRef.current = true
+        setIsManagersLoadingMore(true)
+
+        const nextPage = managersPageRef.current + 1
+
+        try {
+            const response = await apiGetFixationManagers({
+                page: nextPage,
+                page_size: MANAGERS_PER_PAGE,
+                object_id: selectedComplex.id,
+            })
+            const currentPage = response.meta.current_page
+            const lastPage = response.meta.last_page
+            const more = currentPage < lastPage
+
+            setManagers((prev) => mergeById(prev, response.list || []))
+            managersPageRef.current = currentPage
+            managersHasMoreRef.current = more
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : 'Не удалось загрузить список менеджеров'
+            toast.push(<Notification type="danger">{message}</Notification>, {
+                placement: 'top-center',
+            })
+        } finally {
+            managersLoadingMoreRef.current = false
+            setIsManagersLoadingMore(false)
+        }
+    }, [isManagersLoading, selectedComplex?.id])
 
     useEffect(() => {
         if (!isOpen || initialSelectionAppliedRef.current) return
@@ -623,7 +885,6 @@ const FixationsCreateWizardDialog = ({
             null
 
         if (!complex) {
-            initialSelectionAppliedRef.current = true
             return
         }
 
@@ -662,14 +923,27 @@ const FixationsCreateWizardDialog = ({
         initialSelectionAppliedRef.current = true
     }, [complexes, initialSelection, isOpen])
 
-    const complexOptions: SelectOption[] = useMemo(
-        () =>
-            complexes.map((item) => ({
-                value: item.id,
-                label: item.name,
-            })),
-        [complexes],
-    )
+    const complexOptions: SelectOption[] = useMemo(() => {
+        const options = complexes.map((item) => ({
+            value: item.id,
+            label: item.name,
+        }))
+
+        if (
+            selectedComplex &&
+            !options.some((item) => item.value === selectedComplex.id)
+        ) {
+            return [
+                {
+                    value: selectedComplex.id,
+                    label: selectedComplex.name,
+                },
+                ...options,
+            ]
+        }
+
+        return options
+    }, [complexes, selectedComplex])
 
     const apartmentCheckboardItems = useMemo(() => {
         const apartments = selectedComplex?.apartments ?? []
@@ -687,14 +961,27 @@ const FixationsCreateWizardDialog = ({
         })
     }, [selectedComplex])
 
-    const managerOptions: SelectOption[] = useMemo(
-        () =>
-            managers.map((item) => ({
-                value: item.id,
-                label: item.fullName,
-            })),
-        [managers],
-    )
+    const managerOptions: SelectOption[] = useMemo(() => {
+        const options = managers.map((item) => ({
+            value: item.id,
+            label: item.fullName,
+        }))
+
+        if (
+            selectedManager &&
+            !options.some((item) => item.value === selectedManager.id)
+        ) {
+            return [
+                {
+                    value: selectedManager.id,
+                    label: selectedManager.fullName,
+                },
+                ...options,
+            ]
+        }
+
+        return options
+    }, [managers, selectedManager])
 
     const selectedManagerOption = useMemo(() => {
         if (!selectedManager) {
@@ -708,24 +995,21 @@ const FixationsCreateWizardDialog = ({
     }, [managerOptions, selectedManager])
 
     const currentStepIndex =
-        step === 'client-create'
-            ? STEP_INDEX.client
-            : step === 'note'
-              ? STEP_INDEX.confirm
-              : STEP_INDEX[step]
+        step === 'client-create' ? STEP_INDEX.client : STEP_INDEX[step]
     const checkboardLabelMode: CheckboardCellLabel = 'number'
 
     const canGoToStep = (index: number) => {
         if (index === 0) return true
         if (index === 1) return Boolean(selectedClient)
         if (index === 2)
-            return Boolean(selectedClient && selectedComplex && selectedManager)
+            return Boolean(selectedClient && selectedComplex)
+        if (index === 3 && WIZARD_EXTENDED_FIELDS_ENABLED) {
+            return Boolean(selectedClient && selectedComplex)
+        }
         return false
     }
 
-    const canProceedFromComplex = Boolean(
-        selectedComplex && selectedManager,
-    )
+    const canProceedFromComplex = Boolean(selectedComplex)
 
     const handleStepIndexChange = (index: number) => {
         if (!canGoToStep(index)) return
@@ -799,18 +1083,35 @@ const FixationsCreateWizardDialog = ({
         Boolean(selectedComplex?.id) &&
         (!isApartmentCheckboardCollapsed || isCheckboardFullscreen)
 
-    const { data: selectedComplexCheckboard, isLoading: isCheckboardLoading } =
-        useSWR(
-            shouldLoadCheckboard
-                ? ['/api/v2/realty_objects/chess', selectedComplex?.id]
-                : null,
-            () => apiGetCheckboard(selectedComplex?.id || ''),
-            {
-                revalidateOnFocus: false,
-                revalidateIfStale: false,
-                revalidateOnReconnect: false,
-            },
-        )
+    const [selectedComplexCheckboard, setSelectedComplexCheckboard] =
+        useState<CheckboardBuilding | null>(null)
+    const [isCheckboardLoading, setIsCheckboardLoading] = useState(false)
+
+    useEffect(() => {
+        if (!shouldLoadCheckboard || !selectedComplex?.id) {
+            setSelectedComplexCheckboard(null)
+            setIsCheckboardLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsCheckboardLoading(true)
+
+        void apiGetCheckboard(selectedComplex.id)
+            .then((response) => {
+                if (!cancelled) setSelectedComplexCheckboard(response)
+            })
+            .catch(() => {
+                if (!cancelled) setSelectedComplexCheckboard(null)
+            })
+            .finally(() => {
+                if (!cancelled) setIsCheckboardLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [shouldLoadCheckboard, selectedComplex?.id])
 
     const checkboardStatuses = useMemo(
         () =>
@@ -1001,13 +1302,15 @@ const FixationsCreateWizardDialog = ({
     }, [selectedApartment, selectedComplex])
 
     const handleCreateFixation = async () => {
-        if (!selectedClient || !selectedComplex || !selectedManager) return
+        if (!selectedClient || !selectedComplex) return
 
         try {
             setIsSubmitting(true)
             const fixation = await apiCreateFixation({
                 objectId: Number(selectedComplex.id),
-                managerId: Number(selectedManager.id),
+                ...(selectedManager
+                    ? { managerId: Number(selectedManager.id) }
+                    : {}),
                 ...(selectedClient.isNew
                     ? { client: selectedClient }
                     : { clientId: Number(selectedClient.id) }),
@@ -1018,7 +1321,7 @@ const FixationsCreateWizardDialog = ({
                 //     clientId: relative.client.id,
                 //     relation: relative.relation,
                 // })),
-                note: note.trim() || undefined,
+                note: buildFixationComment(selectedApartment, note),
                 desiredArea: desiredArea || undefined,
                 desiredRooms: desiredRooms || undefined,
                 paymentFormat: paymentFormat || undefined,
@@ -1036,27 +1339,23 @@ const FixationsCreateWizardDialog = ({
                         })),
                     })
                 } catch {
-                    await mutate((key) =>
-                        Array.isArray(key) && key[0] === '/api/v2/fixations',
-                    )
                     toast.push(
                         <Notification type="warning">
                             Фиксация создана, но не удалось добавить родственников
                         </Notification>,
                         { placement: 'top-center' },
                     )
+                    onSuccess?.()
                     onClose()
                     return
                 }
             }
 
-            await mutate((key) =>
-                Array.isArray(key) && key[0] === '/api/v2/fixations',
-            )
             toast.push(
                 <Notification type="success">Фиксация создана</Notification>,
                 { placement: 'top-center' },
             )
+            onSuccess?.()
             onClose()
         } catch (err: unknown) {
             const message =
@@ -1078,9 +1377,7 @@ const FixationsCreateWizardDialog = ({
                   description:
                       'Заполните данные — клиент будет создан вместе с фиксацией',
               }
-            : step === 'note'
-              ? STEP_META.confirm
-              : STEP_META[step as Exclude<WizardStep, 'client-create' | 'note'>]
+            : STEP_META[step]
 
     const isClientStep = step === 'client' || step === 'client-create'
 
@@ -1437,16 +1734,26 @@ const FixationsCreateWizardDialog = ({
                                                 selectedComplex?.id,
                                         ) || null
                                     }
+                                    components={{
+                                        MenuList: InfiniteSelectMenuList,
+                                    }}
+                                    onMenuScrollToBottom={() => {
+                                        void handleComplexesMenuScrollToBottom()
+                                    }}
                                     onChange={(option) =>
                                         handleComplexChange(
                                             option as SelectOption | null,
                                         )
                                     }
+                                    {...({
+                                        isLoadingMore: isComplexesLoadingMore,
+                                    } satisfies InfiniteSelectProps)}
                                 />
                                 </FormItem>
-                                <FormItem asterisk label="Менеджер">
+                                <FormItem label="Менеджер (необязательно)">
                                     <Select
                                         {...selectMenuProps}
+                                        isClearable
                                         isLoading={isManagersLoading}
                                         isDisabled={!selectedComplex}
                                         placeholder={
@@ -1456,6 +1763,12 @@ const FixationsCreateWizardDialog = ({
                                         }
                                         options={managerOptions}
                                         value={selectedManagerOption}
+                                        components={{
+                                            MenuList: InfiniteSelectMenuList,
+                                        }}
+                                        onMenuScrollToBottom={() => {
+                                            void handleManagersMenuScrollToBottom()
+                                        }}
                                         onChange={(option) => {
                                             const value = (
                                                 option as SelectOption | null
@@ -1472,6 +1785,10 @@ const FixationsCreateWizardDialog = ({
                                                 ) || null
                                             setSelectedManager(manager)
                                         }}
+                                        {...({
+                                            isLoadingMore:
+                                                isManagersLoadingMore,
+                                        } satisfies InfiniteSelectProps)}
                                     />
                                 </FormItem>
                                 {WIZARD_EXTENDED_FIELDS_ENABLED ? (
@@ -1842,7 +2159,9 @@ const FixationsCreateWizardDialog = ({
                             <SummaryCard
                                 icon={<TbUsers />}
                                 label="Менеджер"
-                                title={selectedManager?.fullName || '—'}
+                                title={
+                                    selectedManager?.fullName || 'Не указан'
+                                }
                                 subtitle={selectedManager?.phone}
                                 isFilled={Boolean(selectedManager)}
                                 onEdit={() => setStep('complex')}
@@ -1898,7 +2217,14 @@ const FixationsCreateWizardDialog = ({
                             icon={<TbArrowLeft />}
                             onClick={() => {
                                 if (step === 'complex') setStep('client')
-                                if (step === 'confirm') setStep('complex')
+                                if (step === 'note') setStep('complex')
+                                if (step === 'confirm') {
+                                    setStep(
+                                        WIZARD_EXTENDED_FIELDS_ENABLED
+                                            ? 'note'
+                                            : 'complex',
+                                    )
+                                }
                             }}
                         >
                             Назад
@@ -1916,7 +2242,13 @@ const FixationsCreateWizardDialog = ({
                                     variant="solid"
                                     className="w-full sm:w-auto"
                                     disabled={!canProceedFromComplex}
-                                    onClick={() => setStep('confirm')}
+                                    onClick={() =>
+                                        setStep(
+                                            WIZARD_EXTENDED_FIELDS_ENABLED
+                                                ? 'note'
+                                                : 'confirm',
+                                        )
+                                    }
                                 >
                                     Далее
                                 </Button>

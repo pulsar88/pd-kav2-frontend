@@ -20,11 +20,29 @@ export type GetFixationClientsResponse = {
     total: number
 }
 
+export type FixationListMeta = {
+    current_page: number
+    last_page: number
+    per_page: number
+    total: number
+}
+
 export type FixationManager = {
     id: string
     fullName: string
     phone?: string
     photo?: string
+}
+
+export type GetFixationManagersParams = {
+    page?: number
+    page_size?: number
+    object_id?: number | string
+}
+
+export type GetFixationManagersResponse = {
+    list: FixationManager[]
+    meta: FixationListMeta
 }
 
 export type FixationApartment = {
@@ -41,6 +59,16 @@ export type FixationComplex = {
     managers: FixationManager[]
 }
 
+export type GetFixationHousesParams = {
+    page?: number
+    per_page?: number
+}
+
+export type GetFixationHousesResponse = {
+    list: FixationComplex[]
+    meta: FixationListMeta
+}
+
 export type CreateFixationRelativePayload = {
     clientId: string
     relation: string
@@ -49,7 +77,7 @@ export type CreateFixationRelativePayload = {
 /** Базовый payload — совпадает с текущим POST /v2/fixations */
 export type CreateFixationPayload = {
     objectId: number
-    managerId: number
+    managerId?: number
     clientId?: number
     client?: FixationClient
 }

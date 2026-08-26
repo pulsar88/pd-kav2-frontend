@@ -889,7 +889,7 @@ const SignInForm = (props: SignInFormProps) => {
                                     className={classNames(
                                         'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
                                         selected
-                                            ? 'bg-primary text-white'
+                                            ? 'bg-primary text-neutral'
                                             : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200',
                                     )}
                                 >
@@ -1042,6 +1042,18 @@ const SignInForm = (props: SignInFormProps) => {
                                     autoComplete="new-password"
                                     placeholder="Придумайте пароль"
                                     {...field}
+                                    onChange={(e) => {
+                                        field.onChange(e)
+                                        if (
+                                            registerPasswordForm.getValues(
+                                                'confirmPassword',
+                                            )
+                                        ) {
+                                            registerPasswordForm.trigger(
+                                                'confirmPassword',
+                                            )
+                                        }
+                                    }}
                                 />
                             )}
                         />

@@ -165,7 +165,7 @@ const NotificationPreferences = () => {
                     Настройки уведомлений недоступны
                 </p>
             ) : (
-                <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {types.map((type) => {
                         const description =
                             formatNotificationTypeDescription(type)
@@ -173,19 +173,19 @@ const NotificationPreferences = () => {
                         return (
                             <div
                                 key={type.id}
-                                className="rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+                                className="flex flex-col gap-3 rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-700"
                             >
-                                <div className="mb-4">
+                                <div className="min-w-0">
                                     <h5 className="font-semibold heading-text">
                                         {formatNotificationTypeTitle(type)}
                                     </h5>
                                     {description ? (
-                                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                                             {description}
                                         </p>
                                     ) : null}
                                 </div>
-                                <div className="flex flex-col gap-3">
+                                <div className="flex flex-col gap-2">
                                     {channels.map((channel) => {
                                         const key = getPreferenceKey(
                                             type.id,
@@ -193,11 +193,11 @@ const NotificationPreferences = () => {
                                         )
 
                                         return (
-                                            <div
+                                            <label
                                                 key={key}
-                                                className="flex items-center justify-between gap-4 py-1"
+                                                className="flex items-center justify-between gap-3 text-sm heading-text"
                                             >
-                                                <span className="text-sm heading-text">
+                                                <span className="whitespace-nowrap">
                                                     {channel.title}
                                                 </span>
                                                 <Switcher
@@ -213,7 +213,7 @@ const NotificationPreferences = () => {
                                                         )
                                                     }
                                                 />
-                                            </div>
+                                            </label>
                                         )
                                     })}
                                 </div>

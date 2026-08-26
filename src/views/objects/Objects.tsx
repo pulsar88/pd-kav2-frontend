@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import useSWR from 'swr'
 import Tabs from '@/components/ui/Tabs'
 import Select from '@/components/ui/Select'
 import Pagination from '@/components/ui/Pagination'
@@ -9,6 +8,8 @@ import Container from '@/components/shared/Container'
 import {
     apiGetRealtyProperties,
     apiGetRealtyPropertiesSummary,
+    type GetRealtyPropertiesResponse,
+    type GetRealtyPropertiesSummaryResponse,
 } from '@/services/ObjectsService'
 import type { ObjectsSearchFilters } from './types'
 import ComplexCard from './components/ComplexCard'
@@ -25,7 +26,7 @@ import {
     serializeObjectsSearchFilters,
     type ObjectsCatalogTab,
 } from './filtersQuery'
-import type { PremiseSortKey, PremiseSortState } from './utils'
+import type { PremiseSortState } from './utils'
 
 const { TabList, TabNav, TabContent } = Tabs
 
@@ -74,6 +75,18 @@ const Objects = () => {
         () => tabFromUrl === 'premises',
     )
 
+    const [complexesData, setComplexesData] = useState<
+        GetRealtyPropertiesSummaryResponse | undefined
+    >()
+    const [isComplexesSummaryLoading, setIsComplexesSummaryLoading] =
+        useState(true)
+
+    const [premisesData, setPremisesData] = useState<
+        GetRealtyPropertiesResponse | undefined
+    >()
+    const [isPremisesLoading, setIsPremisesLoading] = useState(false)
+    const [isPremisesRefreshing, setIsPremisesRefreshing] = useState(false)
+
     useEffect(() => {
         setFilters(filtersFromUrl)
         setAppliedFilters(filtersFromUrl)
@@ -111,11 +124,6 @@ const Objects = () => {
         syncCatalogToUrl(appliedFilters, nextTab)
     }
 
-    const swrConfig = {
-        revalidateOnFocus: false,
-        revalidateOnReconnect: false,
-    } as const
-
     const appliedFiltersKey = useMemo(
         () => serializeObjectsSearchFilters(appliedFilters).toString(),
         [appliedFilters],
@@ -123,66 +131,134 @@ const Objects = () => {
 
     const summaryFiltersActive = hasAppliedCatalogFilters(appliedFilters)
 
-    const {
-        data: complexesData,
-        isLoading: isComplexesSummaryLoading,
-        mutate: mutateComplexesSummary,
-    } = useSWR(
-        [
-            '/api/v2/realty_properties/summary',
-            complexesPage,
-            complexesPageSize,
-            appliedFiltersKey,
-        ],
-        () =>
-            apiGetRealtyPropertiesSummary({
-                page: complexesPage,
-                per_page: complexesPageSize,
-                filters: summaryFiltersActive ? appliedFilters : undefined,
-            }),
-        swrConfig,
-    )
+    useEffect(() => {
+        let cancelled = false
+        setIsComplexesSummaryLoading(true)
+
+        void apiGetRealtyPropertiesSummary({
+            page: complexesPage,
+            per_page: complexesPageSize,
+            filters: summaryFiltersActive ? appliedFilters : undefined,
+        })
+            .then((result) => {
+                if (!cancelled) setComplexesData(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsComplexesSummaryLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+        // appliedFilters keyed via appliedFiltersKey
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [complexesPage, complexesPageSize, appliedFiltersKey, summaryFiltersActive])
+
+    const loadComplexesSummary = useCallback(() => {
+        setIsComplexesSummaryLoading(true)
+        return apiGetRealtyPropertiesSummary({
+            page: complexesPage,
+            per_page: complexesPageSize,
+            filters: summaryFiltersActive ? appliedFilters : undefined,
+        })
+            .then((result) => {
+                setComplexesData(result)
+            })
+            .finally(() => {
+                setIsComplexesSummaryLoading(false)
+            })
+    }, [
+        complexesPage,
+        complexesPageSize,
+        summaryFiltersActive,
+        appliedFilters,
+    ])
+
+    useEffect(() => {
+        if (!hasOpenedPremisesTab) return
+
+        let cancelled = false
+        const hasExistingData = premisesData != null
+
+        if (hasExistingData) {
+            setIsPremisesRefreshing(true)
+        } else {
+            setIsPremisesLoading(true)
+        }
+
+        void apiGetRealtyProperties({
+            page: premisesPage,
+            per_page: premisesPageSize,
+            sort: premisesSortKey ?? undefined,
+            filters: hasActiveObjectsSearchFilters(appliedFilters)
+                ? appliedFilters
+                : undefined,
+        })
+            .then((result) => {
+                if (!cancelled) setPremisesData(result)
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsPremisesLoading(false)
+                    setIsPremisesRefreshing(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+        // premisesData / appliedFilters: keep-previous-data + filters keyed via appliedFiltersKey
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        hasOpenedPremisesTab,
+        premisesPage,
+        premisesPageSize,
+        premisesSortKey,
+        appliedFiltersKey,
+    ])
+
+    const loadPremises = useCallback(() => {
+        if (!hasOpenedPremisesTab) return Promise.resolve()
+
+        const hasExistingData = premisesData != null
+        if (hasExistingData) {
+            setIsPremisesRefreshing(true)
+        } else {
+            setIsPremisesLoading(true)
+        }
+
+        return apiGetRealtyProperties({
+            page: premisesPage,
+            per_page: premisesPageSize,
+            sort: premisesSortKey ?? undefined,
+            filters: hasActiveObjectsSearchFilters(appliedFilters)
+                ? appliedFilters
+                : undefined,
+        })
+            .then((result) => {
+                setPremisesData(result)
+            })
+            .finally(() => {
+                setIsPremisesLoading(false)
+                setIsPremisesRefreshing(false)
+            })
+    }, [
+        hasOpenedPremisesTab,
+        premisesData,
+        premisesPage,
+        premisesPageSize,
+        premisesSortKey,
+        appliedFilters,
+    ])
 
     const filteredComplexes = complexesData?.items ?? []
     const complexesTotal = complexesData?.meta.total ?? 0
-
-    const {
-        data: premisesData,
-        isLoading: isPremisesLoading,
-        isValidating: isPremisesValidating,
-        mutate: mutatePremises,
-    } = useSWR(
-        hasOpenedPremisesTab
-            ? [
-                  '/api/v2/realty_properties',
-                  premisesPage,
-                  premisesPageSize,
-                  premisesSortKey,
-                  appliedFiltersKey,
-              ]
-            : null,
-        () =>
-            apiGetRealtyProperties({
-                page: premisesPage,
-                per_page: premisesPageSize,
-                sort: premisesSortKey ?? undefined,
-                filters: hasActiveObjectsSearchFilters(appliedFilters)
-                    ? appliedFilters
-                    : undefined,
-            }),
-        {
-            ...swrConfig,
-            keepPreviousData: true,
-        },
-    )
 
     const showMatchingPremisesCount = hasAppliedCatalogFilters(appliedFilters)
 
     const premises = premisesData?.items ?? []
     const premisesTotal = premisesData?.meta.total ?? 0
     const isPremisesInitialLoading = isPremisesLoading && !premisesData
-    const isPremisesRefreshing =
-        isPremisesValidating && Boolean(premisesData)
 
     const handleFiltersChange = (nextFilters: ObjectsSearchFilters) => {
         setFilters(nextFilters)
@@ -200,9 +276,9 @@ const Objects = () => {
 
         if (!filtersUnchanged) return
 
-        void mutateComplexesSummary()
+        void loadComplexesSummary()
         if (hasOpenedPremisesTab) {
-            void mutatePremises()
+            void loadPremises()
         }
     }
 

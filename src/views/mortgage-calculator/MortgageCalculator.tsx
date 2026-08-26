@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react'
-import Container from '@/components/shared/Container'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -8,7 +7,11 @@ import { FormItem } from '@/components/ui/Form'
 import Segment from '@/components/ui/Segment'
 import Table from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
-import { HEADER_HEIGHT } from '@/constants/theme.constant'
+import {
+    HEADER_HEIGHT,
+    PAGE_CONTAINER_GUTTER_X,
+} from '@/constants/theme.constant'
+import classNames from '@/utils/classNames'
 import {
     calculateMortgage,
     formatDate,
@@ -195,24 +198,39 @@ const MortgageCalculator = () => {
     }
 
     return (
-        <Container className="min-w-0 overflow-x-hidden py-6">
-            <div className="mb-6">
-                <button
-                    type="button"
-                    className="mb-4 inline-flex items-center gap-3 text-gray-800 outline-hidden transition-colors hover:text-primary dark:text-gray-100 dark:hover:text-primary"
-                    onClick={() => navigate('/tools')}
-                >
-                    <span className="rounded-full bg-gray-100 p-2 text-xl transition-colors hover:bg-primary/10 dark:bg-gray-700 dark:hover:bg-primary/20">
-                        <TbArrowNarrowLeft />
-                    </span>
-                    <span className="text-sm font-semibold">Назад</span>
-                </button>
-                <h3 className="mb-1">Ипотечный калькулятор</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Рассчитайте ежемесячный платёж и график выплат по ипотеке
-                </p>
-            </div>
-
+        <div
+            className={classNames(
+                'min-w-0 w-full overflow-x-hidden py-6',
+                PAGE_CONTAINER_GUTTER_X,
+            )}
+        >
+            <Card
+                className="w-full"
+                header={{
+                    bordered: true,
+                    content: (
+                        <div>
+                            <button
+                                type="button"
+                                className="mb-4 inline-flex items-center gap-3 text-gray-800 outline-hidden transition-colors hover:text-primary dark:text-gray-100 dark:hover:text-primary"
+                                onClick={() => navigate('/tools')}
+                            >
+                                <span className="rounded-full bg-gray-100 p-2 text-xl transition-colors hover:bg-primary/10 dark:bg-gray-700 dark:hover:bg-primary/20">
+                                    <TbArrowNarrowLeft />
+                                </span>
+                                <span className="text-sm font-semibold">
+                                    Назад
+                                </span>
+                            </button>
+                            <h3 className="mb-1">Ипотечный калькулятор</h3>
+                            <p className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                                Рассчитайте ежемесячный платёж и график выплат
+                                по ипотеке
+                            </p>
+                        </div>
+                    ),
+                }}
+            >
             <div className="grid min-w-0 gap-6 min-[1200px]:grid-cols-2">
                 <Card className="min-w-0" bodyClass="p-5">
                     <FormItem label="Тип платежа">
@@ -498,7 +516,8 @@ const MortgageCalculator = () => {
                     </div>
                 </Card>
             ) : null}
-        </Container>
+            </Card>
+        </div>
     )
 }
 

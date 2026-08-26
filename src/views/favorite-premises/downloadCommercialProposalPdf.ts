@@ -43,10 +43,8 @@ const resolveLayoutImageUrl = (premise: Premise) => premise.layoutImage ?? null
 const resolveFloorPlanImageUrl = (premise: Premise) =>
     premise.floorPlanImage ?? null
 
-const resolveComplexImageUrl = (
-    premise: Premise,
-    complex?: Complex | null,
-) => complex?.image ?? premise.complexImage ?? null
+const resolveComplexImageUrl = (premise: Premise, complex?: Complex | null) =>
+    complex?.image ?? premise.complexImage ?? null
 
 const kv = (label: string, value: string) => ({
     columns: [
@@ -245,12 +243,7 @@ const buildComplexFields = (premise: Premise, complex?: Complex | null) => {
             ? [kv('Цена от', formatPrice(complex.priceFrom))]
             : []),
         ...(complex?.pricePerSqm !== undefined
-            ? [
-                  kv(
-                      'Цена за м² от',
-                      `${formatPrice(complex.pricePerSqm)} / м²`,
-                  ),
-              ]
+            ? [kv('Цена за м² от', `${formatPrice(complex.pricePerSqm)} / м²`)]
             : []),
     ]
 }
@@ -361,9 +354,7 @@ const escapeHtml = (value: string) =>
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
 
-const resolvePreviewWindow = (
-    previewWindow?: Window | null,
-): Window | null => {
+const resolvePreviewWindow = (previewWindow?: Window | null): Window | null => {
     if (previewWindow && !previewWindow.closed) {
         return previewWindow
     }
@@ -514,25 +505,23 @@ const openProposalPdfPreview = async (
     renderProposalPdfPreview(previewWindow, blob, fileTitle)
 }
 
-const buildFooter =
-    (manager: CommercialProposalManager) =>
-    () => ({
-        columns: [
-            {
-                text: `Агент: ${manager.name || '—'}`,
-                alignment: 'left' as const,
-                fontSize: 9,
-                color: '#6B7280',
-            },
-            {
-                text: manager.phone || '—',
-                alignment: 'right' as const,
-                fontSize: 9,
-                color: '#6B7280',
-            },
-        ],
-        margin: [40, 8, 40, 24] as [number, number, number, number],
-    })
+const buildFooter = (manager: CommercialProposalManager) => () => ({
+    columns: [
+        {
+            text: `Агент: ${manager.name || '—'}`,
+            alignment: 'left' as const,
+            fontSize: 9,
+            color: '#6B7280',
+        },
+        {
+            text: manager.phone || '—',
+            alignment: 'right' as const,
+            fontSize: 9,
+            color: '#6B7280',
+        },
+    ],
+    margin: [40, 8, 40, 24] as [number, number, number, number],
+})
 
 export const downloadCommercialProposalPdf = async (
     items: CommercialProposalItem[],
@@ -544,21 +533,98 @@ export const downloadCommercialProposalPdf = async (
         return
     }
 
+    const fetchFloorPlanWithOverlayAsDataUrl = async (
+        url?: string | null,
+        floorPath?: string | null,
+    ): Promise<string | null> => {
+        if (!url) return null
+
+        try {
+            // 1. Получаем картинку как Blob
+            const response = await fetch(toAbsoluteUrl(url))
+            if (!response.ok) return null
+            const blob = await response.blob()
+
+            // Если контура нет, отдаем обычный Data URL
+            if (!floorPath) {
+                return await new Promise<string | null>((resolve) => {
+                    const reader = new FileReader()
+                    reader.onloadend = () =>
+                        resolve(
+                            typeof reader.result === 'string'
+                                ? reader.result
+                                : null,
+                        )
+                    reader.onerror = () => resolve(null)
+                    reader.readAsDataURL(blob)
+                })
+            }
+
+            // 2. Создаем HTMLImageElement из Blob
+            const blobUrl = URL.createObjectURL(blob)
+            try {
+                const img = await new Promise<HTMLImageElement>(
+                    (resolve, reject) => {
+                        const image = new Image()
+                        image.onload = () => resolve(image)
+                        image.onerror = (e) => reject(e)
+                        image.src = blobUrl
+                    },
+                )
+
+                // 3. Создаем Canvas с оригинальным разрешением изображения
+                const canvas = document.createElement('canvas')
+                canvas.width = img.naturalWidth || img.width
+                canvas.height = img.naturalHeight || img.height
+
+                const ctx = canvas.getContext('2d')
+                if (!ctx) {
+                    return fetchImageAsDataUrl(url)
+                }
+
+                // 4. Отрисовываем исходный план этажа
+                ctx.drawImage(img, 0, 0)
+
+                // 5. Накладываем векторную разметку помещения
+                const path2d = new Path2D(floorPath)
+
+                // Полупрозрачная заливка (зеленый акцент или в цвет темы)
+                ctx.fillStyle = 'rgba(122, 224, 97, 0.45)'
+                ctx.fill(path2d)
+
+                // Контурная обводка помещения
+                ctx.strokeStyle = '#22c55e'
+                // Толщина линии адаптируется под высокое разрешение картинки
+                ctx.lineWidth = Math.max(3, Math.round(canvas.width / 350))
+                ctx.lineJoin = 'round'
+                ctx.lineCap = 'round'
+                ctx.stroke(path2d)
+
+                // 6. Экспортируем изображение с разметкой
+                return canvas.toDataURL('image/png')
+            } finally {
+                URL.revokeObjectURL(blobUrl)
+            }
+        } catch (error) {
+            console.error('Ошибка наложения разметки на план этажа:', error)
+            // В случае непредвиденной ошибки возвращаем исходное изображение без разметки
+            return fetchImageAsDataUrl(url)
+        }
+    }
+
     const prepared = await Promise.all(
         items.map(async (item) => {
             const [layoutImage, floorPlanImage, complexImage] =
                 await Promise.all([
-                    fetchImageAsDataUrl(
-                        resolveLayoutImageUrl(item.premise),
-                    ),
-                    fetchImageAsDataUrl(
+                    fetchImageAsDataUrl(resolveLayoutImageUrl(item.premise)),
+                    fetchFloorPlanWithOverlayAsDataUrl(
                         resolveFloorPlanImageUrl(item.premise),
+                        item.premise.floorPath,
                     ),
                     fetchImageAsDataUrl(
                         resolveComplexImageUrl(item.premise, item.complex),
                     ),
                 ])
-
             return {
                 ...item,
                 layoutImage,

@@ -1,11 +1,14 @@
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import useSWR from 'swr'
 import Button from '@/components/ui/Button'
+import Notification from '@/components/ui/Notification'
+import toast from '@/components/ui/toast'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
 import Loading from '@/components/shared/Loading'
 import Masonry from '@/components/shared/Masonry'
 import { apiGetFixation } from '@/services/FixationsService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
     TbArrowLeft,
     TbBriefcase,
@@ -20,7 +23,7 @@ import {
     TbX,
 } from 'react-icons/tb'
 import type { ReactNode } from 'react'
-import type { FixationHistoryType } from './types'
+import type { Fixation, FixationHistoryType } from './types'
 import {
     formatFixationDate,
     formatFixationDateTime,
@@ -29,15 +32,11 @@ import {
     getFixationStatusDisplay,
 } from './utils'
 
-const InfoRow = ({
-    label,
-    value,
-}: {
-    label: string
-    value: ReactNode
-}) => (
+const InfoRow = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-700/60">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+            {label}
+        </span>
         <div className="max-w-[65%] text-right text-sm font-medium text-gray-900 dark:text-gray-100">
             {value || '—'}
         </div>
@@ -64,7 +63,9 @@ const SectionCard = ({
                 : className
         }
         bodyClass={
-            scrollable ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : undefined
+            scrollable
+                ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                : undefined
         }
     >
         <h4
@@ -117,10 +118,7 @@ const FixationExpiryDate = ({ value }: { value: string }) => (
     </span>
 )
 
-const fixationHistoryIconMap: Record<
-    FixationHistoryType,
-    typeof TbPlus
-> = {
+const fixationHistoryIconMap: Record<FixationHistoryType, typeof TbPlus> = {
     created: TbPlus,
     status_changed: TbRefresh,
     crm: TbBriefcase,
@@ -154,16 +152,51 @@ const formatObjectFieldValue = (value: unknown) => {
 const FixationDetails = () => {
     const { id } = useParams()
     const navigate = useNavigate()
+    const [data, setData] = useState<Fixation | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [isLoading, setIsLoading] = useState(Boolean(id))
 
-    const { data, isLoading } = useSWR(
-        id ? ['/api/v2/fixations', id] : null,
-        () => apiGetFixation(id || ''),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    useEffect(() => {
+        if (!id) {
+            setData(null)
+            setError(null)
+            setIsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+        setError(null)
+
+        void apiGetFixation(id)
+            .then((response) => {
+                if (!cancelled) {
+                    setData(response)
+                    setError(null)
+                }
+            })
+            .catch((err: unknown) => {
+                if (cancelled) return
+
+                const message = getApiErrorMessage(
+                    err,
+                    'Не удалось загрузить фиксацию',
+                )
+                setData(null)
+                setError(message)
+                toast.push(
+                    <Notification type="danger">{message}</Notification>,
+                    { placement: 'top-center' },
+                )
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
 
     const status = data ? getFixationStatusDisplay(data) : null
 
@@ -173,9 +206,14 @@ const FixationDetails = () => {
                 {!data ? (
                     <AdaptiveCard>
                         <div className="flex flex-col items-start gap-4 py-6">
-                            <h3>Фиксация не найдена</h3>
+                            <h3>
+                                {error
+                                    ? 'Произошла ошибка'
+                                    : 'Фиксация не найдена'}
+                            </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Запись с таким ID отсутствует в списке фиксаций
+                                {error ||
+                                    'Запись с таким ID отсутствует в списке фиксаций'}
                             </p>
                             <Button
                                 icon={<TbArrowLeft />}
@@ -263,10 +301,7 @@ const FixationDetails = () => {
                                 </div>
                             </AdaptiveCard>
 
-                            <Masonry
-                                columns={{ 0: 1, 1024: 2 }}
-                                gap={16}
-                            >
+                            <Masonry columns={{ 0: 1, 1024: 2 }} gap={16}>
                                 <SectionCard title="Основное">
                                     <InfoRow
                                         label="Статус"
@@ -290,10 +325,12 @@ const FixationDetails = () => {
                                         label="Адрес"
                                         value={data.address}
                                     />
-                                    <InfoRow
-                                        label="Помещение"
-                                        value={data.apartment}
-                                    />
+                                    {data.apartment ? (
+                                        <InfoRow
+                                            label="Помещение"
+                                            value={data.apartment}
+                                        />
+                                    ) : null}
                                     <InfoRow
                                         label="Менеджер"
                                         value={
@@ -304,9 +341,7 @@ const FixationDetails = () => {
                                                     </div>
                                                     {data.managerPhone ? (
                                                         <div className="mt-0.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-                                                            {
-                                                                data.managerPhone
-                                                            }
+                                                            {data.managerPhone}
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -331,20 +366,95 @@ const FixationDetails = () => {
                                     />
                                 </SectionCard>
 
+                                <SectionCard title="Предпочтения">
+                                    <InfoRow
+                                        label="Желаемая площадь"
+                                        value={data.desiredArea}
+                                    />
+                                    <InfoRow
+                                        label="Кол-во комнат"
+                                        value={data.desiredRooms}
+                                    />
+                                    <InfoRow
+                                        label="Формат оплаты"
+                                        value={data.paymentFormat}
+                                    />
+                                    <InfoRow
+                                        label="Бюджет"
+                                        value={
+                                            data.budget
+                                                ? `${data.budget} ₽`
+                                                : undefined
+                                        }
+                                    />
+                                    <InfoRow
+                                        label="Дата встречи"
+                                        value={
+                                            data.meetingDate
+                                                ? formatFixationDate(
+                                                      data.meetingDate,
+                                                  )
+                                                : undefined
+                                        }
+                                    />
+                                </SectionCard>
+
+                                <SectionCard title="Родственники">
+                                    {data.relatives &&
+                                    data.relatives.length > 0 ? (
+                                        <div className="flex flex-col gap-3">
+                                            {data.relatives.map((relative) => (
+                                                <div
+                                                    key={relative.id}
+                                                    className="rounded-xl border border-gray-100 p-3 dark:border-gray-700/60"
+                                                >
+                                                    <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                        {relative.fullName}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                        {relative.phone || '—'}
+                                                    </div>
+                                                    <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                                                        {relative.relation}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            Родственники не указаны
+                                        </p>
+                                    )}
+                                </SectionCard>
+
                                 <SectionCard title="Объект">
                                     {data.object ? (
-                                        fixationObjectFields.map(({ key, label }) => (
-                                            <InfoRow
-                                                key={key}
-                                                label={label}
-                                                value={formatObjectFieldValue(
-                                                    data.object?.[key],
-                                                )}
-                                            />
-                                        ))
+                                        fixationObjectFields.map(
+                                            ({ key, label }) => (
+                                                <InfoRow
+                                                    key={key}
+                                                    label={label}
+                                                    value={formatObjectFieldValue(
+                                                        data.object?.[key],
+                                                    )}
+                                                />
+                                            ),
+                                        )
                                     ) : (
                                         <p className="text-sm text-gray-500 dark:text-gray-400">
                                             Объект не указан
+                                        </p>
+                                    )}
+                                </SectionCard>
+
+                                <SectionCard title="Комментарий">
+                                    {data.note ? (
+                                        <p className="whitespace-pre-wrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            {data.note}
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            Комментарий не указан
                                         </p>
                                     )}
                                 </SectionCard>
@@ -426,9 +536,7 @@ const FixationDetails = () => {
                                                     </div>
                                                     {item.description ? (
                                                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                            {
-                                                                item.description
-                                                            }
+                                                            {item.description}
                                                         </p>
                                                     ) : null}
                                                 </div>

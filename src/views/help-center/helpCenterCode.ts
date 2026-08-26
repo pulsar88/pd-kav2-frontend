@@ -43,7 +43,15 @@ const slugify = (value: string) =>
         .join('')
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
-        .slice(0, 80)
+        .slice(0, 60)
 
-export const buildArticleCode = (title: string) =>
-    slugify(title) || `article-${Date.now()}`
+export const buildArticleCode = (title: string) => {
+    const slug = slugify(title)
+    const suffix = Date.now().toString(36).slice(-4)
+
+    if (!slug) {
+        return `article-${suffix}`
+    }
+
+    return `${slug}-${suffix}`
+}

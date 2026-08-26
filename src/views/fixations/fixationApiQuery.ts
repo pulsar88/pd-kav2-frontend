@@ -5,7 +5,7 @@ export const FIXATION_LIST_WITH =
     'max_fix_days,agent,crm_status,client,client.phones,manager,initialManager,agency,object'
 
 export const FIXATION_DETAILS_WITH =
-    `${FIXATION_LIST_WITH},manager.phone`
+    `${FIXATION_LIST_WITH},manager.phone,additionalClients,additionalClients.phones`
 
 export const buildFixationsListParams = (params: GetFixationsParams = {}) => {
     const query: Record<string, string | number | Array<string | number>> = {

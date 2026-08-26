@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
+import Card from '@/components/ui/Card'
 import EditArticleHeader from './components/EditArticleHeader'
 import EditArticleBody from './components/EditArticleBody'
+import ArticleEditorHints from './components/ArticleEditorHints'
 import ArticleFormActions from './components/ArticleFormActions'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { apiCreateSupportHubArticle } from '@/services/HelpCenterService'
 import { useNavigate } from 'react-router'
-import { useSWRConfig } from 'swr'
-import { isPublicationListKey } from './helpCenterQuery'
+import { PAGE_CONTAINER_GUTTER_X } from '@/constants/theme.constant'
+import classNames from '@/utils/classNames'
 import { usePublicationKind } from './publicationKind'
 
 const CreateArticle = () => {
     const navigate = useNavigate()
-    const { mutate } = useSWRConfig()
     const kind = usePublicationKind()
     const [title, setTitle] = useState('')
     const [previewText, setPreviewText] = useState('')
@@ -53,9 +54,6 @@ const CreateArticle = () => {
                 <Notification type="success">{kind.createSuccess}</Notification>,
                 { placement: 'top-end' },
             )
-            await mutate(isPublicationListKey(kind.listEndpoint), undefined, {
-                revalidate: true,
-            })
             navigate(`${kind.basePath}/${article.id}`)
         } catch (error) {
             toast.push(
@@ -70,25 +68,38 @@ const CreateArticle = () => {
     }
 
     return (
-        <>
-            <div className="mx-auto w-full min-w-0 max-w-[1200px] pt-6">
-                <div className="flex flex-col gap-4">
+        <div
+            className={classNames(
+                'flex h-full min-h-[calc(100dvh-10rem)] flex-col py-6',
+                PAGE_CONTAINER_GUTTER_X,
+            )}
+        >
+            <Card
+                className="flex min-h-0 w-full flex-1 flex-col"
+                bodyClass="flex min-h-0 flex-1 flex-col gap-4"
+            >
+                <div className="shrink-0 space-y-4">
+                    <ArticleEditorHints />
                     <EditArticleHeader
                         title={title}
                         previewText={previewText}
                         onTitleChange={setTitle}
                         onPreviewTextChange={setPreviewText}
                     />
-                    <EditArticleBody content={content} onChange={setContent} />
                 </div>
-            </div>
+                <EditArticleBody
+                    fillHeight
+                    content={content}
+                    onChange={setContent}
+                />
+            </Card>
             <ArticleFormActions
                 saveLabel="Создать"
                 isSaving={isSaving}
                 onBack={() => navigate(kind.basePath)}
                 onSave={() => void handleSave()}
             />
-        </>
+        </div>
     )
 }
 
