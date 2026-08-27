@@ -5,6 +5,7 @@ export type Article = {
     previewText?: string
     code?: string
     category?: string
+    isDraft?: boolean
     authors: {
         name: string
         img: string
@@ -45,8 +46,8 @@ export type GetSupportHubArticleResponse = Article & {
 
 export type CreateSupportHubArticlePayload = {
     title: string
-    previewText: string
-    content: string
+    previewText?: string
+    content?: string
     type: number
 }
 
@@ -56,4 +57,5 @@ export type UpdateSupportHubArticlePayload = {
     content: string
     code?: string
     type: number
+    isDraft?: boolean
 }

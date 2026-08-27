@@ -96,6 +96,12 @@ export type ResetPassword = {
     code: string
 }
 
+export type ChangePassword = {
+    old_password: string
+    password: string
+    password_confirmation: string
+}
+
 /** @deprecated legacy shape kept for Oauth helpers */
 export type SignInResponse = {
     token: string

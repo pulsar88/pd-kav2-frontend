@@ -9,6 +9,7 @@ export type AgencyItem = {
 export type GetAgenciesParams = {
     page?: number
     per_page?: number
+    search?: string
 }
 
 export type GetAgenciesResponse = {

@@ -12,10 +12,19 @@ export const buildFixationsListParams = (params: GetFixationsParams = {}) => {
         page: params.page ?? 1,
         page_size: params.page_size ?? 20,
         with: FIXATION_LIST_WITH,
+        sort_by: 'created_at',
+        order: 'desc',
     }
 
     if (params.status) {
         query.status = params.status
+    }
+
+    if (params.search) {
+        const trimmed = params.search.trim()
+        if (trimmed) {
+            query.search = trimmed
+        }
     }
 
     return toAxiosParams(query)

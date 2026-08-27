@@ -21,6 +21,7 @@ export async function apiGetAgencies(
 ): Promise<GetAgenciesResponse> {
     const page = Math.max(1, params.page ?? 1)
     const perPage = Math.max(1, params.per_page ?? DEFAULT_AGENCIES_PER_PAGE)
+    const search = params.search?.trim() || undefined
 
     const response = await ApiService.fetchDataWithAxios<
         GetAgenciesResponse | AgencyItem[]
@@ -30,6 +31,7 @@ export async function apiGetAgencies(
         params: {
             page,
             per_page: perPage,
+            ...(search ? { search } : {}),
         },
     })
 

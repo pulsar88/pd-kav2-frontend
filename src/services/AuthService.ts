@@ -11,6 +11,7 @@ import type {
     AuthStatusResponse,
     AuthTokenResponse,
     CheckPhoneCredential,
+    ChangePassword,
     CurrentUserResponse,
     ForgotPassword,
     ForgotPasswordResponse,
@@ -220,6 +221,14 @@ export async function apiForgotPassword(data: ForgotPassword) {
 export async function apiResetPassword(data: ResetPassword) {
     return ApiService.fetchDataWithAxios<AuthMessageResponse>({
         url: endpointConfig.authResetPassword,
+        method: 'post',
+        data,
+    })
+}
+
+export async function apiChangePassword(data: ChangePassword) {
+    return ApiService.fetchDataWithAxios<AuthMessageResponse>({
+        url: endpointConfig.authChangePassword,
         method: 'post',
         data,
     })

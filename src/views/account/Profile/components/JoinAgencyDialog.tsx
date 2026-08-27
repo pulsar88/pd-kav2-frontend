@@ -93,6 +93,7 @@ const JoinAgencyDialog = ({
     const [selectedAgency, setSelectedAgency] = useState<AgencyOption | null>(
         null,
     )
+    const [searchQuery, setSearchQuery] = useState('')
     const [isLoadingAgencies, setIsLoadingAgencies] = useState(false)
     const [isLoadingMore, setIsLoadingMore] = useState(false)
     const [hasMore, setHasMore] = useState(false)
@@ -101,12 +102,20 @@ const JoinAgencyDialog = ({
     const pageRef = useRef(1)
     const hasMoreRef = useRef(false)
     const loadingMoreRef = useRef(false)
+    const searchRef = useRef('')
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const resetListState = useCallback(() => {
         setAgencies([])
         setSelectedAgency(null)
         setHasMore(false)
         setIsLoadingMore(false)
+        setSearchQuery('')
+        searchRef.current = ''
+        if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current)
+            searchTimerRef.current = null
+        }
         pageRef.current = 1
         hasMoreRef.current = false
         loadingMoreRef.current = false
@@ -119,6 +128,7 @@ const JoinAgencyDialog = ({
         }
 
         let cancelled = false
+        searchRef.current = searchQuery
 
         const fetchFirstPage = async () => {
             setIsLoadingAgencies(true)
@@ -126,6 +136,7 @@ const JoinAgencyDialog = ({
                 const response = await apiGetAgencies({
                     page: 1,
                     per_page: AGENCIES_PER_PAGE,
+                    search: searchQuery || undefined,
                 })
                 if (cancelled) return
 
@@ -161,7 +172,21 @@ const JoinAgencyDialog = ({
         return () => {
             cancelled = true
         }
-    }, [isOpen, resetListState])
+    }, [isOpen, resetListState, searchQuery])
+
+    const handleSearchInputChange = (value: string) => {
+        if (searchTimerRef.current) {
+            clearTimeout(searchTimerRef.current)
+        }
+        searchTimerRef.current = setTimeout(() => {
+            searchTimerRef.current = null
+            const trimmed = value.trim()
+            if (trimmed !== searchRef.current) {
+                searchRef.current = trimmed
+                setSearchQuery(trimmed)
+            }
+        }, 500)
+    }
 
     const handleMenuScrollToBottom = useCallback(async () => {
         if (
@@ -175,13 +200,18 @@ const JoinAgencyDialog = ({
         loadingMoreRef.current = true
         setIsLoadingMore(true)
 
+        const queryAtStart = searchRef.current
         const nextPage = pageRef.current + 1
 
         try {
             const response = await apiGetAgencies({
                 page: nextPage,
                 per_page: AGENCIES_PER_PAGE,
+                search: queryAtStart || undefined,
             })
+
+            if (searchRef.current !== queryAtStart) return
+
             const options = toAgencyOptions(response.data)
             const currentPage = response.meta?.current_page ?? nextPage
             const lastPage = response.meta?.last_page ?? nextPage
@@ -290,8 +320,10 @@ const JoinAgencyDialog = ({
                             }
                             options={agencies}
                             value={selectedAgency}
-                            isDisabled={isLoadingAgencies}
+                            isLoading={isLoadingAgencies || isLoadingMore}
                             isSearchable
+                            filterOption={() => true}
+                            onInputChange={handleSearchInputChange}
                             noOptionsMessage={() => 'Агентства не найдены'}
                             components={{ MenuList: AgencyMenuList }}
                             onMenuScrollToBottom={() => {

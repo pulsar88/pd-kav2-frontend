@@ -46,6 +46,10 @@ const mapBaseArticleFields = (
         content: contentHtml || preview,
         previewText: preview,
         code: item.code?.trim() || undefined,
+        isDraft:
+            item.is_draft === undefined
+                ? undefined
+                : Boolean(Number(item.is_draft)),
         authors: [defaultAuthor],
         tags: [],
         starred: false,
@@ -75,23 +79,24 @@ export const mapNewsApiItemToArticleDetail = (item: NewsApiItem) => {
 
 export const mapCreateArticlePayloadToApiBody = (
     payload: CreateSupportHubArticlePayload,
-): CreateNewsApiBody => ({
-    ...buildArticlePayloadFields(payload),
-    type: String(payload.type),
-})
+): CreateNewsApiBody => {
+    const code = buildArticleCode(payload.title)
+    return {
+        name: payload.title.trim(),
+        code,
+        preview_text: payload.previewText?.trim() || '',
+        content: payload.content
+            ? serializeArticleContentForApi(payload.content)
+            : '',
+        type: String(payload.type),
+    }
+}
 
 export const mapUpdateArticlePayloadToApiBody = (
     payload: UpdateSupportHubArticlePayload,
-): UpdateNewsApiBody => ({
-    ...buildArticlePayloadFields(payload),
-    type: String(payload.type),
-})
-
-const buildArticlePayloadFields = (
-    payload: CreateSupportHubArticlePayload | UpdateSupportHubArticlePayload,
-) => {
+): UpdateNewsApiBody => {
     const code =
-        'code' in payload && payload.code?.trim()
+        payload.code?.trim()
             ? payload.code.trim()
             : buildArticleCode(payload.title)
 
@@ -99,9 +104,11 @@ const buildArticlePayloadFields = (
         name: payload.title.trim(),
         code,
         preview_text:
-            payload.previewText.trim() ||
+            payload.previewText?.trim() ||
             buildArticlePreviewText(payload.content),
         content: serializeArticleContentForApi(payload.content),
+        type: String(payload.type),
+        is_draft: payload.isDraft !== undefined ? payload.isDraft : false,
     }
 }
 

@@ -105,7 +105,7 @@ export const PUBLICATION_KIND: Record<PublicationKind, PublicationKindConfig> =
         event: {
             kind: 'event',
             type: NEWS_TYPE.EVENT,
-            basePath: '/events',
+            basePath: '/news/events',
             listEndpoint: endpointConfig.newsEvents,
             title: 'События',
             description: 'Мероприятия, встречи и важные даты.',
@@ -136,7 +136,10 @@ export const PUBLICATION_KIND: Record<PublicationKind, PublicationKindConfig> =
     }
 
 export const resolvePublicationKind = (pathname: string): PublicationKind => {
-    if (pathname === '/events' || pathname.startsWith('/events/')) {
+    if (
+        pathname === '/news/events' ||
+        pathname.startsWith('/news/events/')
+    ) {
         return 'event'
     }
 

@@ -4,3 +4,19 @@
 @import './template/index.css';
 @import './others/index.css';
 @import './vendors/index.css';
+
+/* TipTap ProseMirror Selected Node Styles */
+.ProseMirror-selectednode {
+    outline: 2px solid var(--primary, #4f46e5) !important;
+    outline-offset: 2px;
+    border-radius: 0.75rem;
+}
+
+.ProseMirror img {
+    cursor: pointer;
+    transition: outline 0.15s ease-in-out, box-shadow 0.15s ease-in-out, filter 0.15s ease-in-out;
+}
+
+.ProseMirror img:hover {
+    outline-offset: 2px;
+}

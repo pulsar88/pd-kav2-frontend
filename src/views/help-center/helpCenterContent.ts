@@ -45,3 +45,26 @@ export const buildArticlePreviewText = (html: string, maxLength = 160) => {
 
     return `${plain.slice(0, maxLength - 1).trim()}…`
 }
+
+export const extractImageSourcesFromHtml = (html: string): string[] => {
+    if (!html?.trim()) return []
+    const sources: string[] = []
+    const regex = /<img[^>]+src=["']([^"']+)["']/gi
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(html)) !== null) {
+        if (match[1] && !match[1].startsWith('data:')) {
+            sources.push(match[1])
+        }
+    }
+    return sources
+}
+
+export const extractFileNameFromSrc = (src: string): string => {
+    try {
+        const clean = src.split('?')[0]
+        const segments = clean.split('/')
+        return segments[segments.length - 1] || src
+    } catch {
+        return src
+    }
+}

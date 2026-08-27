@@ -119,7 +119,7 @@ const navigationConfig: NavigationTree[] = [
             },
             {
                 key: 'events',
-                path: '/events',
+                path: '/news/events',
                 title: 'События',
                 translateKey: 'nav.content.events',
                 icon: 'events',

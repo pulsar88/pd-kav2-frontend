@@ -6,7 +6,7 @@ import PasswordInput from '@/components/shared/PasswordInput'
 import { Form, FormItem } from '@/components/ui/Form'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
-import { apiUpdatePassword } from '@/services/AccountsService'
+import { apiChangePassword } from '@/services/AuthService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -71,9 +71,10 @@ const ChangePassword = () => {
         try {
             setIsSubmitting(true)
             const values = getValues()
-            await apiUpdatePassword({
-                currentPassword: values.currentPassword,
-                newPassword: values.newPassword,
+            await apiChangePassword({
+                old_password: values.currentPassword,
+                password: values.newPassword,
+                password_confirmation: values.confirmNewPassword,
             })
             toast.push(
                 <Notification type="success">Пароль обновлён</Notification>,

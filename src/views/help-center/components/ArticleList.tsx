@@ -200,11 +200,13 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {articles.map((article) => (
                             <ArticleCard
-                                key={article.id}
+                                key={article.code ?? article.id}
                                 id={article.id}
+                                code={article.code}
                                 title={article.title}
                                 previewText={article.previewText}
                                 timeToRead={article.timeToRead}
+                                isDraft={article.isDraft}
                                 canManage={canManageContent}
                                 onDelete={setDeleteId}
                             />

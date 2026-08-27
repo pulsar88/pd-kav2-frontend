@@ -47,11 +47,10 @@ const slugify = (value: string) =>
 
 export const buildArticleCode = (title: string) => {
     const slug = slugify(title)
-    const suffix = Date.now().toString(36).slice(-4)
 
     if (!slug) {
-        return `article-${suffix}`
+        return `article`
     }
 
-    return `${slug}-${suffix}`
+    return `${slug}`
 }

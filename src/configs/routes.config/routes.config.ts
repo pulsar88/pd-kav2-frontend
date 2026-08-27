@@ -97,7 +97,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'help',
-        path: '/help/:id/edit',
+        path: '/help/:slug/edit',
         component: lazy(() => import('@/views/help-center/EditArticle')),
         authority: [CONTENT_MANAGER],
         meta: {
@@ -107,7 +107,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'help',
-        path: '/help/:id',
+        path: '/help/:slug',
         component: lazy(() => import('@/views/help-center/Article')),
         authority: contentManagerAllowedAuthority,
         meta: {
@@ -137,7 +137,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'news',
-        path: '/news/:id/edit',
+        path: '/news/:slug/edit',
         component: lazy(() => import('@/views/help-center/EditArticle')),
         authority: [CONTENT_MANAGER],
         meta: {
@@ -147,7 +147,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'news',
-        path: '/news/:id',
+        path: '/news/:slug',
         component: lazy(() => import('@/views/help-center/Article')),
         authority: contentManagerAllowedAuthority,
         meta: {
@@ -167,7 +167,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'events',
-        path: '/events/create',
+        path: '/news/events/create',
         component: lazy(() => import('@/views/help-center/CreateArticle')),
         authority: [CONTENT_MANAGER],
         meta: {
@@ -177,7 +177,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'events',
-        path: '/events/:id/edit',
+        path: '/news/events/:slug/edit',
         component: lazy(() => import('@/views/help-center/EditArticle')),
         authority: [CONTENT_MANAGER],
         meta: {
@@ -187,7 +187,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'events',
-        path: '/events/:id',
+        path: '/news/events/:slug',
         component: lazy(() => import('@/views/help-center/Article')),
         authority: contentManagerAllowedAuthority,
         meta: {
@@ -197,7 +197,7 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'events',
-        path: '/events',
+        path: '/news/events',
         component: lazy(() => import('@/views/events')),
         authority: contentManagerAllowedAuthority,
         meta: {

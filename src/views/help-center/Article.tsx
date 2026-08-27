@@ -6,6 +6,7 @@ import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Notification from '@/components/ui/Notification'
+import Tag from '@/components/ui/Tag'
 import toast from '@/components/ui/toast'
 import ArticleBody from './components/ArticleBody'
 import ArticleTableOfContent from './components/ArticleTableOfContent'
@@ -22,21 +23,25 @@ import { useSessionUser } from '@/store/authStore'
 import useAuthority from '@/utils/hooks/useAuthority'
 import classNames from '@/utils/classNames'
 import { usePublicationKind } from './publicationKind'
+import { parseItemSlug } from './itemSlug'
 import type { GetSupportHubArticleResponse } from './types'
 
 const Article = () => {
-    const { id } = useParams()
+    const { slug } = useParams()
     const navigate = useNavigate()
     const kind = usePublicationKind()
     const userAuthority = useSessionUser((state) => state.user.authority) ?? []
     const canManageContent = useAuthority(userAuthority, [CONTENT_MANAGER])
+    // URL вида "{id}-{code}": id берём из первого сегмента,
+    // запрос на детальную запись идёт по нему
+    const resolvedId = parseItemSlug(slug ?? '').id
     const [data, setData] = useState<GetSupportHubArticleResponse | null>(null)
-    const [isLoading, setIsLoading] = useState(Boolean(id))
+    const [isLoading, setIsLoading] = useState(Boolean(resolvedId))
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
-        if (!id) {
+        if (!resolvedId) {
             setData(null)
             setIsLoading(false)
             return
@@ -45,7 +50,9 @@ const Article = () => {
         let cancelled = false
         setIsLoading(true)
 
-        void apiGetSupportHubArticle<GetSupportHubArticleResponse>({ id })
+        void apiGetSupportHubArticle<GetSupportHubArticleResponse>({
+            id: resolvedId,
+        })
             .then((article) => {
                 if (!cancelled) {
                     setData(article)
@@ -65,14 +72,14 @@ const Article = () => {
         return () => {
             cancelled = true
         }
-    }, [id])
+    }, [resolvedId])
 
     const handleDelete = async () => {
-        if (!id) return
+        if (!data?.id) return
 
         setIsDeleting(true)
         try {
-            await apiDeleteSupportHubArticle({ id })
+            await apiDeleteSupportHubArticle({ id: data.id })
             toast.push(
                 <Notification type="success">{kind.deleteSuccess}</Notification>,
                 { placement: 'top-end' },
@@ -118,30 +125,40 @@ const Article = () => {
                                 </span>
                             </button>
                         ),
-                        extra:
-                            id && canManageContent ? (
-                                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                    <Button
-                                        variant="solid"
-                                        icon={<TbEdit />}
-                                        onClick={() =>
-                                            navigate(
-                                                `${kind.basePath}/${id}/edit`,
-                                            )
-                                        }
-                                    >
-                                        Редактировать
-                                    </Button>
-                                    <Button
-                                        variant="plain"
-                                        icon={<TbTrash />}
-                                        className="border border-error text-error hover:bg-error/10 hover:text-error"
-                                        onClick={() => setIsDeleteOpen(true)}
-                                    >
-                                        Удалить
-                                    </Button>
-                                </div>
-                            ) : null,
+                        extra: (
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                {data?.isDraft ? (
+                                    <Tag className="border-amber-200 bg-amber-50 text-xs font-semibold text-amber-600 dark:border-amber-700/50 dark:bg-amber-500/20">
+                                        Черновик
+                                    </Tag>
+                                ) : null}
+                                {slug && canManageContent ? (
+                                    <>
+                                        <Button
+                                            variant="solid"
+                                            icon={<TbEdit />}
+                                            onClick={() =>
+                                                navigate(
+                                                    `${kind.basePath}/${slug}/edit`,
+                                                )
+                                            }
+                                        >
+                                            Редактировать
+                                        </Button>
+                                        <Button
+                                            variant="plain"
+                                            icon={<TbTrash />}
+                                            className="border border-error text-error hover:bg-error/10 hover:text-error"
+                                            onClick={() =>
+                                                setIsDeleteOpen(true)
+                                            }
+                                        >
+                                            Удалить
+                                        </Button>
+                                    </>
+                                ) : null}
+                            </div>
+                        ),
                     }}
                 >
                     <Loading

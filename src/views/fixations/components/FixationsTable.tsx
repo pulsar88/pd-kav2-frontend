@@ -52,6 +52,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         void apiGetFixations({
             page: pageIndex,
             page_size: pageSize,
+            search: search || undefined,
         })
             .then((response) => {
                 if (!cancelled) setData(response)
@@ -66,7 +67,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         return () => {
             cancelled = true
         }
-    }, [pageIndex, pageSize, refreshKey])
+    }, [pageIndex, pageSize, refreshKey, search])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
@@ -124,30 +125,6 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
             setIsExtendSubmitting(false)
         }
     }
-
-    const filteredList = useMemo(() => {
-        const query = search.trim().toLowerCase()
-        if (!query) return list
-
-        return list.filter((fixation) => {
-            const statusLabel = getFixationStatusDisplay(fixation).label
-            const haystack = [
-                fixation.fullName,
-                fixation.phone,
-                statusLabel,
-                formatFixationDate(fixation.createdAt),
-                formatFixationDate(fixation.expiresAt),
-                fixation.objectName,
-                fixation.projectName,
-                fixation.agent.fullName,
-                fixation.agent.agency,
-            ]
-                .join(' ')
-                .toLowerCase()
-
-            return haystack.includes(query)
-        })
-    }, [list, search])
 
     const columns: ColumnDef<Fixation>[] = useMemo(() => {
         const allColumns: Array<ColumnDef<Fixation> & { id: string }> = [
@@ -290,7 +267,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         })
     }, [columnVisibility])
 
-    const pageData = filteredList
+    const pageData = list
 
     return (
         <div className="flex flex-col gap-4">
@@ -305,7 +282,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
                 loading={isLoading}
                 noData={!isLoading && pageData.length === 0}
                 pagingData={{
-                    total: search.trim() ? filteredList.length : total,
+                    total,
                     pageIndex,
                     pageSize,
                 }}

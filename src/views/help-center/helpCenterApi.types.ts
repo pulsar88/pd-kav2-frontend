@@ -17,6 +17,7 @@ export type NewsApiItem = {
     preview_text?: string | null
     content?: string | null
     type?: NewsApiType
+    is_draft?: boolean | number
 }
 
 export type NewsArticlesApiMeta = {
@@ -34,8 +35,8 @@ export type NewsArticlesApiResponse = {
 export type CreateNewsApiBody = {
     name: string
     code: string
-    preview_text: string
-    content: string
+    preview_text?: string
+    content?: string
     type: string
 }
 
@@ -45,4 +46,18 @@ export type UpdateNewsApiBody = {
     preview_text: string
     content: string
     type: string
+    is_draft?: boolean | number
+}
+
+export type NewsMediaApiResponse = {
+    src?: string
+    url?: string
+    path?: string
+    file_url?: string
+    data?: {
+        src?: string
+        url?: string
+        path?: string
+        file_url?: string
+    }
 }
