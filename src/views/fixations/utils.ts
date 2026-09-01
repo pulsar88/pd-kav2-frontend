@@ -56,6 +56,11 @@ export const fixationStatusMap: Record<
         className:
             'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300',
     },
+    expired: {
+        label: 'Истекла',
+        className:
+            'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+    },
 }
 
 export const getFixationStatusDisplay = (

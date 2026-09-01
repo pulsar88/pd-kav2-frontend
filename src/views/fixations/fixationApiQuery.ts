@@ -2,7 +2,7 @@ import { toAxiosParams } from '@/views/objects/realtyPropertyQuery'
 import type { GetFixationsParams } from './fixationApi.types'
 
 export const FIXATION_LIST_WITH =
-    'max_fix_days,agent,crm_status,client,client.phones,manager,initialManager,agency,object'
+    'max_fix_days,agent,crm_status,client,client.phones,manager,initialManager,agency,object,extendRequests'
 
 export const FIXATION_DETAILS_WITH =
     `${FIXATION_LIST_WITH},manager.phone,additionalClients,additionalClients.phones`

@@ -8,6 +8,7 @@ export type FixationStatus =
     | 'success'
     | 'failed'
     | 'deleted'
+    | 'expired'
 
 export type FixationAgent = {
     email: string
@@ -87,6 +88,8 @@ export type Fixation = {
     agent: FixationAgent
     crm: FixationCrm
     history: FixationHistoryItem[]
+    has_extend_request?: boolean
+    hasExtendRequest?: boolean
 }
 
 export type GetFixationsResponse = {

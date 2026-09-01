@@ -278,106 +278,49 @@ const FixationDetails = () => {
                                         }
                                     />
                                     <SummaryStat
-                                        label="Менеджер"
+                                        label="Создана"
                                         value={
-                                            <div>
-                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                                                    {data.managerName || '—'}
-                                                </div>
-                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400">
-                                                    {data.managerPhone || '—'}
-                                                </div>
+                                            <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                                {formatFixationDate(
+                                                    data.createdAt,
+                                                )}
                                             </div>
                                         }
                                     />
                                     <SummaryStat
-                                        label="Дата истечения"
+                                        label="Истекает"
                                         value={
-                                            <FixationExpiryDate
-                                                value={data.expiresAt}
-                                            />
+                                            <div className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                                <FixationExpiryDate
+                                                    value={data.expiresAt}
+                                                />
+                                            </div>
                                         }
                                     />
                                 </div>
                             </AdaptiveCard>
 
-                            <Masonry columns={{ 0: 1, 1024: 2 }} gap={16}>
-                                <SectionCard title="Основное">
+                            <Masonry
+                                columns={{ default: 1, md: 2 }}
+                                gap={16}
+                                className="w-full"
+                            >
+                                <SectionCard title="Основная информация">
                                     <InfoRow
-                                        label="Статус"
-                                        value={
-                                            status ? (
-                                                <span
-                                                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}
-                                                >
-                                                    {status.label}
-                                                </span>
-                                            ) : (
-                                                '—'
-                                            )
-                                        }
+                                        label="ФИО клиента"
+                                        value={data.fullName}
                                     />
                                     <InfoRow
-                                        label="Объект"
-                                        value={data.object?.name || '—'}
+                                        label="Телефон клиента"
+                                        value={data.phone}
                                     />
-                                    <InfoRow
-                                        label="Адрес"
-                                        value={data.address}
-                                    />
-                                    {data.apartment ? (
-                                        <InfoRow
-                                            label="Помещение"
-                                            value={data.apartment}
-                                        />
-                                    ) : null}
                                     <InfoRow
                                         label="Менеджер"
-                                        value={
-                                            data.managerName ? (
-                                                <div>
-                                                    <div>
-                                                        {data.managerName}
-                                                    </div>
-                                                    {data.managerPhone ? (
-                                                        <div className="mt-0.5 text-xs font-normal text-gray-500 dark:text-gray-400">
-                                                            {data.managerPhone}
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            ) : (
-                                                '—'
-                                            )
-                                        }
+                                        value={data.managerName}
                                     />
                                     <InfoRow
-                                        label="Дата создания"
-                                        value={formatFixationDate(
-                                            data.createdAt,
-                                        )}
-                                    />
-                                    <InfoRow
-                                        label="Дата истечения"
-                                        value={
-                                            <FixationExpiryDate
-                                                value={data.expiresAt}
-                                            />
-                                        }
-                                    />
-                                </SectionCard>
-
-                                <SectionCard title="Предпочтения">
-                                    <InfoRow
-                                        label="Желаемая площадь"
-                                        value={data.desiredArea}
-                                    />
-                                    <InfoRow
-                                        label="Кол-во комнат"
-                                        value={data.desiredRooms}
-                                    />
-                                    <InfoRow
-                                        label="Формат оплаты"
-                                        value={data.paymentFormat}
+                                        label="Телефон менеджера"
+                                        value={data.managerPhone}
                                     />
                                     <InfoRow
                                         label="Бюджет"
@@ -386,6 +329,22 @@ const FixationDetails = () => {
                                                 ? `${data.budget} ₽`
                                                 : undefined
                                         }
+                                    />
+                                    <InfoRow
+                                        label="Количество комнат"
+                                        value={data.desiredRooms}
+                                    />
+                                    <InfoRow
+                                        label="Желаемая площадь"
+                                        value={
+                                            data.desiredArea
+                                                ? `${data.desiredArea} м²`
+                                                : undefined
+                                        }
+                                    />
+                                    <InfoRow
+                                        label="Форма оплаты"
+                                        value={data.paymentFormat}
                                     />
                                     <InfoRow
                                         label="Дата встречи"

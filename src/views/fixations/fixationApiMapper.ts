@@ -136,6 +136,31 @@ export const unwrapFixationApiResponse = (
     return null
 }
 
+const resolveHasExtendRequest = (item: FixationApiItem): boolean => {
+    const raw = item as Record<string, unknown>
+    if (
+        raw.has_extend_request === true ||
+        raw.has_extend_request === 1 ||
+        raw.has_extend_request === '1'
+    ) {
+        return true
+    }
+    if (
+        raw.hasExtendRequest === true ||
+        raw.hasExtendRequest === 1 ||
+        raw.hasExtendRequest === '1'
+    ) {
+        return true
+    }
+    if (Array.isArray(raw.extend_requests) && raw.extend_requests.length > 0) {
+        return true
+    }
+    if (Array.isArray(raw.extendRequests) && raw.extendRequests.length > 0) {
+        return true
+    }
+    return false
+}
+
 export const mapFixationApiItemToFixation = (
     item: FixationApiItem,
 ): Fixation => {
@@ -143,6 +168,7 @@ export const mapFixationApiItemToFixation = (
     const note = item.comment?.trim() || undefined
     const budget = formatBudget(item.budget)
     const meetingDate = item.meeting_date?.trim() || undefined
+    const hasExtend = resolveHasExtendRequest(item)
 
     return {
         id: String(item.id),
@@ -174,5 +200,7 @@ export const mapFixationApiItemToFixation = (
         },
         crm: mapCrmStatus(item.crm_status),
         history: [],
+        has_extend_request: hasExtend,
+        hasExtendRequest: hasExtend,
     }
 }

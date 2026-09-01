@@ -22,10 +22,10 @@ export type CommercialProposalManager = {
     phone: string
 }
 
-const IMAGE_WIDTH = 230
-const IMAGE_HEIGHT = 260
+const IMAGE_WIDTH = 220
+const IMAGE_HEIGHT = 220
 const CONTENT_WIDTH = 515
-const FULL_WIDTH_IMAGE_HEIGHT = 340
+const FULL_WIDTH_IMAGE_HEIGHT = 280
 
 const roomsLabel = (rooms: number) =>
     rooms === 0 ? 'Студия' : `${rooms}-комн.`
@@ -59,13 +59,13 @@ const kv = (label: string, value: string) => ({
             style: 'fieldValue',
         },
     ],
-    margin: [0, 0, 0, 5] as [number, number, number, number],
+    margin: [0, 0, 0, 3.5] as [number, number, number, number],
 })
 
 const sectionTitle = (text: string) => ({
     text,
     style: 'sectionTitle',
-    margin: [0, 0, 0, 10] as [number, number, number, number],
+    margin: [0, 0, 0, 6] as [number, number, number, number],
 })
 
 const imagePlaceholder = (
@@ -112,10 +112,10 @@ const sectionDivider = () => ({
             x2: CONTENT_WIDTH,
             y2: 0,
             lineWidth: 1,
-            lineColor: '#D1D5DB',
+            lineColor: '#E5E7EB',
         },
     ],
-    margin: [0, 16, 0, 16] as [number, number, number, number],
+    margin: [0, 8, 0, 8] as [number, number, number, number],
 })
 
 const toAbsoluteUrl = (url: string) => {
@@ -167,12 +167,13 @@ const buildImageOrPlaceholder = (
 const buildFullWidthImageBlock = (
     dataUrl: string | null,
     placeholderLabel: string,
+    maxHeight = FULL_WIDTH_IMAGE_HEIGHT,
 ) => {
     if (dataUrl) {
         return {
             image: dataUrl,
             width: CONTENT_WIDTH,
-            fit: [CONTENT_WIDTH, FULL_WIDTH_IMAGE_HEIGHT] as [number, number],
+            fit: [CONTENT_WIDTH, maxHeight] as [number, number],
             alignment: 'center' as const,
             margin: [0, 0, 0, 0] as [number, number, number, number],
         }
@@ -181,8 +182,36 @@ const buildFullWidthImageBlock = (
     return imagePlaceholder(
         placeholderLabel,
         CONTENT_WIDTH,
-        FULL_WIDTH_IMAGE_HEIGHT,
+        maxHeight,
     )
+}
+
+const calculateAvailableFloorPlanHeight = (
+    isFirstPremise: boolean,
+    premiseFieldsCount: number,
+) => {
+    // Высота A4 в portrait: 842 pt. Отступы: 36 сверху, 48 снизу -> доступно 758 pt
+    const pageUsableHeight = 752
+    const docHeaderHeight = isFirstPremise ? 52 : 0
+    const eyebrowHeight = 18
+    const premiseTitleHeight = 22
+    // Высота блока помещения: максимум из высоты картинки планировки (220) и строк параметров
+    const premiseDetailsHeight = Math.max(220, premiseFieldsCount * 15.5 + 4)
+    const dividerHeight = 17
+    const floorPlanTitleHeight = 20
+
+    const usedHeight =
+        docHeaderHeight +
+        eyebrowHeight +
+        premiseTitleHeight +
+        premiseDetailsHeight +
+        dividerHeight +
+        floorPlanTitleHeight
+
+    const remainingHeight = pageUsableHeight - usedHeight
+
+    // Ограничиваем высоту плана этажа строго оставшимся пространством с запасом 14 pt
+    return Math.max(100, Math.min(340, Math.floor(remainingHeight - 14)))
 }
 
 const buildPremiseFields = (premise: Premise) => [
@@ -635,6 +664,12 @@ export const downloadCommercialProposalPdf = async (
     )
 
     const content = prepared.flatMap((item, index) => {
+        const premiseFields = buildPremiseFields(item.premise)
+        const availableFloorPlanHeight = calculateAvailableFloorPlanHeight(
+            index === 0,
+            premiseFields.length,
+        )
+
         const block = [
             {
                 text: `Коммерческое предложение ${index + 1} из ${prepared.length}`,
@@ -644,7 +679,7 @@ export const downloadCommercialProposalPdf = async (
             ...buildTwoColumnBlock(
                 `Помещение № ${item.premise.number}`,
                 buildImageOrPlaceholder(item.layoutImage, 'Планировка'),
-                buildPremiseFields(item.premise),
+                premiseFields,
             ),
             ...(item.floorPlanImage
                 ? [
@@ -653,6 +688,7 @@ export const downloadCommercialProposalPdf = async (
                       buildFullWidthImageBlock(
                           item.floorPlanImage,
                           'План этажа',
+                          availableFloorPlanHeight,
                       ),
                       { text: '', pageBreak: 'before' as const },
                   ]
@@ -676,7 +712,7 @@ export const downloadCommercialProposalPdf = async (
             title: buildProposalInfoTitle(items),
         },
         pageOrientation: 'portrait' as const,
-        pageMargins: [40, 40, 40, 56] as [number, number, number, number],
+        pageMargins: [40, 36, 40, 48] as [number, number, number, number],
         ...(manager?.name || manager?.phone
             ? { footer: buildFooter(manager) }
             : {}),

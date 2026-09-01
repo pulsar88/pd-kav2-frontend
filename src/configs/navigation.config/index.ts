@@ -96,6 +96,16 @@ const navigationConfig: NavigationTree[] = [
                 authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
                 subMenu: [],
             },
+            {
+                key: 'supervisorFixations',
+                path: '/supervisor/fixations',
+                title: 'Управление фиксациями',
+                translateKey: 'nav.supervisorFixations',
+                icon: 'supervisor',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: [ADMIN, SUPERVISOR, AGENCY_SUPERVISOR],
+                subMenu: [],
+            },
         ],
     },
     {

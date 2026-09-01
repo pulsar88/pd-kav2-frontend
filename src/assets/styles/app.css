@@ -18,5 +18,12 @@
 }
 
 .ProseMirror img:hover {
+    outline: 2px dashed rgba(79, 70, 229, 0.45);
     outline-offset: 2px;
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+    outline: 2px solid var(--primary, #4f46e5) !important;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
 }

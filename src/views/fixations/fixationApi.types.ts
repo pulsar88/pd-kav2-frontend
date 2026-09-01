@@ -6,6 +6,7 @@ export type FixationApiStatus =
     | 'success'
     | 'failed'
     | 'deleted'
+    | 'expired'
 
 export type FixationApiStatusRelation = {
     value: FixationApiStatus
@@ -123,6 +124,7 @@ export type FixationApiItem = {
     agency?: FixationApiAgency
     object?: FixationApiObject
     crm_status?: FixationApiCrmStatus
+    has_extend_request?: boolean
 }
 
 export type FixationsApiMeta = {

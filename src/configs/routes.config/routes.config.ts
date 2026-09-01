@@ -211,5 +211,11 @@ export const protectedRoutes: Routes = [
         component: lazy(() => import('@/views/agency/AgencyRequests')),
         authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
     },
+    {
+        key: 'supervisorFixations',
+        path: '/supervisor/fixations',
+        component: lazy(() => import('@/views/supervisor')),
+        authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
+    },
     ...othersRoute,
 ]

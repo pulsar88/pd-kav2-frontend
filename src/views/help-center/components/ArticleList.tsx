@@ -163,35 +163,51 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
 
             {!isLoading && articles.length === 0 ? (
                 <div className="mt-12 text-center">
-                    <div className="flex justify-center">
-                        <NoDataFound height={240} width={240} />
-                    </div>
-                    <h3 className="mt-6">
-                        {query ? kind.notFoundTitle : kind.emptyTitle}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {query
-                            ? 'Попробуйте изменить запрос или вернитесь к списку'
-                            : kind.emptyHint}
-                    </p>
                     {query ? (
-                        <button
-                            type="button"
-                            className="mt-4 text-primary hover:underline"
-                            onClick={() => navigate(kind.basePath)}
-                        >
-                            {kind.showAllLabel}
-                        </button>
+                        <>
+                            <div className="flex justify-center">
+                                <NoDataFound height={200} width={200} />
+                            </div>
+                            <h3 className="mt-6">{kind.notFoundTitle}</h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Попробуйте изменить запрос или вернитесь к списку
+                            </p>
+                            <button
+                                type="button"
+                                className="mt-4 text-primary hover:underline"
+                                onClick={() => navigate(kind.basePath)}
+                            >
+                                {kind.showAllLabel}
+                            </button>
+                        </>
                     ) : canManageContent ? (
-                        <Button
-                            className="mt-4"
-                            variant="solid"
-                            icon={<TbPlus />}
-                            onClick={() => navigate(`${kind.basePath}/create`)}
-                        >
-                            {kind.createLabel}
-                        </Button>
-                    ) : null}
+                        <>
+                            <div className="flex justify-center">
+                                <NoDataFound height={200} width={200} />
+                            </div>
+                            <h3 className="mt-6">{kind.emptyTitle}</h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                {kind.emptyHint}
+                            </p>
+                            <Button
+                                className="mt-4"
+                                variant="solid"
+                                icon={<TbPlus />}
+                                onClick={() => navigate(`${kind.basePath}/create`)}
+                            >
+                                {kind.createLabel}
+                            </Button>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-gray-100 text-4xl text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+                                <kind.icon />
+                            </div>
+                            <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+                                {kind.emptyTitle}
+                            </h4>
+                        </div>
+                    )}
                 </div>
             ) : null}
 

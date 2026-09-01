@@ -524,7 +524,7 @@ const CheckboardPropertyDrawer = ({
                                         >
                                             <div
                                                 key={propertyDetails.id}
-                                                className="relative h-full w-full"
+                                                className="relative flex h-full w-full items-center justify-center"
                                             >
                                                 <img
                                                     src={

@@ -5,8 +5,12 @@ import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import DataTable from '@/components/shared/DataTable'
-import { apiGetFixations } from '@/services/FixationsService'
-import { TbCalendarPlus, TbEye } from 'react-icons/tb'
+import {
+    apiGetFixations,
+    apiCreateFixationExtendRequest,
+} from '@/services/FixationsService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { TbCalendarPlus, TbCalendarTime, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
 import type { Fixation, GetFixationsResponse } from '../types'
 import {
@@ -44,6 +48,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         undefined,
     )
     const [isLoading, setIsLoading] = useState(true)
+    const [refreshCount, setRefreshCount] = useState(0)
 
     useEffect(() => {
         let cancelled = false
@@ -67,7 +72,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         return () => {
             cancelled = true
         }
-    }, [pageIndex, pageSize, refreshKey, search])
+    }, [pageIndex, pageSize, refreshCount, refreshKey, search])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
@@ -109,18 +114,29 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
 
         setIsExtendSubmitting(true)
         try {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 300)
+            await apiCreateFixationExtendRequest({
+                fixation_id: Number(extendFixation.id) || extendFixation.id,
+                add_days: values.extendDays,
+                comment: values.comment,
             })
             toast.push(
                 <Notification type="success">
                     Заявка на продление «{extendFixation.fullName}» на{' '}
-                    {values.extendDays} дн. создана
+                    {values.extendDays} дн. успешно создана
                 </Notification>,
                 { placement: 'top-center' },
             )
             setIsExtendOpen(false)
             setExtendFixation(null)
+            setRefreshCount((prev) => prev + 1)
+        } catch (err: unknown) {
+            const msg = getApiErrorMessage(
+                err,
+                'Не удалось создать заявку на продление',
+            )
+            toast.push(<Notification type="danger">{msg}</Notification>, {
+                placement: 'top-center',
+            })
         } finally {
             setIsExtendSubmitting(false)
         }
@@ -228,7 +244,12 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
                 maxSize: 120,
                 cell: (props) => {
                     const fixation = props.row.original
-                    const canExtend = fixation.status === 'fixed'
+                    const hasExtendRequest = Boolean(
+                        fixation.has_extend_request ||
+                            fixation.hasExtendRequest,
+                    )
+                    const canExtend =
+                        fixation.status === 'fixed' && !hasExtendRequest
 
                     return (
                         <div
@@ -246,15 +267,33 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
                                     }
                                 />
                             </Tooltip>
-                            <Tooltip title="Создать заявку на продление">
-                                <Button
-                                    size="xs"
-                                    variant="plain"
-                                    icon={<TbCalendarPlus />}
-                                    disabled={!canExtend}
-                                    onClick={() => handleOpenExtend(fixation)}
-                                />
-                            </Tooltip>
+                            {hasExtendRequest ? (
+                                <Tooltip title="Запрос на продление уже существует">
+                                    <span className="inline-flex cursor-default items-center justify-center p-1 text-amber-500 dark:text-amber-400">
+                                        <TbCalendarTime className="text-lg" />
+                                    </span>
+                                </Tooltip>
+                            ) : (
+                                <Tooltip
+                                    title={
+                                        canExtend
+                                            ? 'Создать заявку на продление'
+                                            : 'Продление недоступно'
+                                    }
+                                >
+                                    <span className="inline-flex">
+                                        <Button
+                                            size="xs"
+                                            variant="plain"
+                                            icon={<TbCalendarPlus />}
+                                            disabled={!canExtend}
+                                            onClick={() =>
+                                                handleOpenExtend(fixation)
+                                            }
+                                        />
+                                    </span>
+                                </Tooltip>
+                            )}
                         </div>
                     )
                 },

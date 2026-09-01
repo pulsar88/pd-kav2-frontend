@@ -1,14 +1,14 @@
 @layer components {
   .toast {
-    @apply fixed z-40;
+    @apply fixed z-[9999] pointer-events-none;
   }
 
   .toast-wrapper {
-    @apply max-w-full;
+    @apply max-w-full pointer-events-none;
   }
 
   .toast .notification {
-    @apply max-w-full;
+    @apply max-w-full pointer-events-auto;
   }
 
   @media (max-width: 767px) {
@@ -20,14 +20,16 @@
       display: flex;
       justify-content: center;
       transform: none !important;
+      pointer-events: none !important;
     }
 
     .toast-wrapper {
-      @apply w-full;
+      @apply w-full pointer-events-none;
     }
 
     .toast .notification {
       width: 100% !important;
+      pointer-events: auto !important;
     }
   }
 }

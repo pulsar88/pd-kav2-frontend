@@ -8,6 +8,7 @@ import {
     PiCalendarDuotone,
     PiWrenchDuotone,
     PiHeartDuotone,
+    PiShieldCheckDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
 import { TbUserCheck } from 'react-icons/tb'
@@ -25,6 +26,7 @@ const navigationIcon: NavigationIcons = {
     news: <PiNewspaperDuotone />,
     events: <PiCalendarDuotone />,
     agencyRequests: <TbUserCheck />,
+    supervisor: <PiShieldCheckDuotone />,
 }
 
 export default navigationIcon

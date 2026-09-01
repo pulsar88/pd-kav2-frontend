@@ -33,6 +33,14 @@ const endpointConfig = {
     fixation: (fixationId: string | number) => `/v2/fixations/${fixationId}`,
     fixationRelatedClients: (fixationId: string | number) =>
         `/v2/fixations/${fixationId}/related_clients`,
+    fixationExtendRequests: '/v2/fixations/extend_requests',
+    fixationExtendRequestApprove: (requestId: string | number) =>
+        `/v2/fixations/extend_requests/${requestId}/approve`,
+    fixationExtendRequestReject: (requestId: string | number) =>
+        `/v2/fixations/extend_requests/${requestId}`,
+    fixationRestore: (fixationId: string | number) =>
+        `/v2/fixations/${fixationId}/restore`,
+    amoStatuses: '/v2/amo/statuses',
     clients: '/v2/clients',
     managers: '/v2/managers',
     realtyCollectionDefault: '/v2/realty_collections/default',
