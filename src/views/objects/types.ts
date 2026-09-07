@@ -81,6 +81,20 @@ export type Premise = {
     complexImage?: string
     promoText?: string
     description?: string
+    statusId?: number
+    statusName?: string
+    statusColor?: string
+    baseStatus?: number
+    isBaseStatus?: number
+    status?: {
+        id: number
+        name: string
+        external_id?: number
+        color?: string
+        base_status?: number
+        is_base_status?: number
+        show_as?: string | null
+    }
 }
 
 export type ObjectsSearchFilters = {

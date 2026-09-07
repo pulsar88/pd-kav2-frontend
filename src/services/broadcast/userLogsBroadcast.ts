@@ -24,7 +24,16 @@ export const subscribeUserLogsBroadcast = (userId: string | number) => {
 
     const echo = getEcho()
     const channelName = getPrivateUserChannelName(userId)
+    console.log(`[WebSocket] Subscribing to channel: ${channelName}`)
     const channel = echo.private(channelName)
+
+    channel.subscribed(() => {
+        console.log(`[WebSocket] Subscribed to channel: ${channelName}`)
+    })
+
+    channel.error((err: unknown) => {
+        console.error(`[WebSocket] Channel subscription error (${channelName}):`, err)
+    })
 
     let notificationTypes: NotificationTypeDictionaryItem[] = []
 
@@ -33,6 +42,7 @@ export const subscribeUserLogsBroadcast = (userId: string | number) => {
     })
 
     const handleCreated = (payload: unknown) => {
+        console.log(`[WebSocket] Event "${USER_LOGS_CREATED_EVENT}" on "${channelName}":`, payload)
         const rawLog = parseUserLogCreatedPayload(payload)
 
         if (!rawLog) {
@@ -43,6 +53,7 @@ export const subscribeUserLogsBroadcast = (userId: string | number) => {
     }
 
     const handleReaded = (payload: unknown) => {
+        console.log(`[WebSocket] Event "${USER_LOGS_READED_EVENT}" on "${channelName}":`, payload)
         const ids = parseUserLogsReadedPayload(payload)
 
         if (ids.length === 0) {
@@ -57,6 +68,7 @@ export const subscribeUserLogsBroadcast = (userId: string | number) => {
         .listen(USER_LOGS_READED_EVENT, handleReaded)
 
     return () => {
+        console.log(`[WebSocket] Unsubscribing from channel: ${channelName}`)
         channel.stopListening(USER_LOGS_CREATED_EVENT, handleCreated)
         channel.stopListening(USER_LOGS_READED_EVENT, handleReaded)
         echo.leave(channelName)

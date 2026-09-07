@@ -1,5 +1,4 @@
 export const ADMIN = 'admin'
-export const USER = 'user'
 export const AGENT = 'agent'
 export const AGENCY_SUPERVISOR = 'agency-supervisor'
 export const SUPERVISOR = 'supervisor'
@@ -7,7 +6,6 @@ export const CONTENT_MANAGER = 'content-manager'
 
 export type UserRole =
     | typeof ADMIN
-    | typeof USER
     | typeof AGENT
     | typeof AGENCY_SUPERVISOR
     | typeof SUPERVISOR
@@ -17,7 +15,6 @@ export type UserRole =
 /** Роли с доступом к кабинету агента (без контент-менеджера) */
 export const AGENT_CABINET_ROLES = [
     ADMIN,
-    USER,
     AGENT,
     AGENCY_SUPERVISOR,
     SUPERVISOR,
@@ -35,7 +32,6 @@ export const roleLabels: Record<string, string> = {
     [AGENCY_SUPERVISOR]: 'Руководитель агентства',
     [SUPERVISOR]: 'Супервайзер',
     [CONTENT_MANAGER]: 'Контент-менеджер',
-    [USER]: 'Пользователь',
 }
 
 export const getUserRoleLabel = (role?: string | null): string => {

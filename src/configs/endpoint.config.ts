@@ -23,6 +23,7 @@ const endpointConfig = {
     realtyPropertiesSummary: '/v2/realty_properties/summary',
     realtyPropertiesFilters: '/v2/realty_properties/filters',
     realtyProjects: '/v2/realty_projects',
+    realtyObjects: '/v2/realty_objects',
     realtyProperty: (propertyId: string | number) =>
         `/v2/realty_properties/${propertyId}`,
     realtyObject: (objectId: string | number) =>
@@ -40,14 +41,19 @@ const endpointConfig = {
         `/v2/fixations/extend_requests/${requestId}`,
     fixationRestore: (fixationId: string | number) =>
         `/v2/fixations/${fixationId}/restore`,
+    fixationGigalogs: (fixationId: string | number) =>
+        `/v2/fixations/${fixationId}/gigalogs`,
     amoStatuses: '/v2/amo/statuses',
     clients: '/v2/clients',
     managers: '/v2/managers',
     realtyCollectionDefault: '/v2/realty_collections/default',
+    realtyCollectionComparison: '/v2/realty_collections/comparison',
     realtyCollectionProperties: (collectionId: string | number) =>
         `/v2/realty_collections/${collectionId}/properties`,
     realtyCollectionDefaultProperties:
         '/v2/realty_collections/default/properties',
+    realtyCollectionComparisonProperties:
+        '/v2/realty_collections/comparison/properties',
     realtyCollectionCheckProperties: (collectionId: string | number) =>
         `/v2/realty_collections/${collectionId}/check_properties`,
     pushSubscribe: '/v2/push/subscribe',

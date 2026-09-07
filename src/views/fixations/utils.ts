@@ -26,6 +26,11 @@ export const fixationStatusMap: Record<
         className:
             'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
     },
+    moderation: {
+        label: 'Модерация',
+        className:
+            'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
+    },
     denied: {
         label: 'Отклонена',
         className:
@@ -66,7 +71,8 @@ export const fixationStatusMap: Record<
 export const getFixationStatusDisplay = (
     fixation: Pick<Fixation, 'status' | 'statusLabel'>,
 ) => {
-    const meta = fixationStatusMap[fixation.status]
+    const rawStatus = fixation.status ? (String(fixation.status).toLowerCase() as FixationStatus) : 'pending'
+    const meta = fixationStatusMap[rawStatus] || fixationStatusMap[fixation.status]
 
     if (!meta) {
         return {

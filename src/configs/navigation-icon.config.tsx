@@ -9,6 +9,8 @@ import {
     PiWrenchDuotone,
     PiHeartDuotone,
     PiShieldCheckDuotone,
+    PiCalculatorDuotone,
+    PiScalesDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
 import { TbUserCheck } from 'react-icons/tb'
@@ -20,8 +22,10 @@ const navigationIcon: NavigationIcons = {
     fixations: <PiClipboardTextDuotone />,
     objects: <PiBuildingsDuotone />,
     favoritePremises: <PiHeartDuotone />,
+    comparisonPremises: <PiScalesDuotone />,
     profile: <PiUserDuotone />,
     tools: <PiWrenchDuotone />,
+    calculator: <PiCalculatorDuotone />,
     help: <PiQuestionDuotone />,
     news: <PiNewspaperDuotone />,
     events: <PiCalendarDuotone />,

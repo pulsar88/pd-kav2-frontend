@@ -99,6 +99,8 @@ const mapStatus = (status: ChessPropertyStatusApi): CheckboardPropertyStatus => 
         is_booked: isBooked,
         is_sold: status.base_status === 30,
         is_unavailable: !isAvailable && !isBooked && status.base_status !== 30,
+        base_status: status.base_status,
+        is_base_status: status.is_base_status,
         account_id: null,
     }
 }

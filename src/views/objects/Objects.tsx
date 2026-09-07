@@ -11,6 +11,9 @@ import {
     type GetRealtyPropertiesResponse,
     type GetRealtyPropertiesSummaryResponse,
 } from '@/services/ObjectsService'
+import { apiCheckRealtyCollectionProperties } from '@/services/RealtyCollectionsService'
+import { useFavoritesStore } from '@/store/favoritesStore'
+import { useComparisonStore } from '@/store/comparisonStore'
 import type { ObjectsSearchFilters } from './types'
 import ComplexCard from './components/ComplexCard'
 import ComplexesGridSkeleton from './components/ComplexesGridSkeleton'
@@ -195,7 +198,30 @@ const Objects = () => {
                 : undefined,
         })
             .then((result) => {
-                if (!cancelled) setPremisesData(result)
+                if (cancelled) return
+                setPremisesData(result)
+
+                const ids = result.items.map((i) => i.id)
+                if (ids.length > 0) {
+                    void Promise.allSettled([
+                        apiCheckRealtyCollectionProperties(ids, 'default'),
+                        apiCheckRealtyCollectionProperties(ids, 'comparison'),
+                    ]).then(([favRes, compRes]) => {
+                        if (cancelled) return
+                        if (favRes.status === 'fulfilled') {
+                            const current = useFavoritesStore.getState().favoriteIds
+                            const next = new Set(current)
+                            favRes.value.forEach((id) => next.add(id))
+                            useFavoritesStore.getState().setFavoriteIds([...next])
+                        }
+                        if (compRes.status === 'fulfilled') {
+                            const current = useComparisonStore.getState().comparisonIds
+                            const next = new Set(current)
+                            compRes.value.forEach((id) => next.add(id))
+                            useComparisonStore.getState().setComparisonIds([...next])
+                        }
+                    })
+                }
             })
             .finally(() => {
                 if (!cancelled) {
@@ -346,9 +372,7 @@ const Objects = () => {
                                 ) : (
                                     <div className="flex flex-col gap-4">
                                         <h4 className="mb-0 text-base font-semibold">
-                                            {summaryFiltersActive
-                                                ? `Найдено помещений: ${complexesTotal}`
-                                                : `Всего помещений: ${complexesTotal}`}
+                                            Найдено домов: {complexesTotal}
                                         </h4>
                                         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                             {filteredComplexes.map((complex) => (

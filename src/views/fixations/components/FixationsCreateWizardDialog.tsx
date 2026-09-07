@@ -7,6 +7,7 @@ import Steps from '@/components/ui/Steps'
 import Table from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Select, { Option as SelectMenuOption } from '@/components/ui/Select'
+import Dropdown from '@/components/ui/Dropdown'
 import Spinner from '@/components/ui/Spinner'
 import Pagination from '@/components/ui/Pagination'
 import CloseButton from '@/components/ui/CloseButton'
@@ -54,6 +55,7 @@ import {
 import type {
     CheckboardBuilding,
     CheckboardCellLabel,
+    CheckboardProperty,
 } from '@/views/objects/checkboard.types'
 import type {
     FixationApartment,
@@ -1242,6 +1244,14 @@ const FixationsCreateWizardDialog = ({
         setSelectedPropertyId(matchingProperty?.id ?? null)
     }, [selectedApartment, selectedComplexCheckboard])
 
+    const isCheckboardPropertySelectable = useCallback(
+        (property: CheckboardProperty) => {
+            const baseStatus = property.status.base_status
+            return baseStatus !== 30 && baseStatus !== 40
+        },
+        [],
+    )
+
     const handleCheckboardPropertySelect = (propertyId: number) => {
         if (!selectedComplexCheckboard) return
 
@@ -1250,6 +1260,9 @@ const FixationsCreateWizardDialog = ({
             propertyId,
         )
         if (!property) return
+
+        const baseStatus = property.status.base_status
+        if (baseStatus === 30 || baseStatus === 40) return
 
         setSelectedPropertyId(propertyId)
         setSelectedApartment({
@@ -2107,6 +2120,9 @@ const FixationsCreateWizardDialog = ({
                                                                     selectedPropertyId={
                                                                         selectedPropertyId
                                                                     }
+                                                                    isPropertySelectable={
+                                                                        isCheckboardPropertySelectable
+                                                                    }
                                                                     onPropertySelect={
                                                                         handleCheckboardPropertySelect
                                                                     }
@@ -2547,102 +2563,159 @@ const FixationsCreateWizardDialog = ({
                                         </h6>
                                         <div className="space-y-3">
                                             {selectedRelatives.map(
-                                                (relative) => (
-                                                    <div
-                                                        key={relative.client.id}
-                                                        className="rounded-xl border border-gray-200 bg-white p-3.5 dark:border-gray-700 dark:bg-gray-800"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                                        {
-                                                                            relative
+                                                (relative) => {
+                                                    const hasRelation = Boolean(
+                                                        relative.relation,
+                                                    )
+                                                    const kinshipLabel =
+                                                        hasRelation
+                                                            ? formatFixationKinship(
+                                                                  relative.relation,
+                                                              )
+                                                            : 'Степень родства не указана'
+
+                                                    return (
+                                                        <div
+                                                            key={
+                                                                relative.client
+                                                                    .id
+                                                            }
+                                                            className={classNames(
+                                                                'rounded-xl border bg-white p-3.5 transition-colors dark:bg-gray-800',
+                                                                hasRelation
+                                                                    ? 'border-gray-200 dark:border-gray-700'
+                                                                    : 'border-red-500 ring-1 ring-red-500/30 dark:border-red-500/80',
+                                                            )}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                                            {
+                                                                                relative
+                                                                                    .client
+                                                                                    .fullName
+                                                                            }
+                                                                        </p>
+                                                                        {relative
+                                                                            .client
+                                                                            .isNew ? (
+                                                                            <span className="shrink-0 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                                                                                Новый
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                                                                        <span className="text-gray-500 dark:text-gray-400">
+                                                                            {relative
                                                                                 .client
-                                                                                .fullName
-                                                                        }
-                                                                    </p>
-                                                                    {relative
-                                                                        .client
-                                                                        .isNew ? (
-                                                                        <span className="shrink-0 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
-                                                                            Новый
+                                                                                .phone ||
+                                                                                '—'}
                                                                         </span>
-                                                                    ) : null}
+                                                                        <span className="text-gray-300 dark:text-gray-600">
+                                                                            •
+                                                                        </span>
+                                                                        <span
+                                                                            className={
+                                                                                hasRelation
+                                                                                    ? 'font-medium text-gray-700 dark:text-gray-300'
+                                                                                    : 'font-medium text-red-500 dark:text-red-400'
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                kinshipLabel
+                                                                            }
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
-                                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                                    {
-                                                                        relative
-                                                                            .client
-                                                                            .phone
-                                                                    }
-                                                                </p>
-                                                            </div>
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="plain"
-                                                                className="shrink-0 text-red-500 hover:text-red-600"
-                                                                icon={<TbTrash />}
-                                                                onClick={() =>
-                                                                    handleRemoveRelative(
-                                                                        relative
-                                                                            .client
-                                                                            .id,
-                                                                    )
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="mt-2.5">
-                                                            <Select
-                                                                {...selectMenuProps}
-                                                                placeholder="Выберите степень родства"
-                                                                options={
-                                                                    kinshipSelectOptions
-                                                                }
-                                                                value={
-                                                                    kinshipSelectOptions.find(
-                                                                        (
-                                                                            option,
-                                                                        ) =>
-                                                                            option.value ===
-                                                                            relative.relation,
-                                                                    ) || null
-                                                                }
-                                                                onChange={(
-                                                                    option,
-                                                                ) => {
-                                                                    const value =
-                                                                        (
-                                                                            option as SelectOption | null
-                                                                        )
-                                                                            ?.value ||
-                                                                        ''
-                                                                    setSelectedRelatives(
-                                                                        (prev) =>
-                                                                            prev.map(
-                                                                                (
-                                                                                    item,
-                                                                                ) =>
-                                                                                    item
-                                                                                        .client
-                                                                                        .id ===
-                                                                                    relative
-                                                                                        .client
-                                                                                        .id
-                                                                                        ? {
-                                                                                              ...item,
-                                                                                              relation:
-                                                                                                  value,
-                                                                                          }
-                                                                                        : item,
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <Dropdown
+                                                                        placement="bottom-end"
+                                                                        renderTitle={
+                                                                            <Button
+                                                                                type="button"
+                                                                                size="sm"
+                                                                                variant="plain"
+                                                                                className="shrink-0 text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary"
+                                                                                icon={
+                                                                                    <TbUsers className="text-lg" />
+                                                                                }
+                                                                                title="Выбрать степень родства"
+                                                                            />
+                                                                        }
+                                                                    >
+                                                                        <Dropdown.Item variant="header">
+                                                                            <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                                                Степень
+                                                                                родства
+                                                                            </div>
+                                                                        </Dropdown.Item>
+                                                                        {kinshipSelectOptions.map(
+                                                                            (
+                                                                                option,
+                                                                            ) => (
+                                                                                <Dropdown.Item
+                                                                                    key={
+                                                                                        option.value
+                                                                                    }
+                                                                                    active={
+                                                                                        relative.relation ===
+                                                                                        option.value
+                                                                                    }
+                                                                                    onClick={() => {
+                                                                                        setSelectedRelatives(
+                                                                                            (
+                                                                                                prev,
+                                                                                            ) =>
+                                                                                                prev.map(
+                                                                                                    (
+                                                                                                        item,
+                                                                                                    ) =>
+                                                                                                        item
+                                                                                                            .client
+                                                                                                            .id ===
+                                                                                                        relative
+                                                                                                            .client
+                                                                                                            .id
+                                                                                                            ? {
+                                                                                                                  ...item,
+                                                                                                                  relation:
+                                                                                                                      option.value,
+                                                                                                              }
+                                                                                                            : item,
+                                                                                                ),
+                                                                                        )
+                                                                                    }}
+                                                                                >
+                                                                                    {
+                                                                                        option.label
+                                                                                    }
+                                                                                </Dropdown.Item>
                                                                             ),
-                                                                    )
-                                                                }}
-                                                            />
+                                                                        )}
+                                                                    </Dropdown>
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="plain"
+                                                                        className="shrink-0 text-red-500 hover:text-red-600"
+                                                                        icon={
+                                                                            <TbTrash className="text-lg" />
+                                                                        }
+                                                                        title="Удалить"
+                                                                        onClick={() =>
+                                                                            handleRemoveRelative(
+                                                                                relative
+                                                                                    .client
+                                                                                    .id,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ),
+                                                    )
+                                                },
                                             )}
                                         </div>
                                     </div>
@@ -2899,6 +2972,9 @@ const FixationsCreateWizardDialog = ({
                                 building={selectedComplexCheckboard}
                                 labelMode={checkboardLabelMode}
                                 selectedPropertyId={selectedPropertyId}
+                                isPropertySelectable={
+                                    isCheckboardPropertySelectable
+                                }
                                 onPropertySelect={
                                     handleCheckboardPropertySelect
                                 }

@@ -4,9 +4,10 @@ import {
 } from '@/constants/navigation.constant'
 
 import {
+    ADMIN,
+    AGENT,
     AGENCY_SUPERVISOR,
     SUPERVISOR,
-    ADMIN,
     AGENT_CABINET_ROLES,
     CONTENT_MANAGER_ALLOWED_ROLES,
 } from '@/constants/roles.constant'
@@ -15,6 +16,8 @@ import type { NavigationTree } from '@/@types/navigation'
 
 const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
+const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR]
+const supervisorOnlyAuthority = [SUPERVISOR]
 
 const navigationConfig: NavigationTree[] = [
     {
@@ -53,7 +56,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.objects',
                 icon: 'objects',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: agentCabinetAuthority,
+                authority: objectsAuthority,
                 subMenu: [],
             },
             {
@@ -63,15 +66,25 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.favoritePremises',
                 icon: 'favoritePremises',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: agentCabinetAuthority,
+                authority: objectsAuthority,
                 subMenu: [],
             },
             {
-                key: 'tools',
-                path: '/tools',
-                title: 'Инструменты',
-                translateKey: 'nav.tools',
-                icon: 'tools',
+                key: 'comparisonPremises',
+                path: '/comparison-premises',
+                title: 'Сравнение',
+                translateKey: 'nav.comparisonPremises',
+                icon: 'comparisonPremises',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: objectsAuthority,
+                subMenu: [],
+            },
+            {
+                key: 'mortgageCalculator',
+                path: '/tools/mortgage-calculator',
+                title: 'Калькулятор',
+                translateKey: 'nav.mortgageCalculator',
+                icon: 'calculator',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: agentCabinetAuthority,
                 subMenu: [],
@@ -103,7 +116,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.supervisorFixations',
                 icon: 'supervisor',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [ADMIN, SUPERVISOR, AGENCY_SUPERVISOR],
+                authority: supervisorOnlyAuthority,
                 subMenu: [],
             },
         ],

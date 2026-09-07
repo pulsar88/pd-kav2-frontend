@@ -15,6 +15,7 @@ import classNames from '@/utils/classNames'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { useComparisonStore } from '@/store/comparisonStore'
 import { apiCheckRealtyCollectionProperties } from '@/services/RealtyCollectionsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
@@ -23,6 +24,7 @@ import {
     TbHeartFilled,
     TbLayoutGrid,
     TbPlus,
+    TbScale,
     TbZoomIn,
 } from 'react-icons/tb'
 import type { FlatCheckboardProperty } from '../../checkboard.types'
@@ -200,6 +202,8 @@ const CheckboardPropertyDrawer = ({
     } | null>(null)
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
     const setFavoriteIds = useFavoritesStore((state) => state.setFavoriteIds)
+    const toggleComparison = useComparisonStore((state) => state.togglePremise)
+    const setComparisonIds = useComparisonStore((state) => state.setComparisonIds)
     const schema = useThemeStore((state) => state.themeSchema)
     const mode = useThemeStore((state) => state.mode)
     const primaryColor =
@@ -208,6 +212,8 @@ const CheckboardPropertyDrawer = ({
     const setShowFloorPlan = useCommonStore((state) => state.setShowFloorPlan)
     const [isFavoriteChecking, setIsFavoriteChecking] = useState(false)
     const [isFavoriteToggling, setIsFavoriteToggling] = useState(false)
+    const [isComparisonChecking, setIsComparisonChecking] = useState(false)
+    const [isComparisonToggling, setIsComparisonToggling] = useState(false)
 
     const favoritePremise = useMemo(() => {
         if (!property) return null
@@ -225,30 +231,59 @@ const CheckboardPropertyDrawer = ({
             : false,
     )
 
+    const isCompared = useComparisonStore((state) =>
+        favoritePremise
+            ? state.comparisonIds.includes(favoritePremise.id)
+            : false,
+    )
+
     useEffect(() => {
         if (!isOpen || !favoritePremise) {
             setIsFavoriteChecking(false)
+            setIsComparisonChecking(false)
             return
         }
 
         const propertyId = favoritePremise.id
         let cancelled = false
         setIsFavoriteChecking(true)
+        setIsComparisonChecking(true)
 
-        void apiCheckRealtyCollectionProperties([propertyId])
-            .then((existsIds) => {
+        void Promise.allSettled([
+            apiCheckRealtyCollectionProperties([propertyId], 'default'),
+            apiCheckRealtyCollectionProperties([propertyId], 'comparison'),
+        ])
+            .then(([favResult, compResult]) => {
                 if (cancelled) return
 
-                const exists = existsIds.includes(propertyId)
-                const currentIds = useFavoritesStore.getState().favoriteIds
-                const alreadyInStore = currentIds.includes(propertyId)
+                if (favResult.status === 'fulfilled') {
+                    const existsIds = favResult.value
+                    const exists = existsIds.includes(propertyId)
+                    const currentIds = useFavoritesStore.getState().favoriteIds
+                    const alreadyInStore = currentIds.includes(propertyId)
 
-                if (exists && !alreadyInStore) {
-                    setFavoriteIds([...currentIds, propertyId])
-                } else if (!exists && alreadyInStore) {
-                    setFavoriteIds(
-                        currentIds.filter((id) => id !== propertyId),
-                    )
+                    if (exists && !alreadyInStore) {
+                        setFavoriteIds([...currentIds, propertyId])
+                    } else if (!exists && alreadyInStore) {
+                        setFavoriteIds(
+                            currentIds.filter((id) => id !== propertyId),
+                        )
+                    }
+                }
+
+                if (compResult.status === 'fulfilled') {
+                    const existsIds = compResult.value
+                    const exists = existsIds.includes(propertyId)
+                    const currentIds = useComparisonStore.getState().comparisonIds
+                    const alreadyInStore = currentIds.includes(propertyId)
+
+                    if (exists && !alreadyInStore) {
+                        setComparisonIds([...currentIds, propertyId])
+                    } else if (!exists && alreadyInStore) {
+                        setComparisonIds(
+                            currentIds.filter((id) => id !== propertyId),
+                        )
+                    }
                 }
             })
             .catch((error) => {
@@ -257,19 +292,22 @@ const CheckboardPropertyDrawer = ({
                     <Notification type="danger">
                         {getApiErrorMessage(
                             error,
-                            'Не удалось проверить избранное',
+                            'Не удалось проверить статус подборок',
                         )}
                     </Notification>,
                 )
             })
             .finally(() => {
-                if (!cancelled) setIsFavoriteChecking(false)
+                if (!cancelled) {
+                    setIsFavoriteChecking(false)
+                    setIsComparisonChecking(false)
+                }
             })
 
         return () => {
             cancelled = true
         }
-    }, [isOpen, favoritePremise?.id, setFavoriteIds])
+    }, [isOpen, favoritePremise?.id, setFavoriteIds, setComparisonIds])
 
     const display = useMemo(() => {
         if (!property) return null
@@ -347,96 +385,167 @@ const CheckboardPropertyDrawer = ({
                 footer={
                     property ? (
                         <div className="flex w-full flex-col gap-2">
-                            <Button
-                                type="button"
-                                variant="plain"
-                                className={classNames(
-                                    'w-full',
-                                    isFavorite
-                                        ? 'text-rose-500 hover:text-rose-600'
-                                        : 'text-gray-600 dark:text-gray-300',
-                                )}
-                                loading={isFavoriteChecking || isFavoriteToggling}
-                                disabled={
-                                    !favoritePremise ||
-                                    isFavoriteChecking ||
-                                    isFavoriteToggling
-                                }
-                                icon={
-                                    isFavorite ? <TbHeartFilled /> : <TbHeart />
-                                }
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    if (
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant="plain"
+                                    className={classNames(
+                                        'w-full border border-gray-200 dark:border-gray-700',
+                                        isFavorite
+                                            ? 'text-rose-500 hover:text-rose-600 dark:text-rose-400'
+                                            : 'text-gray-600 dark:text-gray-300',
+                                    )}
+                                    loading={isFavoriteChecking || isFavoriteToggling}
+                                    disabled={
                                         !favoritePremise ||
                                         isFavoriteChecking ||
                                         isFavoriteToggling
-                                    ) {
-                                        return
                                     }
+                                    icon={
+                                        isFavorite ? <TbHeartFilled /> : <TbHeart />
+                                    }
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        if (
+                                            !favoritePremise ||
+                                            isFavoriteChecking ||
+                                            isFavoriteToggling
+                                        ) {
+                                            return
+                                        }
 
-                                    setIsFavoriteToggling(true)
-                                    void togglePremise(favoritePremise)
-                                        .catch((error) => {
-                                            toast.push(
-                                                <Notification type="danger">
-                                                    {getApiErrorMessage(
-                                                        error,
-                                                        'Не удалось обновить избранное',
-                                                    )}
-                                                </Notification>,
+                                        setIsFavoriteToggling(true)
+                                        void togglePremise(favoritePremise)
+                                            .catch((error) => {
+                                                toast.push(
+                                                    <Notification type="danger">
+                                                        {getApiErrorMessage(
+                                                            error,
+                                                            'Не удалось обновить избранное',
+                                                        )}
+                                                    </Notification>,
+                                                )
+                                            })
+                                            .finally(() => {
+                                                setIsFavoriteToggling(false)
+                                            })
+                                    }}
+                                >
+                                    {isFavorite
+                                        ? 'В избранном'
+                                        : 'В избранное'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="plain"
+                                    className={classNames(
+                                        'w-full border border-gray-200 dark:border-gray-700 transition-colors',
+                                        isCompared
+                                            ? 'text-indigo-600 hover:text-indigo-700 dark:text-indigo-400'
+                                            : 'text-gray-600 dark:text-gray-300',
+                                    )}
+                                    loading={isComparisonChecking || isComparisonToggling}
+                                    disabled={
+                                        !favoritePremise ||
+                                        isComparisonChecking ||
+                                        isComparisonToggling
+                                    }
+                                    icon={
+                                        <TbScale
+                                            className={classNames(
+                                                'text-lg',
+                                                isCompared && 'stroke-[2.5]',
+                                            )}
+                                        />
+                                    }
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        if (
+                                            !favoritePremise ||
+                                            isComparisonChecking ||
+                                            isComparisonToggling
+                                        ) {
+                                            return
+                                        }
+
+                                        setIsComparisonToggling(true)
+                                        void toggleComparison(favoritePremise)
+                                            .catch((error) => {
+                                                toast.push(
+                                                    <Notification type="danger">
+                                                        {getApiErrorMessage(
+                                                            error,
+                                                            'Не удалось обновить сравнение',
+                                                        )}
+                                                    </Notification>,
+                                                )
+                                            })
+                                            .finally(() => {
+                                                setIsComparisonToggling(false)
+                                            })
+                                    }}
+                                >
+                                    {isCompared
+                                        ? 'В сравнении'
+                                        : 'В сравнение'}
+                                </Button>
+                            </div>
+                            {(() => {
+                                const baseStatus =
+                                    propertyDetails?.baseStatus ??
+                                    propertyDetails?.status?.base_status ??
+                                    property?.status?.base_status
+                                const isUnavailableForFixation =
+                                    baseStatus === 30 || baseStatus === 40
+
+                                if (isUnavailableForFixation) {
+                                    return null
+                                }
+
+                                return (
+                                    <Button
+                                        type="button"
+                                        variant="solid"
+                                        className="w-full"
+                                        icon={<TbPlus />}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            if (!property || !display) return
+
+                                            const params = new URLSearchParams({
+                                                create: '1',
+                                            })
+
+                                            if (complexId) {
+                                                params.set('complexId', complexId)
+                                            }
+
+                                            params.set(
+                                                'propertyId',
+                                                String(property.id),
                                             )
-                                        })
-                                        .finally(() => {
-                                            setIsFavoriteToggling(false)
-                                        })
-                                }}
-                            >
-                                {isFavorite
-                                    ? 'Убрать из избранного'
-                                    : 'Добавить в избранное'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="solid"
-                                className="w-full"
-                                icon={<TbPlus />}
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    if (!property || !display) return
+                                            params.set(
+                                                'apartmentNumber',
+                                                display.number,
+                                            )
+                                            if (display.hasRooms) {
+                                                params.set(
+                                                    'rooms',
+                                                    String(
+                                                        display.roomsCount === 0
+                                                            ? 0
+                                                            : display.roomsCount,
+                                                    ),
+                                                )
+                                            }
 
-                                    const params = new URLSearchParams({
-                                        create: '1',
-                                    })
-
-                                    if (complexId) {
-                                        params.set('complexId', complexId)
-                                    }
-
-                                    params.set(
-                                        'propertyId',
-                                        String(property.id),
-                                    )
-                                    params.set(
-                                        'apartmentNumber',
-                                        display.number,
-                                    )
-                                    if (display.hasRooms) {
-                                        params.set(
-                                            'rooms',
-                                            String(
-                                                display.roomsCount === 0
-                                                    ? 0
-                                                    : display.roomsCount,
-                                            ),
-                                        )
-                                    }
-
-                                    navigate(`/fixations?${params.toString()}`)
-                                }}
-                            >
-                                Создать фиксацию
-                            </Button>
+                                            navigate(`/fixations?${params.toString()}`)
+                                        }}
+                                    >
+                                        Создать фиксацию
+                                    </Button>
+                                )
+                            })()}
                         </div>
                     ) : null
                 }

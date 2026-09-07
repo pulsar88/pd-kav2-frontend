@@ -5,20 +5,23 @@ type StatusItem = {
     name: string
     color: string
     text_color: string
+    base_status?: number
 }
 
 type CheckboardLegendProps = {
     statuses: StatusItem[]
-    activeStatusCode?: string
+    activeStatusCodes?: string[]
     onStatusClick?: (code: string) => void
 }
 
 const CheckboardLegend = ({
     statuses,
-    activeStatusCode,
+    activeStatusCodes = [],
     onStatusClick,
 }: CheckboardLegendProps) => {
     if (statuses.length === 0) return null
+
+    const hasActiveFilter = activeStatusCodes.length > 0
 
     return (
         <div className="flex flex-wrap items-center gap-2">
@@ -26,13 +29,16 @@ const CheckboardLegend = ({
                 Статусы:
             </span>
             {statuses.map((status) => {
-                const active = activeStatusCode === status.code
+                const active =
+                    !hasActiveFilter ||
+                    activeStatusCodes.includes(status.code)
                 const className = classNames(
                     'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium',
-                    onStatusClick && 'transition-shadow',
+                    onStatusClick && 'transition-all',
                     onStatusClick &&
                         active &&
                         'ring-2 ring-primary ring-offset-1',
+                    onStatusClick && !active && 'opacity-45',
                 )
                 const style = {
                     backgroundColor: status.color,

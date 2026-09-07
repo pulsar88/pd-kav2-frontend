@@ -8,6 +8,7 @@ import { useForm, useFormItem } from '../Form/context'
 import { useInputGroup } from '../InputGroup/context'
 import { HiChevronDown, HiX } from 'react-icons/hi'
 import DefaultOption from './Option'
+import CompactValueContainer from './CompactValueContainer'
 import Spinner from '../Spinner/Spinner'
 import { CONTROL_SIZES } from '../utils/constants'
 import type { CommonProps, TypeAttributes } from '../@types/common'
@@ -72,6 +73,7 @@ export type SelectProps<
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         field?: any
         componentAs?: ReactSelect | CreatableSelect | AsyncSelect
+        compactMulti?: boolean
     }
 
 function Select<
@@ -90,8 +92,12 @@ function Select<
         invalid,
         noOptionsMessage,
         loadingMessage,
+        compactMulti,
+        hideSelectedOptions,
         ...rest
     } = props
+
+    const isCompact = Boolean(compactMulti && rest.isMulti)
 
     const { controlSize } = useConfig()
     const formControlSize = useForm()?.size
@@ -146,6 +152,7 @@ function Select<
                     valueContainer: ({ isMulti, hasValue, selectProps }) =>
                         cn(
                             'select-value-container',
+                            isCompact && '!flex-nowrap overflow-hidden',
                             isMulti &&
                                 hasValue &&
                                 selectProps.controlShouldRenderValue
@@ -176,7 +183,14 @@ function Select<
             styles={
                 {
                     control: () => ({}),
-                    valueContainer: () => ({}),
+                    valueContainer: (provided, state) => ({
+                        ...(styles?.valueContainer
+                            ? styles.valueContainer(provided, state)
+                            : provided),
+                        ...(isCompact
+                            ? { flexWrap: 'nowrap', overflow: 'hidden' }
+                            : {}),
+                    }),
                     input: ({
                         margin,
                         paddingTop,
@@ -198,6 +212,17 @@ function Select<
                         ...provided
                     }) => ({ ...provided, zIndex: 50 }),
                     ...styles,
+                    ...(isCompact
+                        ? {
+                              valueContainer: (provided, state) => ({
+                                  ...(styles?.valueContainer
+                                      ? styles.valueContainer(provided, state)
+                                      : provided),
+                                  flexWrap: 'nowrap',
+                                  overflow: 'hidden',
+                              }),
+                          }
+                        : {}),
                 } as StylesConfig<Option, IsMulti, Group>
             }
             components={{
@@ -206,6 +231,12 @@ function Select<
                 LoadingIndicator: DefaultLoadingIndicator,
                 DropdownIndicator: DefaultDropdownIndicator,
                 ClearIndicator: DefaultClearIndicator,
+                ...(isCompact
+                    ? {
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          ValueContainer: CompactValueContainer as any,
+                      }
+                    : {}),
                 ...components,
             }}
             noOptionsMessage={
@@ -214,6 +245,9 @@ function Select<
                     inputValue ? 'Ничего не найдено' : 'Нет доступных вариантов')
             }
             loadingMessage={loadingMessage ?? (() => 'Загрузка...')}
+            hideSelectedOptions={
+                hideSelectedOptions ?? (isCompact ? false : undefined)
+            }
             {...field}
             {...rest}
         />

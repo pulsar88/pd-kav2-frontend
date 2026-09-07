@@ -3,8 +3,6 @@ import ApiService from './ApiService'
 import endpointConfig from '@/configs/endpoint.config'
 import { getFixationsDashboardStats } from '@/views/fixations/fixationsDashboardMockData'
 import type { FixationsDashboardStats } from '@/views/fixations/dashboard.constants'
-import type { Complex } from '@/views/objects/types'
-import { apiGetRealtyPropertiesSummary } from '@/services/ObjectsService'
 import type {
     CreateFixationClientPayload,
     CreateFixationWizardPayload,
@@ -171,13 +169,22 @@ export async function apiGetFixationManagers(
     }
 }
 
-const mapComplexToFixationComplex = (item: Complex): FixationComplex => ({
-    id: item.id,
-    name: item.name,
-    address: item.address?.trim() || '',
-    apartments: [],
-    managers: [],
-})
+export type RealtyObjectListItem = {
+    id: number | string
+    name: string
+    facing?: string | null
+    material?: string | null
+    building_state?: { value?: string; code?: string; name?: string } | string | null
+    development_start?: string | null
+    development_end?: string | null
+    address?: string | null
+    external_id?: number | null
+}
+
+export type RealtyObjectsApiResponse = {
+    data: RealtyObjectListItem[]
+    meta?: FixationsApiMeta
+}
 
 export async function apiGetFixationHouses(
     params: GetFixationHousesParams = {},
@@ -185,17 +192,37 @@ export async function apiGetFixationHouses(
     const page = Math.max(1, params.page ?? 1)
     const perPage = Math.max(1, params.per_page ?? DEFAULT_HOUSES_PER_PAGE)
 
-    const response = await apiGetRealtyPropertiesSummary({
-        page,
-        per_page: perPage,
+    const response = await ApiService.fetchDataWithAxios<RealtyObjectsApiResponse | RealtyObjectListItem[]>({
+        url: endpointConfig.realtyObjects,
+        method: 'get',
+        params: toAxiosParams({
+            page,
+            per_page: perPage,
+        }),
     })
 
+    const rawList = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : []
+
+    const list: FixationComplex[] = rawList.map((item) => ({
+        id: String(item.id),
+        name: item.name || '',
+        address: item.address?.trim() || '',
+        apartments: [],
+        managers: [],
+    }))
+
+    const meta = !Array.isArray(response) && response?.meta ? response.meta : undefined
+
     return {
-        list: response.items.map(mapComplexToFixationComplex),
-        meta: toListMeta(response.meta, {
+        list,
+        meta: toListMeta(meta, {
             page,
             perPage,
-            total: response.items.length,
+            total: list.length,
         }),
     }
 }
@@ -523,6 +550,80 @@ export function formatFixedTillToDateString(
         return parsed.format('DD.MM.YYYY')
     }
     return dayjs().add(1, 'day').format('DD.MM.YYYY')
+}
+
+export type FixationGigalogMetaStatus = {
+    value?: string
+    code?: string
+    name?: string
+}
+
+export type FixationGigalogMetaChange = {
+    status?: FixationGigalogMetaStatus | string
+    fixed_till?: string
+    [key: string]: unknown
+}
+
+export type FixationGigalogMeta =
+    | {
+          old?: FixationGigalogMetaChange
+          attributes?: FixationGigalogMetaChange
+          loaded?: unknown[]
+      }
+    | unknown[]
+    | null
+
+export type FixationGigalogItem = {
+    id: number
+    code?: string
+    subject_id?: number
+    subject_code?: string
+    causer_id?: number | null
+    causer_code?: string | null
+    group?: {
+        name: string
+        code: string
+    }
+    meta?: FixationGigalogMeta
+    message: string
+    created_at: string
+}
+
+export type FixationGigalogsApiResponse = {
+    data: FixationGigalogItem[]
+    links?: {
+        first?: string | null
+        last?: string | null
+        prev?: string | null
+        next?: string | null
+    }
+    meta?: {
+        current_page: number
+        from?: number
+        last_page: number
+        per_page: number
+        to?: number
+        total: number
+    }
+}
+
+export async function apiGetFixationGigalogs(
+    fixationId: string | number,
+    params: { page?: number; per_page?: number } = {},
+): Promise<FixationGigalogsApiResponse> {
+    const page = params.page ?? 1
+    const perPage = params.per_page ?? 20
+
+    const response = await ApiService.fetchDataWithAxios<FixationGigalogsApiResponse>({
+        url: endpointConfig.fixationGigalogs(fixationId),
+        method: 'get',
+        params: {
+            page,
+            per_page: perPage,
+        },
+    })
+
+    return response
 }
 
 export async function apiRestoreFixation(

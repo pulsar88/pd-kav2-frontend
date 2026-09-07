@@ -54,11 +54,16 @@ export type RealtyCollection = {
 export const FAVORITE_COLLECTION_SWR_KEY =
     endpointConfig.realtyCollectionDefault
 
+export const COMPARISON_COLLECTION_SWR_KEY =
+    endpointConfig.realtyCollectionComparison
+
 export type FavoriteCollectionPageData = {
     collection: RealtyCollection | null
     items: Premise[]
     meta: PaginatedApiMeta
 }
+
+export type ComparisonCollectionPageData = FavoriteCollectionPageData
 
 export const isFavoriteCollectionSwrKey = (
     key: unknown,
@@ -77,9 +82,14 @@ export const getFavoriteCollectionSwrKey = (
 ) => [FAVORITE_COLLECTION_SWR_KEY, page, perPage, sort] as const
 
 let cachedDefaultCollection: RealtyCollection | null = null
+let cachedComparisonCollection: RealtyCollection | null = null
 
 export const clearDefaultRealtyCollectionCache = () => {
     cachedDefaultCollection = null
+}
+
+export const clearComparisonRealtyCollectionCache = () => {
+    cachedComparisonCollection = null
 }
 
 const mapRealtyCollectionApi = (item: RealtyCollectionApi): RealtyCollection => ({
@@ -109,6 +119,27 @@ export async function apiGetDefaultRealtyCollection(
 
     cachedDefaultCollection = mapRealtyCollectionApi(item)
     return cachedDefaultCollection
+}
+
+export async function apiGetComparisonRealtyCollection(
+    options: { force?: boolean } = {},
+): Promise<RealtyCollection | null> {
+    if (!options.force && cachedComparisonCollection) {
+        return cachedComparisonCollection
+    }
+
+    const response = await ApiService.fetchDataWithAxios<
+        RealtyCollectionApi | { data: RealtyCollectionApi }
+    >({
+        url: endpointConfig.realtyCollectionComparison,
+        method: 'get',
+    })
+
+    const item = unwrapApiData(response)
+    if (!item?.id) return null
+
+    cachedComparisonCollection = mapRealtyCollectionApi(item)
+    return cachedComparisonCollection
 }
 
 export async function apiGetRealtyCollectionProperties(
@@ -209,6 +240,44 @@ export async function apiGetDefaultCollectionPropertiesPage(
     return { collection, items, meta }
 }
 
+export async function apiGetComparisonCollectionPropertiesPage(
+    params: {
+        page?: number
+        per_page?: number
+        sort?: PremiseSortKey
+    } = {},
+): Promise<ComparisonCollectionPageData> {
+    const collection = await apiGetComparisonRealtyCollection()
+    if (!collection) {
+        return {
+            collection: null,
+            items: [],
+            meta: {
+                current_page: 1,
+                last_page: 1,
+                per_page: params.per_page ?? 20,
+                total: 0,
+            },
+        }
+    }
+
+    const { items, meta } = await apiGetRealtyCollectionProperties(
+        collection.id,
+        params,
+    )
+
+    return { collection, items, meta }
+}
+
+export async function apiGetAllComparisonCollectionProperties(): Promise<Premise[]> {
+    const collection = await apiGetComparisonRealtyCollection()
+    if (!collection) {
+        return []
+    }
+
+    return apiGetAllRealtyCollectionProperties(collection.id)
+}
+
 /** @deprecated Загружает все страницы подряд — используйте apiGetDefaultCollectionPropertiesPage */
 export async function apiGetDefaultCollectionProperties(): Promise<{
     collection: RealtyCollection | null
@@ -263,6 +332,26 @@ export async function apiRemoveRealtyCollectionProperty(
 ): Promise<void> {
     await ApiService.fetchDataWithAxios({
         url: endpointConfig.realtyCollectionDefaultProperties,
+        method: 'delete',
+        data: { property_id: Number(propertyId) },
+    })
+}
+
+export async function apiAddComparisonCollectionProperty(
+    propertyId: string | number,
+): Promise<void> {
+    await ApiService.fetchDataWithAxios({
+        url: endpointConfig.realtyCollectionComparisonProperties,
+        method: 'post',
+        data: { property_id: Number(propertyId) },
+    })
+}
+
+export async function apiRemoveComparisonCollectionProperty(
+    propertyId: string | number,
+): Promise<void> {
+    await ApiService.fetchDataWithAxios({
+        url: endpointConfig.realtyCollectionComparisonProperties,
         method: 'delete',
         data: { property_id: Number(propertyId) },
     })

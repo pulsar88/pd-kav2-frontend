@@ -18,6 +18,9 @@ export type CheckboardPropertyStatus = {
     is_booked: boolean
     is_sold: boolean
     is_unavailable: boolean
+    base_status?: number
+    is_base_status?: number
+    show_as?: string | null
     account_id: number | null
 }
 

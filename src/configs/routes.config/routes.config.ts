@@ -3,6 +3,7 @@ import authRoute from './authRoute'
 import othersRoute from './othersRoute'
 import type { Routes } from '@/@types/routes'
 import {
+    AGENT,
     AGENCY_SUPERVISOR,
     SUPERVISOR,
     ADMIN,
@@ -13,6 +14,8 @@ import {
 
 const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
+const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR]
+const supervisorOnlyAuthority = [SUPERVISOR]
 
 export const publicRoutes: Routes = [...authRoute]
 
@@ -39,19 +42,31 @@ export const protectedRoutes: Routes = [
         key: 'objects',
         path: '/objects',
         component: lazy(() => import('@/views/objects')),
-        authority: agentCabinetAuthority,
+        authority: objectsAuthority,
     },
     {
         key: 'objects',
         path: '/objects/:id',
         component: lazy(() => import('@/views/objects/ComplexCheckboard')),
-        authority: agentCabinetAuthority,
+        authority: objectsAuthority,
     },
     {
         key: 'favoritePremises',
         path: '/favorite-premises',
         component: lazy(() => import('@/views/favorite-premises')),
-        authority: agentCabinetAuthority,
+        authority: objectsAuthority,
+    },
+    {
+        key: 'comparisonPremises',
+        path: '/comparison-premises',
+        component: lazy(() => import('@/views/comparison')),
+        authority: objectsAuthority,
+    },
+    {
+        key: 'comparisonPremises',
+        path: '/comparison',
+        component: lazy(() => import('@/views/comparison')),
+        authority: objectsAuthority,
     },
     {
         key: 'profile',
@@ -215,7 +230,7 @@ export const protectedRoutes: Routes = [
         key: 'supervisorFixations',
         path: '/supervisor/fixations',
         component: lazy(() => import('@/views/supervisor')),
-        authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
+        authority: supervisorOnlyAuthority,
     },
     ...othersRoute,
 ]

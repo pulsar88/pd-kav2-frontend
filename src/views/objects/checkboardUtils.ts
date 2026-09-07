@@ -273,8 +273,7 @@ export const isPropertyActive = (
     )
 }
 
-export const DIMMED_CELL_CLASS =
-    'opacity-30 grayscale contrast-75 saturate-0'
+export const DIMMED_CELL_CLASS = 'opacity-35'
 
 export const getSectionFloors = (section: CheckboardSection) => {
     const { min_floor, max_floor } = section.checkboard_data
@@ -337,6 +336,7 @@ export const collectStatuses = (building: CheckboardBuilding) => {
             name: string
             color: string
             text_color: string
+            base_status?: number
         }
     >()
     flattenBuildingProperties(building).forEach((property) => {
@@ -346,11 +346,22 @@ export const collectStatuses = (building: CheckboardBuilding) => {
                 name: property.status.name,
                 color: property.status.color,
                 text_color: property.status.text_color,
+                base_status: property.status.base_status,
             })
         }
     })
     return [...map.values()]
 }
+
+export const getDefaultActiveStatusCodes = (
+    statuses: Array<{ code: string; base_status?: number }>,
+) =>
+    statuses
+        .filter(
+            (status) =>
+                status.base_status !== 30 && status.base_status !== 40,
+        )
+        .map((status) => status.code)
 
 export const collectTypes = (building: CheckboardBuilding) => {
     const map = new Map<string, string>()

@@ -1,5 +1,7 @@
 export type FixationApiStatus =
     | 'pending'
+    | 'moderation'
+    | 'MODERATION'
     | 'denied'
     | 'fixed'
     | 'registration'

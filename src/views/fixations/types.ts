@@ -2,6 +2,7 @@ import { FixationApiBuildingState } from "./fixationApi.types"
 
 export type FixationStatus =
     | 'pending'
+    | 'moderation'
     | 'denied'
     | 'fixed'
     | 'registration'
