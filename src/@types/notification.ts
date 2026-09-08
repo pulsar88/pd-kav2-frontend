@@ -63,13 +63,19 @@ export type NotificationTypeDictionaryItem = {
     code: string
     title: string
     description: string
+    sort?: number
     default_channels: number[]
+    readonly_channels?: number[]
+    hidden_channels?: number[]
 }
 
 export type NotificationChannelDictionaryItem = {
     id: number
     code: string
     title: string
+    sort?: number
+    is_hidden?: boolean
+    is_active?: boolean | null
 }
 
 export type NotificationDictionaries = {
