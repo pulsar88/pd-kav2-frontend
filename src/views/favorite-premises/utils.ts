@@ -25,6 +25,7 @@ export const mergePremiseDetails = (
         layoutName: premise.layoutName ?? details.layoutName,
         layoutImage: premise.layoutImage ?? details.layoutImage,
         floorPlanImage: premise.floorPlanImage ?? details.floorPlanImage,
+        floorPath: premise.floorPath ?? details.floorPath,
         complexImage: premise.complexImage ?? details.complexImage,
         promoText: premise.promoText ?? details.promoText,
         price: premise.price ?? details.price,

@@ -49,6 +49,21 @@ const ImageGallery = ({
                         ? () => null
                         : render?.buttonNext,
                 }}
+                styles={{
+                    container: {
+                        backgroundColor: "#fff",
+                        // 1. Указываем базовый цвет (ваша primary переменная)
+                        "--yarl__color_button": "#52525B",
+
+                        // 2. Указываем цвет при ховере (ваша primary-mild переменная)
+                              "--yarl__color_button_active": "#71717A",
+      "--yarl__button_color_active": "#71717A",
+
+                        // 3. Полностью отключаем тень (shadow) у кнопок
+                        "--yarl__button_filter": "none"
+                    }
+
+                }}
             />
         </>
     )

@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react'
 import ArticleCard from './ArticleCard'
-import { apiGetSupportHubArticles } from '@/services/HelpCenterService'
+import {
+    apiDeleteSupportHubArticle,
+    apiGetSupportHubArticles,
+} from '@/services/HelpCenterService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import NoDataFound from '@/assets/svg/NoDataFound'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import Button from '@/components/ui/Button'
+import Notification from '@/components/ui/Notification'
 import Pagination from '@/components/ui/Pagination'
 import Spinner from '@/components/ui/Spinner'
 import Select from '@/components/ui/Select'
-import useSWR from 'swr'
+import toast from '@/components/ui/toast'
 import { TbArrowNarrowLeft, TbPlus } from 'react-icons/tb'
 import { useNavigate } from 'react-router'
+import { CONTENT_MANAGER } from '@/constants/roles.constant'
+import { useSessionUser } from '@/store/authStore'
+import useAuthority from '@/utils/hooks/useAuthority'
 import { DEFAULT_HELP_CENTER_PAGE_SIZE } from '../helpCenterApiQuery'
-import { publicationListKey } from '../helpCenterQuery'
 import { usePublicationKind } from '../publicationKind'
+import type { GetSupportHubArticlesResponse } from '../types'
 
 type Option = {
     value: number
@@ -30,31 +39,86 @@ type ArticleListProps = {
 const ArticleList = ({ query = '' }: ArticleListProps) => {
     const navigate = useNavigate()
     const kind = usePublicationKind()
+    const userAuthority = useSessionUser((state) => state.user.authority) ?? []
+    const canManageContent = useAuthority(userAuthority, [CONTENT_MANAGER])
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(DEFAULT_HELP_CENTER_PAGE_SIZE)
+    const [data, setData] = useState<GetSupportHubArticlesResponse | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [reloadToken, setReloadToken] = useState(0)
 
     useEffect(() => {
         setPageIndex(1)
     }, [query, pageSize, kind.kind])
 
-    const { data, isLoading } = useSWR(
-        publicationListKey(kind.listEndpoint, query, pageIndex, pageSize),
-        () =>
-            apiGetSupportHubArticles(
-                {
-                    query,
-                    page: pageIndex,
-                    page_size: pageSize,
-                },
-                kind.listEndpoint,
-            ),
-        {
-            revalidateOnFocus: false,
-        },
-    )
+    useEffect(() => {
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetSupportHubArticles(
+            {
+                query,
+                page: pageIndex,
+                page_size: pageSize,
+            },
+            kind.listEndpoint,
+        )
+            .then((response) => {
+                if (!cancelled) {
+                    setData(response)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setData(null)
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoading(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [query, pageIndex, pageSize, kind.listEndpoint, reloadToken])
 
     const articles = data?.list ?? []
     const totalCount = data?.total ?? 0
+    const deleteTarget = articles.find((article) => article.id === deleteId)
+
+    const handleDelete = async () => {
+        if (!deleteId) return
+
+        setIsDeleting(true)
+        try {
+            await apiDeleteSupportHubArticle({ id: deleteId })
+            toast.push(
+                <Notification type="success">{kind.deleteSuccess}</Notification>,
+                { placement: 'top-end' },
+            )
+            setDeleteId(null)
+
+            const remainingOnPage = articles.length - 1
+            if (remainingOnPage <= 0 && pageIndex > 1) {
+                setPageIndex((page) => page - 1)
+            } else {
+                setReloadToken((token) => token + 1)
+            }
+        } catch (error) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(error, kind.deleteError)}
+                </Notification>,
+                { placement: 'top-end' },
+            )
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     return (
         <div>
@@ -78,15 +142,17 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                 ) : (
                     <h3 className="mb-0">{kind.listHeading}</h3>
                 )}
-                <Button
-                    variant="solid"
-                    size="sm"
-                    className="shrink-0"
-                    icon={<TbPlus />}
-                    onClick={() => navigate(`${kind.basePath}/create`)}
-                >
-                    {kind.createLabel}
-                </Button>
+                {canManageContent ? (
+                    <Button
+                        variant="solid"
+                        size="sm"
+                        className="shrink-0"
+                        icon={<TbPlus />}
+                        onClick={() => navigate(`${kind.basePath}/create`)}
+                    >
+                        {kind.createLabel}
+                    </Button>
+                ) : null}
             </div>
 
             {isLoading ? (
@@ -97,48 +163,68 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
 
             {!isLoading && articles.length === 0 ? (
                 <div className="mt-12 text-center">
-                    <div className="flex justify-center">
-                        <NoDataFound height={240} width={240} />
-                    </div>
-                    <h3 className="mt-6">
-                        {query ? kind.notFoundTitle : kind.emptyTitle}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                        {query
-                            ? 'Попробуйте изменить запрос или вернитесь к списку'
-                            : kind.emptyHint}
-                    </p>
                     {query ? (
-                        <button
-                            type="button"
-                            className="mt-4 text-primary hover:underline"
-                            onClick={() => navigate(kind.basePath)}
-                        >
-                            {kind.showAllLabel}
-                        </button>
+                        <>
+                            <div className="flex justify-center">
+                                <NoDataFound height={200} width={200} />
+                            </div>
+                            <h3 className="mt-6">{kind.notFoundTitle}</h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                Попробуйте изменить запрос или вернитесь к списку
+                            </p>
+                            <button
+                                type="button"
+                                className="mt-4 text-primary hover:underline"
+                                onClick={() => navigate(kind.basePath)}
+                            >
+                                {kind.showAllLabel}
+                            </button>
+                        </>
+                    ) : canManageContent ? (
+                        <>
+                            <div className="flex justify-center">
+                                <NoDataFound height={200} width={200} />
+                            </div>
+                            <h3 className="mt-6">{kind.emptyTitle}</h3>
+                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                {kind.emptyHint}
+                            </p>
+                            <Button
+                                className="mt-4"
+                                variant="solid"
+                                icon={<TbPlus />}
+                                onClick={() => navigate(`${kind.basePath}/create`)}
+                            >
+                                {kind.createLabel}
+                            </Button>
+                        </>
                     ) : (
-                        <Button
-                            className="mt-4"
-                            variant="solid"
-                            icon={<TbPlus />}
-                            onClick={() => navigate(`${kind.basePath}/create`)}
-                        >
-                            {kind.createLabel}
-                        </Button>
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-gray-100 text-4xl text-gray-400 dark:bg-gray-800 dark:text-gray-500">
+                                <kind.icon />
+                            </div>
+                            <h4 className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+                                {kind.emptyTitle}
+                            </h4>
+                        </div>
                     )}
                 </div>
             ) : null}
 
             {!isLoading && articles.length > 0 ? (
                 <>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                         {articles.map((article) => (
                             <ArticleCard
-                                key={article.id}
+                                key={article.code ?? article.id}
                                 id={article.id}
+                                code={article.code}
                                 title={article.title}
                                 previewText={article.previewText}
                                 timeToRead={article.timeToRead}
+                                isDraft={article.isDraft}
+                                canManage={canManageContent}
+                                onDelete={setDeleteId}
                             />
                         ))}
                     </div>
@@ -177,6 +263,34 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                     </div>
                 </>
             ) : null}
+
+            <ConfirmDialog
+                isOpen={Boolean(deleteId)}
+                type="danger"
+                title={kind.deleteConfirmTitle}
+                confirmText="Удалить"
+                cancelText="Отмена"
+                confirmButtonProps={{
+                    loading: isDeleting,
+                    customColorClass: () =>
+                        'bg-error hover:bg-error/90 active:bg-error border-error',
+                }}
+                onCancel={() => setDeleteId(null)}
+                onClose={() => setDeleteId(null)}
+                onConfirm={() => {
+                    void handleDelete()
+                }}
+            >
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {deleteTarget?.title ? (
+                        <>
+                            «{deleteTarget.title}». {kind.deleteConfirmText}
+                        </>
+                    ) : (
+                        kind.deleteConfirmText
+                    )}
+                </p>
+            </ConfirmDialog>
         </div>
     )
 }

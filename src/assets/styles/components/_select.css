@@ -40,15 +40,15 @@
   }
 
   .select-multi-value {
-    @apply flex rounded-lg mx-0.5 font-bold border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100;
+    @apply flex items-center rounded-lg mx-0.5 font-bold border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 min-w-0 max-w-full;
   }
 
   .select-multi-value-label {
-    @apply text-xs ltr:pl-2 rtl:pr-2 py-1.5 flex items-center;
+    @apply text-xs ltr:pl-2 rtl:pr-2 py-1.5 block overflow-hidden text-ellipsis whitespace-nowrap min-w-0 flex-1;
   }
 
   .select-multi-value-remove {
-    @apply flex items-center ltr:pr-2 ltr:pl-1 rtl:pr-1 rtl:pl-2;
+    @apply flex items-center shrink-0 ltr:pr-2 ltr:pl-1 rtl:pr-1 rtl:pl-2 cursor-pointer;
   }
 
   .select-menu {

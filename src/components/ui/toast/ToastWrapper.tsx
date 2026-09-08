@@ -133,7 +133,7 @@ const ToastWrapper = (props: ToastWrapperProps) => {
         return (
             <motion.div
                 key={item.key}
-                className={'toast-wrapper'}
+                className={'toast-wrapper pointer-events-none'}
                 initial={placementTransition.variants.initial}
                 variants={placementTransition.variants}
                 animate={item.visible ? 'animate' : 'exit'}
@@ -148,7 +148,10 @@ const ToastWrapper = (props: ToastWrapperProps) => {
                             item.node?.props?.onClose,
                             () => remove(item.key),
                         ),
-                        className: classNames(item.node?.props?.className),
+                        className: classNames(
+                            'pointer-events-auto',
+                            item.node?.props?.className,
+                        ),
                     },
                 )}
             </motion.div>
@@ -163,7 +166,10 @@ const ToastWrapper = (props: ToastWrapperProps) => {
                 rootRef.current = thisRef
                 callback?.(thisRef)
             }}
-            className={classNames('toast', block && 'w-full')}
+            className={classNames(
+                'toast pointer-events-none',
+                block && 'w-full',
+            )}
         >
             {messageElements}
         </div>

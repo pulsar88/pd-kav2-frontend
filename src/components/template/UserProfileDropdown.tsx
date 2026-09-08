@@ -60,7 +60,7 @@ const _UserDropdown = () => {
                             className="truncate text-xs"
                             title={email || undefined}
                         >
-                            {email || 'No email available'}
+                            {email || 'Email не указан'}
                         </div>
                     </div>
                 </div>

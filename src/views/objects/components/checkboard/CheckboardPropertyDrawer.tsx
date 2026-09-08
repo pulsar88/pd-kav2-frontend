@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
+import {
+    ImageSlide,
+    isImageSlide,
+    type RenderSlideProps,
+} from 'yet-another-react-lightbox'
 import Drawer from '@/components/ui/Drawer'
 import { Button, Carousel } from '@/components/ui'
 import ImageGallery from '@/components/shared/ImageGallery'
@@ -10,11 +15,28 @@ import classNames from '@/utils/classNames'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { useComparisonStore } from '@/store/comparisonStore'
+import { apiCheckRealtyCollectionProperties } from '@/services/RealtyCollectionsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
-import { TbHeart, TbHeartFilled, TbLayoutGrid, TbPlus, TbZoomIn } from 'react-icons/tb'
+import {
+    TbChevronDown,
+    TbHeart,
+    TbHeartFilled,
+    TbLayoutGrid,
+    TbPlus,
+    TbScale,
+    TbZoomIn,
+} from 'react-icons/tb'
 import type { FlatCheckboardProperty } from '../../checkboard.types'
 import type { Premise } from '../../types'
-import { buildPremiseFromCheckboardProperty, formatCheckboardPrice } from '../../checkboardUtils'
+import {
+    buildPremiseFromCheckboardProperty,
+    formatCheckboardPrice,
+} from '../../checkboardUtils'
+import { useThemeStore } from '@/store/themeStore'
+import presetThemeSchemaConfig from '@/configs/preset-theme-schema.config'
+import { hexToRgba } from '@/utils/hetToRgba'
+import { useCommonStore } from '@/store/commonStore'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -26,15 +48,11 @@ type CheckboardPropertyDrawerProps = {
     onClose: () => void
 }
 
-const InfoRow = ({
-    label,
-    value,
-}: {
-    label: string
-    value: ReactNode
-}) => (
+const InfoRow = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="flex items-start justify-between gap-4 py-2">
-        <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+            {label}
+        </span>
         <div className="max-w-[60%] text-right text-sm font-medium text-gray-900 dark:text-gray-100">
             {value || '—'}
         </div>
@@ -79,10 +97,85 @@ const LayoutImagePlaceholder = () => (
     </div>
 )
 
-const formatSectionValue = (
-    section?: string,
-    sectionName?: string,
-) => {
+const FloorPlanPathOverlay = ({
+    path,
+    width,
+    height,
+    color = '#3b82f6',
+}: {
+    path: string
+    width: number
+    height: number
+    color: string
+}) => (
+    <svg
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+    >
+        <path d={path} fill={hexToRgba(color)} stroke={color} strokeWidth={4} />
+    </svg>
+)
+
+const FloorPlanGallerySlide = ({
+    slide,
+    offset,
+    rect,
+    floorPath,
+    color,
+}: RenderSlideProps & {
+    floorPath: string
+    color: string
+}) => {
+    if (!isImageSlide(slide)) {
+        return null
+    }
+
+    const hasSize = Boolean(slide.width && slide.height)
+
+    return (
+        <div
+            style={{
+                position: 'relative',
+                ...(hasSize
+                    ? {
+                          maxWidth: `min(${slide.width}px, 100%)`,
+                          maxHeight: `min(${slide.height}px, 100%)`,
+                          aspectRatio: `${slide.width} / ${slide.height}`,
+                      }
+                    : null),
+            }}
+        >
+            <ImageSlide
+                slide={slide}
+                offset={offset}
+                rect={rect}
+                style={{
+                    display: 'block',
+                    ...(hasSize
+                        ? {
+                              width: '100%',
+                              height: 'auto',
+                              maxWidth: undefined,
+                              maxHeight: undefined,
+                          }
+                        : null),
+                }}
+            />
+            {hasSize ? (
+                <FloorPlanPathOverlay
+                    path={floorPath}
+                    width={slide.width!}
+                    height={slide.height!}
+                    color={color}
+                />
+            ) : null}
+        </div>
+    )
+}
+
+const formatSectionValue = (section?: string, sectionName?: string) => {
     const raw = section ?? sectionName
     if (!raw) return undefined
 
@@ -102,7 +195,25 @@ const CheckboardPropertyDrawer = ({
     const { smaller } = useResponsive()
     const isMobile = smaller.md
     const [previewIndex, setPreviewIndex] = useState(-1)
+    const [floorPlanPreviewIndex, setFloorPlanPreviewIndex] = useState(-1)
+    const [floorPlanSize, setFloorPlanSize] = useState<{
+        width: number
+        height: number
+    } | null>(null)
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
+    const setFavoriteIds = useFavoritesStore((state) => state.setFavoriteIds)
+    const toggleComparison = useComparisonStore((state) => state.togglePremise)
+    const setComparisonIds = useComparisonStore((state) => state.setComparisonIds)
+    const schema = useThemeStore((state) => state.themeSchema)
+    const mode = useThemeStore((state) => state.mode)
+    const primaryColor =
+        presetThemeSchemaConfig[schema]?.[mode]?.primary ?? '#3b82f6'
+    const showFloorPlan = useCommonStore((state) => state.showFloorPlan)
+    const setShowFloorPlan = useCommonStore((state) => state.setShowFloorPlan)
+    const [isFavoriteChecking, setIsFavoriteChecking] = useState(false)
+    const [isFavoriteToggling, setIsFavoriteToggling] = useState(false)
+    const [isComparisonChecking, setIsComparisonChecking] = useState(false)
+    const [isComparisonToggling, setIsComparisonToggling] = useState(false)
 
     const favoritePremise = useMemo(() => {
         if (!property) return null
@@ -119,6 +230,84 @@ const CheckboardPropertyDrawer = ({
             ? state.favoriteIds.includes(favoritePremise.id)
             : false,
     )
+
+    const isCompared = useComparisonStore((state) =>
+        favoritePremise
+            ? state.comparisonIds.includes(favoritePremise.id)
+            : false,
+    )
+
+    useEffect(() => {
+        if (!isOpen || !favoritePremise) {
+            setIsFavoriteChecking(false)
+            setIsComparisonChecking(false)
+            return
+        }
+
+        const propertyId = favoritePremise.id
+        let cancelled = false
+        setIsFavoriteChecking(true)
+        setIsComparisonChecking(true)
+
+        void Promise.allSettled([
+            apiCheckRealtyCollectionProperties([propertyId], 'default'),
+            apiCheckRealtyCollectionProperties([propertyId], 'comparison'),
+        ])
+            .then(([favResult, compResult]) => {
+                if (cancelled) return
+
+                if (favResult.status === 'fulfilled') {
+                    const existsIds = favResult.value
+                    const exists = existsIds.includes(propertyId)
+                    const currentIds = useFavoritesStore.getState().favoriteIds
+                    const alreadyInStore = currentIds.includes(propertyId)
+
+                    if (exists && !alreadyInStore) {
+                        setFavoriteIds([...currentIds, propertyId])
+                    } else if (!exists && alreadyInStore) {
+                        setFavoriteIds(
+                            currentIds.filter((id) => id !== propertyId),
+                        )
+                    }
+                }
+
+                if (compResult.status === 'fulfilled') {
+                    const existsIds = compResult.value
+                    const exists = existsIds.includes(propertyId)
+                    const currentIds = useComparisonStore.getState().comparisonIds
+                    const alreadyInStore = currentIds.includes(propertyId)
+
+                    if (exists && !alreadyInStore) {
+                        setComparisonIds([...currentIds, propertyId])
+                    } else if (!exists && alreadyInStore) {
+                        setComparisonIds(
+                            currentIds.filter((id) => id !== propertyId),
+                        )
+                    }
+                }
+            })
+            .catch((error) => {
+                if (cancelled) return
+                toast.push(
+                    <Notification type="danger">
+                        {getApiErrorMessage(
+                            error,
+                            'Не удалось проверить статус подборок',
+                        )}
+                    </Notification>,
+                )
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsFavoriteChecking(false)
+                    setIsComparisonChecking(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen, favoritePremise?.id, setFavoriteIds, setComparisonIds])
 
     const display = useMemo(() => {
         if (!property) return null
@@ -160,17 +349,21 @@ const CheckboardPropertyDrawer = ({
 
         return getImageUrls(property)
     }, [property, propertyDetails?.layoutImage])
+
     const hasImages = imageUrls.length > 0
     const slides = imageUrls.map((src) => ({ src }))
 
     useEffect(() => {
         if (!isOpen) {
             setPreviewIndex(-1)
+            setFloorPlanPreviewIndex(-1)
         }
     }, [isOpen])
 
     useEffect(() => {
         setPreviewIndex(-1)
+        setFloorPlanPreviewIndex(-1)
+        setFloorPlanSize(null)
     }, [property?.id])
 
     return (
@@ -192,78 +385,167 @@ const CheckboardPropertyDrawer = ({
                 footer={
                     property ? (
                         <div className="flex w-full flex-col gap-2">
-                            <Button
-                                type="button"
-                                variant="plain"
-                                className={classNames(
-                                    'w-full',
-                                    isFavorite
-                                        ? 'text-rose-500 hover:text-rose-600'
-                                        : 'text-gray-600 dark:text-gray-300',
-                                )}
-                                icon={
-                                    isFavorite ? (
-                                        <TbHeartFilled />
-                                    ) : (
-                                        <TbHeart />
-                                    )
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button
+                                    type="button"
+                                    variant="plain"
+                                    className={classNames(
+                                        'w-full border border-gray-200 dark:border-gray-700',
+                                        isFavorite
+                                            ? 'text-rose-500 hover:text-rose-600 dark:text-rose-400'
+                                            : 'text-gray-600 dark:text-gray-300',
+                                    )}
+                                    loading={isFavoriteChecking || isFavoriteToggling}
+                                    disabled={
+                                        !favoritePremise ||
+                                        isFavoriteChecking ||
+                                        isFavoriteToggling
+                                    }
+                                    icon={
+                                        isFavorite ? <TbHeartFilled /> : <TbHeart />
+                                    }
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        if (
+                                            !favoritePremise ||
+                                            isFavoriteChecking ||
+                                            isFavoriteToggling
+                                        ) {
+                                            return
+                                        }
+
+                                        setIsFavoriteToggling(true)
+                                        void togglePremise(favoritePremise)
+                                            .catch((error) => {
+                                                toast.push(
+                                                    <Notification type="danger">
+                                                        {getApiErrorMessage(
+                                                            error,
+                                                            'Не удалось обновить избранное',
+                                                        )}
+                                                    </Notification>,
+                                                )
+                                            })
+                                            .finally(() => {
+                                                setIsFavoriteToggling(false)
+                                            })
+                                    }}
+                                >
+                                    {isFavorite
+                                        ? 'В избранном'
+                                        : 'В избранное'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="plain"
+                                    className={classNames(
+                                        'w-full border border-gray-200 dark:border-gray-700 transition-colors',
+                                        isCompared
+                                            ? 'text-indigo-600 hover:text-indigo-700 dark:text-indigo-400'
+                                            : 'text-gray-600 dark:text-gray-300',
+                                    )}
+                                    loading={isComparisonChecking || isComparisonToggling}
+                                    disabled={
+                                        !favoritePremise ||
+                                        isComparisonChecking ||
+                                        isComparisonToggling
+                                    }
+                                    icon={
+                                        <TbScale
+                                            className={classNames(
+                                                'text-lg',
+                                                isCompared && 'stroke-[2.5]',
+                                            )}
+                                        />
+                                    }
+                                    onClick={(event) => {
+                                        event.stopPropagation()
+                                        if (
+                                            !favoritePremise ||
+                                            isComparisonChecking ||
+                                            isComparisonToggling
+                                        ) {
+                                            return
+                                        }
+
+                                        setIsComparisonToggling(true)
+                                        void toggleComparison(favoritePremise)
+                                            .catch((error) => {
+                                                toast.push(
+                                                    <Notification type="danger">
+                                                        {getApiErrorMessage(
+                                                            error,
+                                                            'Не удалось обновить сравнение',
+                                                        )}
+                                                    </Notification>,
+                                                )
+                                            })
+                                            .finally(() => {
+                                                setIsComparisonToggling(false)
+                                            })
+                                    }}
+                                >
+                                    {isCompared
+                                        ? 'В сравнении'
+                                        : 'В сравнение'}
+                                </Button>
+                            </div>
+                            {(() => {
+                                const baseStatus =
+                                    propertyDetails?.baseStatus ??
+                                    propertyDetails?.status?.base_status ??
+                                    property?.status?.base_status
+                                const isUnavailableForFixation =
+                                    baseStatus === 30 || baseStatus === 40
+
+                                if (isUnavailableForFixation) {
+                                    return null
                                 }
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    if (!favoritePremise) return
-                                    void togglePremise(favoritePremise).catch(
-                                        (error) => {
-                                            toast.push(
-                                                <Notification type="danger">
-                                                    {getApiErrorMessage(
-                                                        error,
-                                                        'Не удалось обновить избранное',
-                                                    )}
-                                                </Notification>,
+
+                                return (
+                                    <Button
+                                        type="button"
+                                        variant="solid"
+                                        className="w-full"
+                                        icon={<TbPlus />}
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            if (!property || !display) return
+
+                                            const params = new URLSearchParams({
+                                                create: '1',
+                                            })
+
+                                            if (complexId) {
+                                                params.set('complexId', complexId)
+                                            }
+
+                                            params.set(
+                                                'propertyId',
+                                                String(property.id),
                                             )
-                                        },
-                                    )
-                                }}
-                            >
-                                {isFavorite
-                                    ? 'Убрать из избранного'
-                                    : 'Добавить в избранное'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="solid"
-                                className="w-full"
-                                icon={<TbPlus />}
-                                onClick={(event) => {
-                                    event.stopPropagation()
-                                    if (!property || !display) return
+                                            params.set(
+                                                'apartmentNumber',
+                                                display.number,
+                                            )
+                                            if (display.hasRooms) {
+                                                params.set(
+                                                    'rooms',
+                                                    String(
+                                                        display.roomsCount === 0
+                                                            ? 0
+                                                            : display.roomsCount,
+                                                    ),
+                                                )
+                                            }
 
-                                    const params = new URLSearchParams({
-                                        create: '1',
-                                    })
-
-                                    if (complexId) {
-                                        params.set('complexId', complexId)
-                                    }
-
-                                    params.set('propertyId', String(property.id))
-                                    params.set('apartmentNumber', display.number)
-                                    if (display.hasRooms) {
-                                        params.set(
-                                            'rooms',
-                                            String(
-                                                display.roomsCount === 0
-                                                    ? 0
-                                                    : display.roomsCount,
-                                            ),
-                                        )
-                                    }
-
-                                    navigate(`/fixations?${params.toString()}`)
-                                }}
-                            >
-                                Создать фиксацию
-                            </Button>
+                                            navigate(`/fixations?${params.toString()}`)
+                                        }}
+                                    >
+                                        Создать фиксацию
+                                    </Button>
+                                )
+                            })()}
                         </div>
                     ) : null
                 }
@@ -277,7 +559,7 @@ const CheckboardPropertyDrawer = ({
                             <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 Изображения
                             </h5>
-                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
                                 {hasImages ? (
                                     <Carousel
                                         opts={{ loop: imageUrls.length > 1 }}
@@ -292,7 +574,9 @@ const CheckboardPropertyDrawer = ({
                                                         type="button"
                                                         className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
                                                         onClick={() =>
-                                                            setPreviewIndex(index)
+                                                            setPreviewIndex(
+                                                                index,
+                                                            )
                                                         }
                                                     >
                                                         <img
@@ -320,6 +604,79 @@ const CheckboardPropertyDrawer = ({
                                     <LayoutImagePlaceholder />
                                 )}
                             </div>
+                        </div>
+                        <div>
+                            <button
+                                type="button"
+                                className="flex w-full items-center justify-between gap-3 py-3 text-left"
+                                onClick={() => setShowFloorPlan(!showFloorPlan)}
+                            >
+                                <h5 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    План этажа
+                                </h5>
+                                <TbChevronDown
+                                    className={classNames(
+                                        'shrink-0 text-lg text-gray-400 transition-transform duration-200',
+                                        showFloorPlan && 'rotate-180',
+                                    )}
+                                />
+                            </button>
+                            {showFloorPlan ? (
+                                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-white">
+                                    {propertyDetails?.floorPlanImage ? (
+                                        <button
+                                            type="button"
+                                            className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
+                                            onClick={() =>
+                                                setFloorPlanPreviewIndex(0)
+                                            }
+                                        >
+                                            <div
+                                                key={propertyDetails.id}
+                                                className="relative flex h-full w-full items-center justify-center"
+                                            >
+                                                <img
+                                                    src={
+                                                        propertyDetails.floorPlanImage
+                                                    }
+                                                    alt={`План этажа, помещение №${display.number}`}
+                                                    className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
+                                                    loading="lazy"
+                                                    onLoad={(event) => {
+                                                        const img =
+                                                            event.currentTarget
+                                                        setFloorPlanSize({
+                                                            width: img.naturalWidth,
+                                                            height: img.naturalHeight,
+                                                        })
+                                                    }}
+                                                />
+                                                {floorPlanSize &&
+                                                propertyDetails.floorPath ? (
+                                                    <FloorPlanPathOverlay
+                                                        path={
+                                                            propertyDetails.floorPath
+                                                        }
+                                                        width={
+                                                            floorPlanSize.width
+                                                        }
+                                                        height={
+                                                            floorPlanSize.height
+                                                        }
+                                                        color="#7ae061ff"
+                                                    />
+                                                ) : null}
+                                            </div>
+                                            <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                                <TbZoomIn className="text-sm" />
+                                                Увеличить
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <LayoutImagePlaceholder />
+                                    )}
+                                </div>
+                            ) : null}
                         </div>
 
                         <div>
@@ -403,6 +760,40 @@ const CheckboardPropertyDrawer = ({
                     index={previewIndex}
                     slides={slides}
                     onClose={() => setPreviewIndex(-1)}
+                />
+            ) : null}
+
+            {propertyDetails?.floorPlanImage ? (
+                <ImageGallery
+                    index={floorPlanPreviewIndex}
+                    slides={[
+                        {
+                            src: propertyDetails.floorPlanImage,
+                            alt: `План этажа, помещение №${display?.number ?? ''}`,
+                            ...(floorPlanSize
+                                ? {
+                                      width: floorPlanSize.width,
+                                      height: floorPlanSize.height,
+                                  }
+                                : null),
+                        },
+                    ]}
+                    render={{
+                        slide: (props) => {
+                            if (!propertyDetails.floorPath) {
+                                return undefined
+                            }
+
+                            return (
+                                <FloorPlanGallerySlide
+                                    {...props}
+                                    floorPath={propertyDetails.floorPath}
+                                    color="#7ae061ff"
+                                />
+                            )
+                        },
+                    }}
+                    onClose={() => setFloorPlanPreviewIndex(-1)}
                 />
             ) : null}
         </>

@@ -26,6 +26,7 @@ const CheckboardSharedPropertyTooltip = ({
     const { refs, floatingStyles, context } = useFloating({
         open,
         placement: 'top',
+        whileElementsMounted: autoUpdate,
         middleware: [
             offset(7),
             flip({
@@ -38,18 +39,6 @@ const CheckboardSharedPropertyTooltip = ({
     useEffect(() => {
         refs.setReference(referenceElement)
     }, [referenceElement, refs])
-
-    useEffect(() => {
-        if (!open || !referenceElement || !refs.floating.current) {
-            return undefined
-        }
-
-        return autoUpdate(
-            referenceElement,
-            refs.floating.current,
-            refs.update,
-        )
-    }, [open, referenceElement, refs])
 
     if (!open || !property) {
         return null

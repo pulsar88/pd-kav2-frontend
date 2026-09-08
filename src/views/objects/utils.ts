@@ -196,9 +196,24 @@ export const formatRoomsCount = (rooms: number) => {
     return `${rooms} комнат`
 }
 
-export const formatCompletionDate = (value: string) => {
+export const isUndefinedValue = (value?: string | null) => {
+    if (!value) return true
+    const lower = value.toLowerCase().replace(/ё/g, 'е').trim()
+    return (
+        !lower ||
+        lower === '—' ||
+        lower === '-' ||
+        lower === 'null' ||
+        lower === 'undefined' ||
+        lower.includes('не определен') ||
+        lower.includes('не указан')
+    )
+}
+
+export const formatCompletionDate = (value?: string | null) => {
+    if (!value) return '—'
     const trimmed = value.trim()
-    if (!trimmed) return '—'
+    if (!trimmed || isUndefinedValue(trimmed)) return '—'
 
     const date = new Date(trimmed)
     if (Number.isNaN(date.getTime())) return trimmed

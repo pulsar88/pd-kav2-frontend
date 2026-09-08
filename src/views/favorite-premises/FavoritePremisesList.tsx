@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Notification from '@/components/ui/Notification'
@@ -17,12 +16,9 @@ import PremisesListSkeleton from '@/views/objects/components/PremisesListSkeleto
 import { createEmptyObjectsSearchFilters } from '@/views/objects/filtersQuery'
 import {
     apiGetDefaultCollectionPropertiesPage,
-    getFavoriteCollectionSwrKey,
-    isFavoriteCollectionSwrKey,
     type FavoriteCollectionPageData,
 } from '@/services/RealtyCollectionsService'
 import { useFavoritesStore } from '@/store/favoritesStore'
-import { mutate } from 'swr'
 import { TbArrowDown, TbArrowUp, TbSearch } from 'react-icons/tb'
 import type { Premise } from '@/views/objects/types'
 import {
@@ -34,7 +30,6 @@ import {
     premiseSortFields,
     toPremiseSortKey,
     type PremiseSortField,
-    type PremiseSortKey,
     type PremiseSortState,
 } from '@/views/objects/utils'
 
@@ -54,17 +49,6 @@ const emptySearchFilters = createEmptyObjectsSearchFilters()
 
 const REMOVAL_DELAY_MS = 5000
 
-const mutateFavoriteCollectionPages = (
-    updater: (
-        current: FavoriteCollectionPageData | undefined,
-    ) => FavoriteCollectionPageData | undefined,
-) =>
-    mutate<FavoriteCollectionPageData>(
-        (key) => isFavoriteCollectionSwrKey(key),
-        updater,
-        { revalidate: false },
-    )
-
 const FavoritePremisesList = ({
     selectedIds,
     onSelectedIdsChange,
@@ -72,6 +56,7 @@ const FavoritePremisesList = ({
     const { authenticated } = useAuth()
     const addPremise = useFavoritesStore((state) => state.addPremise)
     const removePremise = useFavoritesStore((state) => state.removePremise)
+    const setFavoriteIds = useFavoritesStore((state) => state.setFavoriteIds)
     const [sortKey, setSortKey] = useState<PremiseSortState>(null)
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(20)
@@ -80,30 +65,64 @@ const FavoritePremisesList = ({
     const [previewSlides, setPreviewSlides] = useState<Array<{ src: string }>>(
         [],
     )
-    const { data, isLoading } = useSWR(
-        authenticated
-            ? getFavoriteCollectionSwrKey(pageIndex, pageSize, sortKey)
-            : null,
-        ([, page, perPage, sort]) =>
-            apiGetDefaultCollectionPropertiesPage({
-                page,
-                per_page: perPage,
-                sort: sort ?? undefined,
-            }),
-        {
-            revalidateOnFocus: false,
-            keepPreviousData: true,
-        },
-    )
-
-    const premises = data?.items ?? []
-    const totalCount = data?.meta.total ?? 0
+    const [data, setData] = useState<FavoriteCollectionPageData | undefined>()
+    const [isLoading, setIsLoading] = useState(authenticated)
     const [pendingRemovals, setPendingRemovals] = useState<
         Map<string, number>
     >(() => new Map())
     const removalTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
         new Map(),
     )
+    const pendingRemovalIdsRef = useRef(new Set<string>())
+    const selectedIdsRef = useRef(selectedIds)
+    selectedIdsRef.current = selectedIds
+
+    useEffect(() => {
+        if (!authenticated) {
+            setData(undefined)
+            setIsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetDefaultCollectionPropertiesPage({
+            page: pageIndex,
+            per_page: pageSize,
+            sort: sortKey ?? undefined,
+        })
+            .then((result) => {
+                if (cancelled) return
+
+                setData(result)
+
+                const pendingIds = removalTimersRef.current
+                const currentIds = useFavoritesStore.getState().favoriteIds
+                const nextIds = new Set(currentIds)
+                let changed = false
+
+                for (const item of result.items) {
+                    if (pendingIds.has(item.id) || nextIds.has(item.id)) continue
+                    nextIds.add(item.id)
+                    changed = true
+                }
+
+                if (changed) {
+                    setFavoriteIds([...nextIds])
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [authenticated, pageIndex, pageSize, sortKey, setFavoriteIds])
+
+    const premises = data?.items ?? []
+    const totalCount = data?.meta.total ?? 0
 
     useEffect(() => {
         const timers = removalTimersRef.current
@@ -122,97 +141,103 @@ const FavoritePremisesList = ({
         })
     }
 
-    const cancelDelayedCacheRemoval = (premiseId: string) => {
+    const cancelDelayedRemoval = (premiseId: string) => {
         const timer = removalTimersRef.current.get(premiseId)
         if (timer) {
             clearTimeout(timer)
             removalTimersRef.current.delete(premiseId)
         }
+        pendingRemovalIdsRef.current.delete(premiseId)
         clearPendingRemovalState(premiseId)
     }
 
-    const scheduleDelayedCacheRemoval = (premiseId: string) => {
-        cancelDelayedCacheRemoval(premiseId)
+    const scheduleDelayedRemoval = (premiseId: string) => {
+        cancelDelayedRemoval(premiseId)
+        pendingRemovalIdsRef.current.add(premiseId)
         setPendingRemovals((prev) => new Map(prev).set(premiseId, Date.now()))
 
         const timer = setTimeout(() => {
-            clearPendingRemovalState(premiseId)
-            void mutateFavoriteCollectionPages((current) => {
-                if (!current) return current
-
-                const hasItem = current.items.some(
-                    (item) => item.id === premiseId,
-                )
-                if (!hasItem) return current
-
-                return {
-                    ...current,
-                    items: current.items.filter(
-                        (item) => item.id !== premiseId,
-                    ),
-                    meta: {
-                        ...current.meta,
-                        total: Math.max(0, current.meta.total - 1),
-                    },
-                }
-            })
             removalTimersRef.current.delete(premiseId)
+
+            void (async () => {
+                if (!pendingRemovalIdsRef.current.has(premiseId)) {
+                    return
+                }
+
+                try {
+                    await removePremise(premiseId)
+
+                    if (!pendingRemovalIdsRef.current.has(premiseId)) {
+                        try {
+                            await addPremise(premiseId)
+                        } catch (error) {
+                            toast.push(
+                                <Notification type="danger">
+                                    {getApiErrorMessage(
+                                        error,
+                                        'Не удалось вернуть помещение в избранное',
+                                    )}
+                                </Notification>,
+                            )
+                        }
+                        return
+                    }
+
+                    pendingRemovalIdsRef.current.delete(premiseId)
+                    clearPendingRemovalState(premiseId)
+                    setData((current) => {
+                        if (!current) return current
+
+                        const hasItem = current.items.some(
+                            (item) => item.id === premiseId,
+                        )
+                        if (!hasItem) return current
+
+                        return {
+                            ...current,
+                            items: current.items.filter(
+                                (item) => item.id !== premiseId,
+                            ),
+                            meta: {
+                                ...current.meta,
+                                total: Math.max(0, current.meta.total - 1),
+                            },
+                        }
+                    })
+                    onSelectedIdsChange(
+                        selectedIdsRef.current.filter(
+                            (id) => id !== premiseId,
+                        ),
+                    )
+                } catch (error) {
+                    pendingRemovalIdsRef.current.delete(premiseId)
+                    clearPendingRemovalState(premiseId)
+                    toast.push(
+                        <Notification type="danger">
+                            {getApiErrorMessage(
+                                error,
+                                'Не удалось обновить избранное',
+                            )}
+                        </Notification>,
+                    )
+                }
+            })()
         }, REMOVAL_DELAY_MS)
 
         removalTimersRef.current.set(premiseId, timer)
     }
 
-    const handleCancelPendingRemoval = async (premise: Premise) => {
-        cancelDelayedCacheRemoval(premise.id)
-
-        try {
-            await addPremise(premise.id)
-        } catch (error) {
-            toast.push(
-                <Notification type="danger">
-                    {getApiErrorMessage(
-                        error,
-                        'Не удалось вернуть помещение в избранное',
-                    )}
-                </Notification>,
-            )
-        }
+    const handleCancelPendingRemoval = (premise: Premise) => {
+        cancelDelayedRemoval(premise.id)
     }
 
     const handleToggleFavorite = async (premise: Premise) => {
-        const isPendingRemoval = pendingRemovals.has(premise.id)
-
-        if (!isPendingRemoval) {
-            scheduleDelayedCacheRemoval(premise.id)
-            try {
-                await removePremise(premise.id)
-            } catch (error) {
-                cancelDelayedCacheRemoval(premise.id)
-                toast.push(
-                    <Notification type="danger">
-                        {getApiErrorMessage(
-                            error,
-                            'Не удалось обновить избранное',
-                        )}
-                    </Notification>,
-                )
-            }
+        if (pendingRemovals.has(premise.id)) {
+            cancelDelayedRemoval(premise.id)
             return
         }
 
-        cancelDelayedCacheRemoval(premise.id)
-        try {
-            await addPremise(premise.id)
-        } catch (error) {
-            toast.push(
-                <Notification type="danger">
-                    {getApiErrorMessage(
-                        error,
-                        'Не удалось обновить избранное',
-                    )}
-                </Notification>,
-            )
-        }
+        scheduleDelayedRemoval(premise.id)
     }
 
     const sortState = sortKey ? parsePremiseSortKey(sortKey) : null

@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
-import useSWR from 'swr'
 import classNames from 'classnames'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
 import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
 import RangeInputGroup from './RangeInputGroup'
-import type { ObjectsSearchFilters, RealtyPropertyTypeCode } from '../types'
+import type {
+    ObjectsSearchFilters,
+    RealtyPropertiesFilters,
+} from '../types'
 import { hasActiveObjectsSearchFilters } from '../filtersQuery'
 
 type Option = { value: string; label: string }
@@ -30,6 +32,18 @@ type ObjectsSearchFormProps = {
 const isFilled = (
     value: string | number | Array<string | number> | '' | undefined | null,
 ) => (Array.isArray(value) ? value.length > 0 : value !== '' && value !== undefined && value !== null)
+
+/** Сохраняет порядок выбора, а не порядок options в меню */
+const optionsInSelectionOrder = (
+    selectedValues: string[] | undefined,
+    options: Option[],
+): Option[] => {
+    if (!selectedValues?.length) return []
+    const byValue = new Map(options.map((item) => [item.value, item]))
+    return selectedValues
+        .map((value) => byValue.get(value))
+        .filter((item): item is Option => Boolean(item))
+}
 
 const selectMenuProps = {
     menuPortalTarget:
@@ -64,14 +78,21 @@ const ObjectsSearchForm = ({
         }
     }
 
-    const { data: filterOptions } = useSWR(
-        '/api/v2/realty_properties/filters',
-        () => apiGetRealtyPropertiesFilters(),
-        {
-            revalidateOnFocus: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    const [filterOptions, setFilterOptions] = useState<
+        RealtyPropertiesFilters | undefined
+    >()
+
+    useEffect(() => {
+        let cancelled = false
+
+        void apiGetRealtyPropertiesFilters().then((result) => {
+            if (!cancelled) setFilterOptions(result)
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
         (item) => ({
@@ -101,7 +122,6 @@ const ObjectsSearchForm = ({
     )
 
     const hasDraftFilters = hasActiveObjectsSearchFilters(filters)
-    const canSearch = hasDraftFilters
     const canReset = hasDraftFilters || hasAppliedFilters
 
     const patch = (partial: Partial<ObjectsSearchFilters>) =>
@@ -116,7 +136,6 @@ const ObjectsSearchForm = ({
                 variant="solid"
                 type="button"
                 loading={isSearching}
-                disabled={!canSearch}
                 onClick={onSearch}
             >
                 Найти помещения
@@ -168,16 +187,14 @@ const ObjectsSearchForm = ({
                                         <Select<Option, true>
                                             {...selectMenuProps}
                                             isMulti
+                                            compactMulti
                                             closeMenuOnSelect={false}
                                             isClearable
                                             placeholder="Все ЖК"
                                             options={projectOptions}
-                                            value={projectOptions.filter(
-                                                (item) =>
-                                                    (
-                                                        filters.realtyProjectIds ||
-                                                        []
-                                                    ).includes(item.value),
+                                            value={optionsInSelectionOrder(
+                                                filters.realtyProjectIds,
+                                                projectOptions,
                                             )}
                                             onChange={(option) =>
                                                 patch({
@@ -195,14 +212,14 @@ const ObjectsSearchForm = ({
                                     <Select<Option, true>
                                         {...selectMenuProps}
                                         isMulti
+                                        compactMulti
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любой"
                                         options={typeOptions}
-                                        value={typeOptions.filter((item) =>
-                                            (filters.type || []).includes(
-                                                item.value as RealtyPropertyTypeCode,
-                                            ),
+                                        value={optionsInSelectionOrder(
+                                            filters.type,
+                                            typeOptions,
                                         )}
                                         onChange={(option) =>
                                             patch({
@@ -217,14 +234,14 @@ const ObjectsSearchForm = ({
                                     <Select<Option, true>
                                         {...selectMenuProps}
                                         isMulti
+                                        compactMulti
                                         closeMenuOnSelect={false}
                                         isClearable
                                         placeholder="Любая"
                                         options={roomSelectOptions}
-                                        value={roomSelectOptions.filter((item) =>
-                                            (filters.rooms || []).includes(
-                                                item.value,
-                                            ),
+                                        value={optionsInSelectionOrder(
+                                            filters.rooms,
+                                            roomSelectOptions,
                                         )}
                                         onChange={(option) => {
                                             patch({

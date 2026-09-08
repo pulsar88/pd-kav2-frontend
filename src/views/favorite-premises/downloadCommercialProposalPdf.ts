@@ -22,10 +22,10 @@ export type CommercialProposalManager = {
     phone: string
 }
 
-const IMAGE_WIDTH = 230
-const IMAGE_HEIGHT = 260
+const IMAGE_WIDTH = 220
+const IMAGE_HEIGHT = 220
 const CONTENT_WIDTH = 515
-const FULL_WIDTH_IMAGE_HEIGHT = 340
+const FULL_WIDTH_IMAGE_HEIGHT = 280
 
 const roomsLabel = (rooms: number) =>
     rooms === 0 ? 'Студия' : `${rooms}-комн.`
@@ -43,10 +43,8 @@ const resolveLayoutImageUrl = (premise: Premise) => premise.layoutImage ?? null
 const resolveFloorPlanImageUrl = (premise: Premise) =>
     premise.floorPlanImage ?? null
 
-const resolveComplexImageUrl = (
-    premise: Premise,
-    complex?: Complex | null,
-) => complex?.image ?? premise.complexImage ?? null
+const resolveComplexImageUrl = (premise: Premise, complex?: Complex | null) =>
+    complex?.image ?? premise.complexImage ?? null
 
 const kv = (label: string, value: string) => ({
     columns: [
@@ -61,13 +59,13 @@ const kv = (label: string, value: string) => ({
             style: 'fieldValue',
         },
     ],
-    margin: [0, 0, 0, 5] as [number, number, number, number],
+    margin: [0, 0, 0, 3.5] as [number, number, number, number],
 })
 
 const sectionTitle = (text: string) => ({
     text,
     style: 'sectionTitle',
-    margin: [0, 0, 0, 10] as [number, number, number, number],
+    margin: [0, 0, 0, 6] as [number, number, number, number],
 })
 
 const imagePlaceholder = (
@@ -114,10 +112,10 @@ const sectionDivider = () => ({
             x2: CONTENT_WIDTH,
             y2: 0,
             lineWidth: 1,
-            lineColor: '#D1D5DB',
+            lineColor: '#E5E7EB',
         },
     ],
-    margin: [0, 16, 0, 16] as [number, number, number, number],
+    margin: [0, 8, 0, 8] as [number, number, number, number],
 })
 
 const toAbsoluteUrl = (url: string) => {
@@ -169,12 +167,13 @@ const buildImageOrPlaceholder = (
 const buildFullWidthImageBlock = (
     dataUrl: string | null,
     placeholderLabel: string,
+    maxHeight = FULL_WIDTH_IMAGE_HEIGHT,
 ) => {
     if (dataUrl) {
         return {
             image: dataUrl,
             width: CONTENT_WIDTH,
-            fit: [CONTENT_WIDTH, FULL_WIDTH_IMAGE_HEIGHT] as [number, number],
+            fit: [CONTENT_WIDTH, maxHeight] as [number, number],
             alignment: 'center' as const,
             margin: [0, 0, 0, 0] as [number, number, number, number],
         }
@@ -183,8 +182,36 @@ const buildFullWidthImageBlock = (
     return imagePlaceholder(
         placeholderLabel,
         CONTENT_WIDTH,
-        FULL_WIDTH_IMAGE_HEIGHT,
+        maxHeight,
     )
+}
+
+const calculateAvailableFloorPlanHeight = (
+    isFirstPremise: boolean,
+    premiseFieldsCount: number,
+) => {
+    // Высота A4 в portrait: 842 pt. Отступы: 36 сверху, 48 снизу -> доступно 758 pt
+    const pageUsableHeight = 752
+    const docHeaderHeight = isFirstPremise ? 52 : 0
+    const eyebrowHeight = 18
+    const premiseTitleHeight = 22
+    // Высота блока помещения: максимум из высоты картинки планировки (220) и строк параметров
+    const premiseDetailsHeight = Math.max(220, premiseFieldsCount * 15.5 + 4)
+    const dividerHeight = 17
+    const floorPlanTitleHeight = 20
+
+    const usedHeight =
+        docHeaderHeight +
+        eyebrowHeight +
+        premiseTitleHeight +
+        premiseDetailsHeight +
+        dividerHeight +
+        floorPlanTitleHeight
+
+    const remainingHeight = pageUsableHeight - usedHeight
+
+    // Ограничиваем высоту плана этажа строго оставшимся пространством с запасом 14 pt
+    return Math.max(100, Math.min(340, Math.floor(remainingHeight - 14)))
 }
 
 const buildPremiseFields = (premise: Premise) => [
@@ -245,12 +272,7 @@ const buildComplexFields = (premise: Premise, complex?: Complex | null) => {
             ? [kv('Цена от', formatPrice(complex.priceFrom))]
             : []),
         ...(complex?.pricePerSqm !== undefined
-            ? [
-                  kv(
-                      'Цена за м² от',
-                      `${formatPrice(complex.pricePerSqm)} / м²`,
-                  ),
-              ]
+            ? [kv('Цена за м² от', `${formatPrice(complex.pricePerSqm)} / м²`)]
             : []),
     ]
 }
@@ -361,9 +383,7 @@ const escapeHtml = (value: string) =>
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
 
-const resolvePreviewWindow = (
-    previewWindow?: Window | null,
-): Window | null => {
+const resolvePreviewWindow = (previewWindow?: Window | null): Window | null => {
     if (previewWindow && !previewWindow.closed) {
         return previewWindow
     }
@@ -514,25 +534,23 @@ const openProposalPdfPreview = async (
     renderProposalPdfPreview(previewWindow, blob, fileTitle)
 }
 
-const buildFooter =
-    (manager: CommercialProposalManager) =>
-    () => ({
-        columns: [
-            {
-                text: `Агент: ${manager.name || '—'}`,
-                alignment: 'left' as const,
-                fontSize: 9,
-                color: '#6B7280',
-            },
-            {
-                text: manager.phone || '—',
-                alignment: 'right' as const,
-                fontSize: 9,
-                color: '#6B7280',
-            },
-        ],
-        margin: [40, 8, 40, 24] as [number, number, number, number],
-    })
+const buildFooter = (manager: CommercialProposalManager) => () => ({
+    columns: [
+        {
+            text: `Агент: ${manager.name || '—'}`,
+            alignment: 'left' as const,
+            fontSize: 9,
+            color: '#6B7280',
+        },
+        {
+            text: manager.phone || '—',
+            alignment: 'right' as const,
+            fontSize: 9,
+            color: '#6B7280',
+        },
+    ],
+    margin: [40, 8, 40, 24] as [number, number, number, number],
+})
 
 export const downloadCommercialProposalPdf = async (
     items: CommercialProposalItem[],
@@ -544,21 +562,98 @@ export const downloadCommercialProposalPdf = async (
         return
     }
 
+    const fetchFloorPlanWithOverlayAsDataUrl = async (
+        url?: string | null,
+        floorPath?: string | null,
+    ): Promise<string | null> => {
+        if (!url) return null
+
+        try {
+            // 1. Получаем картинку как Blob
+            const response = await fetch(toAbsoluteUrl(url))
+            if (!response.ok) return null
+            const blob = await response.blob()
+
+            // Если контура нет, отдаем обычный Data URL
+            if (!floorPath) {
+                return await new Promise<string | null>((resolve) => {
+                    const reader = new FileReader()
+                    reader.onloadend = () =>
+                        resolve(
+                            typeof reader.result === 'string'
+                                ? reader.result
+                                : null,
+                        )
+                    reader.onerror = () => resolve(null)
+                    reader.readAsDataURL(blob)
+                })
+            }
+
+            // 2. Создаем HTMLImageElement из Blob
+            const blobUrl = URL.createObjectURL(blob)
+            try {
+                const img = await new Promise<HTMLImageElement>(
+                    (resolve, reject) => {
+                        const image = new Image()
+                        image.onload = () => resolve(image)
+                        image.onerror = (e) => reject(e)
+                        image.src = blobUrl
+                    },
+                )
+
+                // 3. Создаем Canvas с оригинальным разрешением изображения
+                const canvas = document.createElement('canvas')
+                canvas.width = img.naturalWidth || img.width
+                canvas.height = img.naturalHeight || img.height
+
+                const ctx = canvas.getContext('2d')
+                if (!ctx) {
+                    return fetchImageAsDataUrl(url)
+                }
+
+                // 4. Отрисовываем исходный план этажа
+                ctx.drawImage(img, 0, 0)
+
+                // 5. Накладываем векторную разметку помещения
+                const path2d = new Path2D(floorPath)
+
+                // Полупрозрачная заливка (зеленый акцент или в цвет темы)
+                ctx.fillStyle = 'rgba(122, 224, 97, 0.45)'
+                ctx.fill(path2d)
+
+                // Контурная обводка помещения
+                ctx.strokeStyle = '#22c55e'
+                // Толщина линии адаптируется под высокое разрешение картинки
+                ctx.lineWidth = Math.max(3, Math.round(canvas.width / 350))
+                ctx.lineJoin = 'round'
+                ctx.lineCap = 'round'
+                ctx.stroke(path2d)
+
+                // 6. Экспортируем изображение с разметкой
+                return canvas.toDataURL('image/png')
+            } finally {
+                URL.revokeObjectURL(blobUrl)
+            }
+        } catch (error) {
+            console.error('Ошибка наложения разметки на план этажа:', error)
+            // В случае непредвиденной ошибки возвращаем исходное изображение без разметки
+            return fetchImageAsDataUrl(url)
+        }
+    }
+
     const prepared = await Promise.all(
         items.map(async (item) => {
             const [layoutImage, floorPlanImage, complexImage] =
                 await Promise.all([
-                    fetchImageAsDataUrl(
-                        resolveLayoutImageUrl(item.premise),
-                    ),
-                    fetchImageAsDataUrl(
+                    fetchImageAsDataUrl(resolveLayoutImageUrl(item.premise)),
+                    fetchFloorPlanWithOverlayAsDataUrl(
                         resolveFloorPlanImageUrl(item.premise),
+                        item.premise.floorPath,
                     ),
                     fetchImageAsDataUrl(
                         resolveComplexImageUrl(item.premise, item.complex),
                     ),
                 ])
-
             return {
                 ...item,
                 layoutImage,
@@ -569,6 +664,12 @@ export const downloadCommercialProposalPdf = async (
     )
 
     const content = prepared.flatMap((item, index) => {
+        const premiseFields = buildPremiseFields(item.premise)
+        const availableFloorPlanHeight = calculateAvailableFloorPlanHeight(
+            index === 0,
+            premiseFields.length,
+        )
+
         const block = [
             {
                 text: `Коммерческое предложение ${index + 1} из ${prepared.length}`,
@@ -578,7 +679,7 @@ export const downloadCommercialProposalPdf = async (
             ...buildTwoColumnBlock(
                 `Помещение № ${item.premise.number}`,
                 buildImageOrPlaceholder(item.layoutImage, 'Планировка'),
-                buildPremiseFields(item.premise),
+                premiseFields,
             ),
             ...(item.floorPlanImage
                 ? [
@@ -587,6 +688,7 @@ export const downloadCommercialProposalPdf = async (
                       buildFullWidthImageBlock(
                           item.floorPlanImage,
                           'План этажа',
+                          availableFloorPlanHeight,
                       ),
                       { text: '', pageBreak: 'before' as const },
                   ]
@@ -610,7 +712,7 @@ export const downloadCommercialProposalPdf = async (
             title: buildProposalInfoTitle(items),
         },
         pageOrientation: 'portrait' as const,
-        pageMargins: [40, 40, 40, 56] as [number, number, number, number],
+        pageMargins: [40, 36, 40, 48] as [number, number, number, number],
         ...(manager?.name || manager?.phone
             ? { footer: buildFooter(manager) }
             : {}),

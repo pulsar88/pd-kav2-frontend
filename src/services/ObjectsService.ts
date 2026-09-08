@@ -28,13 +28,19 @@ type RealtyObjectApi = {
     name: string
     facing?: string
     material?: string
-    building_state?: string
+    building_state?: BuildingState | null
     development_start?: string
     development_end?: string
     address?: string
     external_id?: number
     image?: RealtyPropertyImageApi | string | null
     project?: RealtyProjectApi | null
+}
+
+type BuildingState = {
+    value: string
+    code: string
+    name: string
 }
 
 type RealtyPropertyTypeApi = {
@@ -62,9 +68,10 @@ type RealtyObjectBriefApi = {
     address?: string
     facing?: string
     material?: string
-    building_state?: string
+    building_state?: BuildingState | null
     development_start?: string
     development_end?: string
+    max_floor?: number
     image?: RealtyPropertyImageApi | string | null
 }
 
@@ -80,11 +87,22 @@ type RealtyFloorApi = {
     floor_plan?: RealtyFloorPlanApi | string | null
 }
 
+type RealtyPropertyStatusApi = {
+    id: number
+    name: string
+    external_id?: number
+    color?: string
+    base_status?: number
+    is_base_status?: number
+    show_as?: string | null
+}
+
 type RealtyPropertyApi = {
     id: number
     number: string
     section: string
     floor: number
+    floor_path?: string
     area: number
     good_area: number
     type: RealtyPropertyTypeApi
@@ -99,10 +117,11 @@ type RealtyPropertyApi = {
     object_id?: number
     object?: RealtyObjectBriefApi | null
     project?: RealtyProjectApi | null
+    status?: RealtyPropertyStatusApi | null
 }
 
 export const REALTY_PROPERTY_WITH =
-    'preset.image,object,realtyFloor.floorPlan,project,object.image'
+    'preset.image,object,realtyFloor.floorPlan,project,object.image,status'
 
 const REALTY_OBJECT_WITH = 'image,project'
 
@@ -213,6 +232,8 @@ type RealtyPropertySummaryApi = {
     address?: string | null
     completion_date?: string | null
     delivery_date?: string | null
+    development_end?: string | null
+    development_start?: string | null
     count_filter: number
     count: number
     min_price: number
@@ -304,22 +325,23 @@ const mapRealtyPropertySummaryToComplex = (
     pricePerSqm: item.min_price_m2,
     matchingPremisesCount: item.count_filter,
     completionDate:
+        item.development_end?.trim() ||
         item.completion_date?.trim() ||
         item.delivery_date?.trim() ||
         undefined,
 })
 
 const mapBuildingStateToHouseStatus = (
-    state?: string,
+    state?: BuildingState | null,
 ): HouseStatus | undefined => {
-    if (!state) return undefined
+    if (!state?.code) return undefined
 
-    switch (state.toUpperCase()) {
+    switch (state.code) {
+        case 'HAND_OVER':
+            return 'commissioned'
         case 'UNFINISHED':
             return 'under_construction'
-        case 'FINISHED':
-        case 'COMMISSIONED':
-        case 'BUILT':
+        case 'BUILT': 
             return 'commissioned'
         default:
             return undefined
@@ -333,10 +355,11 @@ const mapRealtyObjectFields = (realtyObject?: RealtyObjectBriefApi | null) => ({
     address: realtyObject?.address?.trim() || undefined,
     facing: realtyObject?.facing?.trim() || undefined,
     material: realtyObject?.material?.trim() || undefined,
-    buildingState: realtyObject?.building_state?.trim() || undefined,
+    buildingState: realtyObject?.building_state?.name?.trim() || undefined,
     houseStatus: mapBuildingStateToHouseStatus(realtyObject?.building_state),
     developmentStart: realtyObject?.development_start?.trim() || undefined,
     deliveryDate: realtyObject?.development_end?.trim() || undefined,
+    floorsInBuilding: realtyObject?.max_floor,
     complexImage: resolveRealtyObjectImageUrl(realtyObject?.image),
 })
 
@@ -363,7 +386,14 @@ export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => 
         layoutName: resolvePremiseLayoutName(item),
         layoutImage: resolvePresetImageUrl(item.preset),
         floorPlanImage: resolveFloorPlanImageUrl(item.realty_floor),
+        floorPath: item.floor_path?.trim() || undefined,
         promoText: item.project?.promo_text?.trim() || undefined,
+        statusId: item.status?.id,
+        statusName: item.status?.name,
+        statusColor: item.status?.color,
+        baseStatus: item.status?.base_status,
+        isBaseStatus: item.status?.is_base_status,
+        status: item.status ?? undefined,
         ...objectFields,
         complexId:
             objectFields.complexId ??

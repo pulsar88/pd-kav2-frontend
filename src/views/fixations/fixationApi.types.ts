@@ -1,11 +1,14 @@
 export type FixationApiStatus =
     | 'pending'
+    | 'moderation'
+    | 'MODERATION'
     | 'denied'
     | 'fixed'
     | 'registration'
     | 'success'
     | 'failed'
     | 'deleted'
+    | 'expired'
 
 export type FixationApiStatusRelation = {
     value: FixationApiStatus
@@ -59,12 +62,18 @@ export type FixationApiAgency = {
     fix_days?: number
 }
 
+export type FixationApiBuildingState = {
+    value: string
+    code: string
+    name: string
+}
+
 export type FixationApiObject = {
     id: number
     name: string
     facing?: string | null
     material?: string | null
-    building_state?: string | null
+    building_state?: FixationApiBuildingState | null
     development_start?: string | null
     development_end?: string | null
     address?: string | null
@@ -77,19 +86,47 @@ export type FixationApiCrmStatus = {
     external_id?: string | null
 }
 
+export type FixationApiPreferenceOption = {
+    value?: number | string
+    code?: string
+    name?: string
+}
+
+export type FixationApiRelationOption = {
+    value?: number | string
+    code?: string
+    name?: string
+}
+
+export type FixationApiAdditionalClient = FixationApiClient & {
+    relation?: {
+        relation?: FixationApiRelationOption
+    }
+}
+
 export type FixationApiItem = {
     id: number
     status: FixationApiStatusRelation
     max_fix_days?: number
     fixed_till?: string
+    comment?: string | null
+    budget?: number | string | null
+    meeting_date?: string | null
+    preferred_rooms_count?: FixationApiPreferenceOption | null
+    preferred_area?: FixationApiPreferenceOption | null
+    preferred_payment?: FixationApiPreferenceOption | null
     created_at: string
     agent?: FixationApiAgent
     client?: FixationApiClient
+    additional_clients?: FixationApiAdditionalClient[]
+    additionalClients?: FixationApiAdditionalClient[]
     manager?: FixationApiManager
     initialManager?: FixationApiManager
+    initial_manager?: FixationApiManager
     agency?: FixationApiAgency
     object?: FixationApiObject
     crm_status?: FixationApiCrmStatus
+    has_extend_request?: boolean
 }
 
 export type FixationsApiMeta = {
@@ -108,4 +145,5 @@ export type GetFixationsParams = {
     page?: number
     page_size?: number
     status?: FixationApiStatus | FixationApiStatus[]
+    search?: string
 }

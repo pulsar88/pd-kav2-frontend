@@ -1,6 +1,7 @@
 import { useEffect, useRef, useImperativeHandle, useState } from 'react'
 import AuthContext from './AuthContext'
 import appConfig from '@/configs/app.config'
+import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
 import { useSessionUser, useToken } from '@/store/authStore'
 import {
     apiAuthCheck,
@@ -16,10 +17,13 @@ import {
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { disconnectEcho } from '@/services/broadcast/echo'
 import { clearFavoritesStore } from '@/store/favoritesStore'
+import { clearComparisonStore } from '@/store/comparisonStore'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
 import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
 import { preparePushPromptAfterAuth } from '@/utils/webPush'
+import Notification from '@/components/ui/Notification'
+import toast from '@/components/ui/toast'
 import type {
     SignInCredential,
     SignUpCredential,
@@ -36,6 +40,8 @@ import type {
 } from '@/@types/auth'
 import type { ReactNode, Ref } from 'react'
 import type { NavigateFunction } from 'react-router'
+import type { AxiosError } from 'axios'
+import { mutate } from 'swr'
 
 type AuthProviderProps = { children: ReactNode }
 
@@ -70,13 +76,19 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const navigatorRef = useRef<IsolatedNavigatorRef>(null)
 
-    const redirect = () => {
+    const redirect = (authority?: string[]) => {
         const search = window.location.search
         const params = new URLSearchParams(search)
         const redirectUrl = params.get(REDIRECT_URL_KEY)
+        const roles = authority ?? user.authority ?? []
 
         navigatorRef.current?.navigate(
-            redirectUrl ? redirectUrl : appConfig.authenticatedEntryPath,
+            redirectUrl
+                ? redirectUrl
+                : getAuthenticatedEntryPath(
+                      roles,
+                      appConfig.authenticatedEntryPath,
+                  ),
         )
     }
 
@@ -93,6 +105,8 @@ function AuthProvider({ children }: AuthProviderProps) {
     const handleSignOut = () => {
         disconnectEcho()
         clearFavoritesStore()
+        clearComparisonStore()
+        void mutate(() => true, undefined, { revalidate: false })
         setToken('')
         setTokenState('')
         setUser({})
@@ -103,8 +117,10 @@ function AuthProvider({ children }: AuthProviderProps) {
         try {
             const currentUser = await apiGetCurrentUser()
             setUser(currentUser)
+            return currentUser
         } catch {
             // оставляем данные из fallback / persist
+            return null
         }
     }
 
@@ -131,10 +147,33 @@ function AuthProvider({ children }: AuthProviderProps) {
                 setTokenState(token)
                 setSessionSignedIn(true)
                 await loadCurrentUser()
-            } catch {
-                if (!cancelled) {
+            } catch (error) {
+                if (cancelled) return
+
+                // Разлогиниваем только при явной потере сессии.
+                // 5xx / сеть не должны выкидывать пользователя.
+                const status = (error as AxiosError)?.response?.status
+                if (
+                    status === 401 ||
+                    status === 419 ||
+                    status === 440
+                ) {
                     handleSignOut()
+                    return
                 }
+
+                setTokenState(token)
+                setSessionSignedIn(true)
+                await loadCurrentUser()
+
+                toast.push(
+                    <Notification type="warning" title="Сервер временно недоступен">
+                        {status
+                            ? `Не удалось проверить сессию (ошибка ${status}). Вы остаётесь в системе — попробуйте обновить страницу позже.`
+                            : 'Не удалось проверить сессию из‑за сетевой ошибки. Вы остаётесь в системе — попробуйте обновить страницу позже.'}
+                    </Notification>,
+                    { placement: 'top-center' },
+                )
             }
         }
 
@@ -148,8 +187,8 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const finishAuth = async (accessToken: string, nextUser?: User) => {
         handleSignIn({ accessToken }, nextUser)
-        await loadCurrentUser()
-        redirect()
+        const currentUser = await loadCurrentUser()
+        redirect(currentUser?.authority ?? nextUser?.authority)
 
         void preparePushPromptAfterAuth()
             .then(({ shouldPrompt }) => {

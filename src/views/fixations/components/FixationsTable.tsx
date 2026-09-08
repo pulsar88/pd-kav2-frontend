@@ -5,11 +5,14 @@ import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import DataTable from '@/components/shared/DataTable'
-import { apiGetFixations } from '@/services/FixationsService'
-import useSWR from 'swr'
-import { TbCalendarPlus, TbEye } from 'react-icons/tb'
+import {
+    apiGetFixations,
+    apiCreateFixationExtendRequest,
+} from '@/services/FixationsService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { TbCalendarPlus, TbCalendarTime, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
-import type { Fixation } from '../types'
+import type { Fixation, GetFixationsResponse } from '../types'
 import {
     fixationStatusMap,
     formatFixationDate,
@@ -27,7 +30,11 @@ import FixationExtendRequestDialog, {
 } from './FixationExtendRequestDialog'
 import FixationsTableTools from './FixationsTableTools'
 
-const FixationsTable = () => {
+type FixationsTableProps = {
+    refreshKey?: number
+}
+
+const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
     const navigate = useNavigate()
     const [pageIndex, setPageIndex] = useState(1)
     const [pageSize, setPageSize] = useState(20)
@@ -37,20 +44,35 @@ const FixationsTable = () => {
     const [extendFixation, setExtendFixation] = useState<Fixation | null>(null)
     const [isExtendOpen, setIsExtendOpen] = useState(false)
     const [isExtendSubmitting, setIsExtendSubmitting] = useState(false)
-
-    const { data, isLoading } = useSWR(
-        ['/api/v2/fixations', pageIndex, pageSize],
-        () =>
-            apiGetFixations({
-                page: pageIndex,
-                page_size: pageSize,
-            }),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
+    const [data, setData] = useState<GetFixationsResponse | undefined>(
+        undefined,
     )
+    const [isLoading, setIsLoading] = useState(true)
+    const [refreshCount, setRefreshCount] = useState(0)
+
+    useEffect(() => {
+        let cancelled = false
+        setIsLoading(true)
+
+        void apiGetFixations({
+            page: pageIndex,
+            page_size: pageSize,
+            search: search || undefined,
+        })
+            .then((response) => {
+                if (!cancelled) setData(response)
+            })
+            .catch(() => {
+                if (!cancelled) setData(undefined)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [pageIndex, pageSize, refreshCount, refreshKey, search])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
@@ -92,46 +114,33 @@ const FixationsTable = () => {
 
         setIsExtendSubmitting(true)
         try {
-            await new Promise((resolve) => {
-                setTimeout(resolve, 300)
+            await apiCreateFixationExtendRequest({
+                fixation_id: Number(extendFixation.id) || extendFixation.id,
+                add_days: values.extendDays,
+                comment: values.comment,
             })
             toast.push(
                 <Notification type="success">
                     Заявка на продление «{extendFixation.fullName}» на{' '}
-                    {values.extendDays} дн. создана
+                    {values.extendDays} дн. успешно создана
                 </Notification>,
                 { placement: 'top-center' },
             )
             setIsExtendOpen(false)
             setExtendFixation(null)
+            setRefreshCount((prev) => prev + 1)
+        } catch (err: unknown) {
+            const msg = getApiErrorMessage(
+                err,
+                'Не удалось создать заявку на продление',
+            )
+            toast.push(<Notification type="danger">{msg}</Notification>, {
+                placement: 'top-center',
+            })
         } finally {
             setIsExtendSubmitting(false)
         }
     }
-
-    const filteredList = useMemo(() => {
-        const query = search.trim().toLowerCase()
-        if (!query) return list
-
-        return list.filter((fixation) => {
-            const statusLabel = getFixationStatusDisplay(fixation).label
-            const haystack = [
-                fixation.fullName,
-                fixation.phone,
-                statusLabel,
-                formatFixationDate(fixation.createdAt),
-                formatFixationDate(fixation.expiresAt),
-                fixation.objectName,
-                fixation.projectName,
-                fixation.agent.fullName,
-                fixation.agent.agency,
-            ]
-                .join(' ')
-                .toLowerCase()
-
-            return haystack.includes(query)
-        })
-    }, [list, search])
 
     const columns: ColumnDef<Fixation>[] = useMemo(() => {
         const allColumns: Array<ColumnDef<Fixation> & { id: string }> = [
@@ -235,7 +244,12 @@ const FixationsTable = () => {
                 maxSize: 120,
                 cell: (props) => {
                     const fixation = props.row.original
-                    const canExtend = fixation.status === 'fixed'
+                    const hasExtendRequest = Boolean(
+                        fixation.has_extend_request ||
+                            fixation.hasExtendRequest,
+                    )
+                    const canExtend =
+                        fixation.status === 'fixed' && !hasExtendRequest
 
                     return (
                         <div
@@ -253,15 +267,33 @@ const FixationsTable = () => {
                                     }
                                 />
                             </Tooltip>
-                            <Tooltip title="Создать заявку на продление">
-                                <Button
-                                    size="xs"
-                                    variant="plain"
-                                    icon={<TbCalendarPlus />}
-                                    disabled={!canExtend}
-                                    onClick={() => handleOpenExtend(fixation)}
-                                />
-                            </Tooltip>
+                            {hasExtendRequest ? (
+                                <Tooltip title="Запрос на продление уже существует">
+                                    <span className="inline-flex cursor-default items-center justify-center p-1 text-amber-500 dark:text-amber-400">
+                                        <TbCalendarTime className="text-lg" />
+                                    </span>
+                                </Tooltip>
+                            ) : (
+                                <Tooltip
+                                    title={
+                                        canExtend
+                                            ? 'Создать заявку на продление'
+                                            : 'Продление недоступно'
+                                    }
+                                >
+                                    <span className="inline-flex">
+                                        <Button
+                                            size="xs"
+                                            variant="plain"
+                                            icon={<TbCalendarPlus />}
+                                            disabled={!canExtend}
+                                            onClick={() =>
+                                                handleOpenExtend(fixation)
+                                            }
+                                        />
+                                    </span>
+                                </Tooltip>
+                            )}
                         </div>
                     )
                 },
@@ -274,7 +306,7 @@ const FixationsTable = () => {
         })
     }, [columnVisibility])
 
-    const pageData = filteredList
+    const pageData = list
 
     return (
         <div className="flex flex-col gap-4">
@@ -289,7 +321,7 @@ const FixationsTable = () => {
                 loading={isLoading}
                 noData={!isLoading && pageData.length === 0}
                 pagingData={{
-                    total: search.trim() ? filteredList.length : total,
+                    total,
                     pageIndex,
                     pageSize,
                 }}

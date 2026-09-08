@@ -1,45 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
-
 import { useNavigate, useParams } from 'react-router'
-
-import useSWR from 'swr'
-
 import classNames from '@/utils/classNames'
-
 import Button from '@/components/ui/Button'
-
 import Tabs from '@/components/ui/Tabs'
-
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
-
 import Container from '@/components/shared/Container'
-
 import Loading from '@/components/shared/Loading'
-
 import {
     apiGetCheckboard,
     apiGetRealtyObject,
     apiGetRealtyProperty,
 } from '@/services/ObjectsService'
-
-import { TbArrowLeft } from 'react-icons/tb'
-
-import type { CheckboardCellLabel } from './checkboard.types'
-import type { Complex, ObjectsSearchFilters } from './types'
-
+import { TbArrowLeft, TbZoomIn, TbZoomOut } from 'react-icons/tb'
+import type {
+    CheckboardBuilding,
+    CheckboardCellLabel,
+} from './checkboard.types'
+import type { Complex, ObjectsSearchFilters, Premise } from './types'
 import {
     collectStatuses,
     findBuildingPropertyById,
     flattenBuildingProperties,
+    getDefaultActiveStatusCodes,
     matchesObjectsSearchFilters,
 } from './checkboardUtils'
-
 import CheckboardClassic from './components/checkboard/CheckboardClassic'
-
 import CheckboardLegend from './components/checkboard/CheckboardLegend'
-
 import CheckboardPlus from './components/checkboard/CheckboardPlus'
-
 import CheckboardPropertyDrawer from './components/checkboard/CheckboardPropertyDrawer'
 import ComplexAboutTab from './components/checkboard/ComplexAboutTab'
 import ObjectsSearchForm from './components/ObjectsSearchForm'
@@ -53,6 +40,40 @@ import {
 } from './filtersQuery'
 
 const { TabList, TabNav, TabContent } = Tabs
+
+const CHECKBOARD_ZOOM_MIN = 0.3
+const CHECKBOARD_ZOOM_MAX = 1.5
+const CHECKBOARD_ZOOM_STEP = 0.1
+const CHECKBOARD_ZOOM_STORAGE_KEY = 'objects.checkboard.zoom'
+
+const clampCheckboardZoom = (value: number) =>
+    Math.round(
+        Math.min(CHECKBOARD_ZOOM_MAX, Math.max(CHECKBOARD_ZOOM_MIN, value)) *
+            10,
+    ) / 10
+
+const readStoredCheckboardZoom = () => {
+    try {
+        const raw = localStorage.getItem(CHECKBOARD_ZOOM_STORAGE_KEY)
+        if (raw == null) return 1
+        const parsed = Number(raw)
+        if (!Number.isFinite(parsed)) return 1
+        return clampCheckboardZoom(parsed)
+    } catch {
+        return 1
+    }
+}
+
+const writeStoredCheckboardZoom = (value: number) => {
+    try {
+        localStorage.setItem(
+            CHECKBOARD_ZOOM_STORAGE_KEY,
+            String(clampCheckboardZoom(value)),
+        )
+    } catch {
+        // ignore quota / private mode errors
+    }
+}
 
 const syncSearchStateInUrl = (
     filters: ObjectsSearchFilters,
@@ -74,68 +95,117 @@ const syncSearchStateInUrl = (
 
 const ComplexCheckboard = () => {
     const { id } = useParams()
-
     const navigate = useNavigate()
     const initialFilters = useMemo(() => createEmptyObjectsSearchFilters(), [])
-
     const [view, setView] = useState('classic')
-
     const [labelMode, setLabelMode] = useState<CheckboardCellLabel>('rooms')
-
+    const [zoom, setZoom] = useState(readStoredCheckboardZoom)
     const [draftFilters, setDraftFilters] =
         useState<ObjectsSearchFilters>(initialFilters)
-
     const [appliedFilters, setAppliedFilters] =
         useState<ObjectsSearchFilters>(initialFilters)
-    const [activeStatusCode, setActiveStatusCode] = useState('')
-
+    const [activeStatusCodes, setActiveStatusCodes] = useState<string[]>([])
     const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(
         null,
     )
     const [detailsPanelOpen, setDetailsPanelOpen] = useState(false)
-
-    const { data, isLoading } = useSWR(
-        id ? ['/api/v2/realty_objects/chess', id] : null,
-
-        () => apiGetCheckboard(id || ''),
-
-        {
-            revalidateOnFocus: false,
-
-            revalidateIfStale: false,
-
-            revalidateOnReconnect: false,
-        },
+    const [data, setData] = useState<CheckboardBuilding | null | undefined>()
+    const [isLoading, setIsLoading] = useState(Boolean(id))
+    const [complexInfo, setComplexInfo] = useState<Complex | null | undefined>()
+    const [isComplexInfoLoading, setIsComplexInfoLoading] = useState(
+        Boolean(id),
     )
+    const [propertyDetails, setPropertyDetails] = useState<
+        Premise | null | undefined
+    >()
+    const [isPropertyDetailsLoading, setIsPropertyDetailsLoading] =
+        useState(false)
 
-    const { data: complexInfo, isLoading: isComplexInfoLoading } = useSWR(
-        id ? ['/api/v2/realty_objects', id] : null,
-        () => apiGetRealtyObject(id || ''),
-        {
-            revalidateOnFocus: false,
-            revalidateIfStale: false,
-            revalidateOnReconnect: false,
-        },
-    )
+    useEffect(() => {
+        writeStoredCheckboardZoom(zoom)
+    }, [zoom])
+
+    useEffect(() => {
+        if (!id) {
+            setData(undefined)
+            setIsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsLoading(true)
+        setActiveStatusCodes([])
+
+        void apiGetCheckboard(id)
+            .then((result) => {
+                if (cancelled) return
+                setData(result)
+                if (result) {
+                    setActiveStatusCodes(
+                        getDefaultActiveStatusCodes(collectStatuses(result)),
+                    )
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
+
+    useEffect(() => {
+        if (!id) {
+            setComplexInfo(undefined)
+            setIsComplexInfoLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsComplexInfoLoading(true)
+
+        void apiGetRealtyObject(id)
+            .then((result) => {
+                if (!cancelled) setComplexInfo(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsComplexInfoLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [id])
+
+    useEffect(() => {
+        if (selectedPropertyId == null) {
+            setPropertyDetails(undefined)
+            setIsPropertyDetailsLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsPropertyDetailsLoading(true)
+
+        void apiGetRealtyProperty(selectedPropertyId)
+            .then((result) => {
+                if (!cancelled) setPropertyDetails(result)
+            })
+            .finally(() => {
+                if (!cancelled) setIsPropertyDetailsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [selectedPropertyId])
 
     const selectedProperty = useMemo(() => {
         if (!data || selectedPropertyId == null) return null
 
         return findBuildingPropertyById(data, selectedPropertyId) ?? null
     }, [data, selectedPropertyId])
-
-    const { data: propertyDetails, isLoading: isPropertyDetailsLoading } =
-        useSWR(
-            selectedPropertyId != null
-                ? ['/api/v2/realty_properties', selectedPropertyId]
-                : null,
-            () => apiGetRealtyProperty(selectedPropertyId!),
-            {
-                revalidateOnFocus: false,
-                revalidateIfStale: false,
-                revalidateOnReconnect: false,
-            },
-        )
 
     useEffect(() => {
         if (selectedPropertyId == null) return
@@ -221,9 +291,14 @@ const ComplexCheckboard = () => {
     const activePropertyIds = useMemo(() => {
         if (!data) return null
 
-        if (!hasSearchFilters && !activeStatusCode) {
+        if (!hasSearchFilters && activeStatusCodes.length === 0) {
             return null
         }
+
+        const activeStatusSet =
+            activeStatusCodes.length > 0
+                ? new Set(activeStatusCodes)
+                : null
 
         const visible = new Set<number>()
 
@@ -235,7 +310,10 @@ const ComplexCheckboard = () => {
             ) {
                 return
             }
-            if (activeStatusCode && property.status.code !== activeStatusCode) {
+            if (
+                activeStatusSet &&
+                !activeStatusSet.has(property.status.code)
+            ) {
                 return
             }
             visible.add(property.id)
@@ -243,7 +321,7 @@ const ComplexCheckboard = () => {
 
         return visible
     }, [
-        activeStatusCode,
+        activeStatusCodes,
         allProperties,
         data,
         hasSearchFilters,
@@ -252,30 +330,23 @@ const ComplexCheckboard = () => {
 
     const stats = useMemo(() => {
         if (!data) {
-            return { total: 0, available: 0 }
+            return { total: 0 }
         }
 
         if (!activePropertyIds) {
             return {
                 total: allProperties.length,
-                available: allProperties.filter(
-                    (property) => property.status.is_available,
-                ).length,
             }
         }
 
         let total = 0
-        let available = 0
 
         allProperties.forEach((property) => {
             if (!activePropertyIds.has(property.id)) return
             total += 1
-            if (property.status.is_available) {
-                available += 1
-            }
         })
 
-        return { total, available }
+        return { total }
     }, [activePropertyIds, allProperties, data])
 
     const statuses = useMemo(() => (data ? collectStatuses(data) : []), [data])
@@ -314,7 +385,14 @@ const ComplexCheckboard = () => {
     }
 
     const handleStatusClick = (code: string) => {
-        setActiveStatusCode((prev) => (prev === code ? '' : code))
+        setActiveStatusCodes((prev) =>
+            prev.includes(code)
+                ? prev.filter((item) => item !== code)
+                : [...prev, code],
+        )
+        if (view === 'about') {
+            setView('classic')
+        }
     }
 
     const handlePropertySelect = (propertyId: number) => {
@@ -396,17 +474,11 @@ const ComplexCheckboard = () => {
                                         {stats.total}
                                     </span>
                                 </span>
-                                <span className="inline-flex items-center rounded-lg bg-[#a4f4cf] px-2.5 py-1 text-sm font-semibold text-[#006045]">
-                                    Свободно:{' '}
-                                    <span className="ml-1 text-base tabular-nums">
-                                        {stats.available}
-                                    </span>
-                                </span>
                             </div>
 
                             <CheckboardLegend
                                 statuses={statuses}
-                                activeStatusCode={activeStatusCode}
+                                activeStatusCodes={activeStatusCodes}
                                 onStatusClick={handleStatusClick}
                             />
 
@@ -438,44 +510,95 @@ const ComplexCheckboard = () => {
                                         </TabNav>
                                     </TabList>
 
-                                    {view === 'classic' ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-sm text-gray-500">
-                                                Показывать:
-                                            </span>
+                                    {view !== 'about' ? (
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            {view === 'classic' ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-sm text-gray-500">
+                                                        Показывать:
+                                                    </span>
+                                                    {(
+                                                        [
+                                                            {
+                                                                value: 'rooms',
+                                                                label: 'Комнатность',
+                                                            },
+                                                            {
+                                                                value: 'number',
+                                                                label: 'Номер',
+                                                            },
+                                                        ] as const
+                                                    ).map((item) => (
+                                                        <button
+                                                            key={item.value}
+                                                            type="button"
+                                                            className={classNames(
+                                                                'rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+                                                                labelMode ===
+                                                                    item.value
+                                                                    ? 'bg-primary text-neutral'
+                                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200',
+                                                            )}
+                                                            onClick={() =>
+                                                                setLabelMode(
+                                                                    item.value,
+                                                                )
+                                                            }
+                                                        >
+                                                            {item.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : null}
 
-                                            {(
-                                                [
-                                                    {
-                                                        value: 'rooms',
-
-                                                        label: 'Комнатность',
-                                                    },
-
-                                                    {
-                                                        value: 'number',
-
-                                                        label: 'Номер',
-                                                    },
-                                                ] as const
-                                            ).map((item) => (
+                                            <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-800/60">
                                                 <button
-                                                    key={item.value}
                                                     type="button"
-                                                    className={classNames(
-                                                        'rounded-lg px-2.5 py-1.5 text-sm transition-colors',
-
-                                                        labelMode === item.value
-                                                            ? 'bg-primary text-neutral'
-                                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200',
-                                                    )}
+                                                    title="Уменьшить"
+                                                    disabled={
+                                                        zoom <=
+                                                        CHECKBOARD_ZOOM_MIN
+                                                    }
+                                                    className="flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-white hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
                                                     onClick={() =>
-                                                        setLabelMode(item.value)
+                                                        setZoom((value) =>
+                                                            clampCheckboardZoom(
+                                                                value -
+                                                                    CHECKBOARD_ZOOM_STEP,
+                                                            ),
+                                                        )
                                                     }
                                                 >
-                                                    {item.label}
+                                                    <TbZoomOut className="text-lg" />
                                                 </button>
-                                            ))}
+                                                <button
+                                                    type="button"
+                                                    title="Сбросить масштаб"
+                                                    className="min-w-14 rounded-md px-2 py-1.5 text-center text-sm font-semibold tabular-nums text-gray-700 transition-colors hover:bg-white dark:text-gray-200 dark:hover:bg-gray-700"
+                                                    onClick={() => setZoom(1)}
+                                                >
+                                                    {Math.round(zoom * 100)}%
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    title="Увеличить"
+                                                    disabled={
+                                                        zoom >=
+                                                        CHECKBOARD_ZOOM_MAX
+                                                    }
+                                                    className="flex h-8 w-8 items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-white hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                                                    onClick={() =>
+                                                        setZoom((value) =>
+                                                            clampCheckboardZoom(
+                                                                value +
+                                                                    CHECKBOARD_ZOOM_STEP,
+                                                            ),
+                                                        )
+                                                    }
+                                                >
+                                                    <TbZoomIn className="text-lg" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ) : null}
                                 </div>
@@ -491,6 +614,8 @@ const ComplexCheckboard = () => {
                                             selectedPropertyId={
                                                 selectedPropertyId
                                             }
+                                            zoom={zoom}
+                                            onZoomChange={setZoom}
                                             onPropertySelect={
                                                 handlePropertySelect
                                             }
@@ -506,6 +631,8 @@ const ComplexCheckboard = () => {
                                             selectedPropertyId={
                                                 selectedPropertyId
                                             }
+                                            zoom={zoom}
+                                            onZoomChange={setZoom}
                                             onPropertySelect={
                                                 handlePropertySelect
                                             }

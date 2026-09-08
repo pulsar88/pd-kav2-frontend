@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
-import { TbBuildingSkyscraper, TbHeart, TbHeartFilled, TbLayoutGrid, TbZoomIn } from 'react-icons/tb'
+import {
+    TbBuildingSkyscraper,
+    TbHeart,
+    TbHeartFilled,
+    TbLayoutGrid,
+    TbScale,
+    TbZoomIn,
+} from 'react-icons/tb'
 import classNames from '@/utils/classNames'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
@@ -10,6 +17,7 @@ import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
+import { useComparisonStore } from '@/store/comparisonStore'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import type { ObjectsSearchFilters, Premise } from '../types'
 import { serializeObjectsSearchFilters, withoutComplexFilters, appendObjectsCatalogTab } from '../filtersQuery'
@@ -99,6 +107,8 @@ type PremiseResultItemProps = {
     onSelectedChange?: (selected: boolean) => void
     onToggleFavorite?: (premise: Premise) => void | Promise<void>
     favoriteState?: boolean
+    onToggleComparison?: (premise: Premise) => void | Promise<void>
+    comparisonState?: boolean
     pendingRemoval?: {
         startedAt: number
         durationMs: number
@@ -128,6 +138,18 @@ const collapsedPlanClass = (open: boolean) =>
             : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700',
         'aspect-[4/3] w-full max-h-52 sm:aspect-auto sm:h-20 sm:w-20 sm:max-h-none sm:shrink-0',
     )
+
+const getContrastTextColor = (hexColor: string) => {
+    const hex = hexColor.replace('#', '')
+    if (hex.length !== 6) return '#ffffff'
+
+    const r = Number.parseInt(hex.slice(0, 2), 16)
+    const g = Number.parseInt(hex.slice(2, 4), 16)
+    const b = Number.parseInt(hex.slice(4, 6), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+    return luminance > 0.62 ? '#111827' : '#ffffff'
+}
 
 const LayoutImagePlaceholder = ({
     compact = false,
@@ -163,6 +185,8 @@ const PremiseResultItem = ({
     onSelectedChange,
     onToggleFavorite,
     favoriteState,
+    onToggleComparison,
+    comparisonState,
     pendingRemoval,
     onCancelPendingRemoval,
 }: PremiseResultItemProps) => {
@@ -173,6 +197,13 @@ const PremiseResultItem = ({
     )
     const isFavoriteDisplay = favoriteState ?? isFavorite
     const togglePremise = useFavoritesStore((state) => state.togglePremise)
+
+    const isCompared = useComparisonStore((state) =>
+        state.comparisonIds.includes(premise.id),
+    )
+    const isComparedDisplay = comparisonState ?? isCompared
+    const toggleComparison = useComparisonStore((state) => state.togglePremise)
+
     const typeLabel = getPremiseTypeLabel(premise)
     const pricePerSqm = getPremisePricePerSqm(premise.price, premise.area)
     const coverImage = getPremiseCoverImage(premise)
@@ -184,12 +215,9 @@ const PremiseResultItem = ({
             premise.floorsInBuilding ? `/${premise.floorsInBuilding}` : ''
         }`,
         `№${premise.number}`,
-        premise.layout,
     ]
         .filter(Boolean)
         .join(' · ')
-
-    const expandedPlanBlockCaption = premise.layoutName ?? ''
 
     const apartmentDetails = (
         <>
@@ -334,12 +362,39 @@ const PremiseResultItem = ({
     const hasPriceInfo =
         premise.price !== undefined || pricePerSqm !== undefined
 
+    const statusName = premise.statusName ?? premise.status?.name
+    const statusColor = premise.statusColor ?? premise.status?.color
+
     const complexBadge = premise.complexName ? (
-        <span className="mb-1.5 inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1 text-sm font-bold leading-tight text-neutral shadow-sm ring-1 ring-primary-deep/30">
+        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1 text-sm font-bold leading-tight text-neutral shadow-sm ring-1 ring-primary-deep/30">
             <TbBuildingSkyscraper className="shrink-0 text-base text-neutral" />
             <span className="truncate">{premise.complexName}</span>
         </span>
     ) : null
+
+    const statusBadge = statusName ? (
+        <span
+            className="inline-flex shrink-0 items-center rounded-lg px-2.5 py-1 text-sm font-bold leading-tight shadow-sm"
+            style={
+                statusColor
+                    ? {
+                          backgroundColor: statusColor,
+                          color: getContrastTextColor(statusColor),
+                      }
+                    : undefined
+            }
+        >
+            {statusName}
+        </span>
+    ) : null
+
+    const badgesRow =
+        complexBadge || statusBadge ? (
+            <div className="mb-1.5 flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
+                {complexBadge}
+                {statusBadge}
+            </div>
+        ) : null
 
     const favoriteButton = (
         <Tooltip
@@ -354,10 +409,18 @@ const PremiseResultItem = ({
                 size="sm"
                 variant="plain"
                 className={classNames(
-                    'bg-white/90 shadow-sm backdrop-blur-sm dark:bg-gray-900/90 sm:bg-transparent sm:shadow-none sm:backdrop-blur-none',
-                    isFavoriteDisplay ? 'text-rose-500' : 'text-gray-500',
+                    'shadow-sm backdrop-blur-sm sm:shadow-none sm:backdrop-blur-none transition-all',
+                    isFavoriteDisplay
+                        ? 'bg-white/90 text-rose-500 hover:text-rose-600 dark:bg-gray-900/90 dark:text-rose-400 dark:hover:text-rose-300 sm:bg-transparent'
+                        : 'bg-white/90 text-gray-500 hover:text-rose-500 dark:bg-gray-900/90 dark:text-gray-400 dark:hover:text-rose-400 sm:bg-transparent',
                 )}
-                icon={isFavoriteDisplay ? <TbHeartFilled /> : <TbHeart />}
+                icon={
+                    isFavoriteDisplay ? (
+                        <TbHeartFilled className="scale-110" />
+                    ) : (
+                        <TbHeart />
+                    )
+                }
                 onClick={(event) => {
                     event.stopPropagation()
                     const action =
@@ -369,6 +432,52 @@ const PremiseResultItem = ({
                                 {getApiErrorMessage(
                                     error,
                                     'Не удалось обновить избранное',
+                                )}
+                            </Notification>,
+                        )
+                    })
+                }}
+            />
+        </Tooltip>
+    )
+
+    const compareButton = (
+        <Tooltip
+            title={
+                isComparedDisplay
+                    ? 'Убрать из сравнения'
+                    : 'Добавить в сравнение'
+            }
+        >
+            <Button
+                type="button"
+                size="sm"
+                variant="plain"
+                className={classNames(
+                    'shadow-sm backdrop-blur-sm sm:shadow-none sm:backdrop-blur-none transition-all',
+                    isComparedDisplay
+                        ? 'bg-indigo-600 text-white sm:bg-indigo-50 sm:text-indigo-600 sm:ring-1 sm:ring-indigo-300 dark:sm:bg-indigo-950/60 dark:sm:text-indigo-400 dark:sm:ring-indigo-700'
+                        : 'bg-white/90 text-gray-500 hover:text-indigo-600 dark:bg-gray-900/90 dark:text-gray-400 dark:hover:text-indigo-400 sm:bg-transparent',
+                )}
+                icon={
+                    <TbScale
+                        className={classNames(
+                            'text-lg transition-transform',
+                            isComparedDisplay && 'scale-110 stroke-[2.5]',
+                        )}
+                    />
+                }
+                onClick={(event) => {
+                    event.stopPropagation()
+                    const action =
+                        onToggleComparison ??
+                        (() => toggleComparison(premise))
+                    void Promise.resolve(action(premise)).catch((error) => {
+                        toast.push(
+                            <Notification type="danger">
+                                {getApiErrorMessage(
+                                    error,
+                                    'Не удалось обновить сравнение',
                                 )}
                             </Notification>,
                         )
@@ -402,7 +511,7 @@ const PremiseResultItem = ({
                             type="button"
                             className={classNames(
                                 collapsedPlanClass(open),
-                                'group block',
+                                'group block dark:bg-white',
                             )}
                             onClick={onPreviewLayout}
                         >
@@ -441,6 +550,7 @@ const PremiseResultItem = ({
                             open && 'hidden',
                         )}
                     >
+                        {compareButton}
                         {favoriteButton}
                     </div>
                 </div>
@@ -457,7 +567,7 @@ const PremiseResultItem = ({
                             open && 'pr-10 sm:pr-0',
                         )}
                     >
-                        {complexBadge}
+                        {badgesRow}
                         <p
                             className={classNames(
                                 'text-sm font-semibold leading-snug sm:text-base',
@@ -507,9 +617,10 @@ const PremiseResultItem = ({
                     </button>
                     <div
                         className={classNames(
-                            'hidden shrink-0 self-center sm:block sm:pr-0',
+                            'hidden shrink-0 self-center sm:flex sm:items-center sm:gap-1 sm:pr-0',
                         )}
                     >
+                        {compareButton}
                         {favoriteButton}
                     </div>
                 </div>
@@ -520,6 +631,7 @@ const PremiseResultItem = ({
                         !open && 'hidden',
                     )}
                 >
+                    {compareButton}
                     {favoriteButton}
                 </div>
             </div>
@@ -538,10 +650,7 @@ const PremiseResultItem = ({
                             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-stretch">
                                 {coverImage ? (
                                     <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
-                                        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-700 px-3 py-2.5">
-                                            <span className="min-w-0 text-sm font-semibold leading-snug text-gray-100">
-                                                {expandedPlanBlockCaption}
-                                            </span>
+                                        <div className="flex shrink-0 items-center justify-end gap-3 border-b border-gray-700 px-3 py-2.5">
                                             <button
                                                 type="button"
                                                 className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-gray-400 transition-colors hover:text-primary"
@@ -553,7 +662,7 @@ const PremiseResultItem = ({
                                         </div>
                                         <button
                                             type="button"
-                                            className="group flex flex-1 items-center justify-center p-3"
+                                            className="group flex flex-1 items-center justify-center p-3 bg-white"
                                             onClick={onPreviewLayout}
                                         >
                                             <img
@@ -565,11 +674,6 @@ const PremiseResultItem = ({
                                     </div>
                                 ) : (
                                     <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
-                                        <div className="shrink-0 border-b border-gray-700 px-3 py-2.5">
-                                            <span className="text-sm font-semibold leading-snug text-gray-100">
-                                                {expandedPlanBlockCaption}
-                                            </span>
-                                        </div>
                                         <div className="flex flex-1 items-center justify-center p-3">
                                             <div className="flex min-h-[220px] w-full max-w-full items-center justify-center rounded-xl border border-dashed border-gray-600 bg-gray-900/40">
                                                 <LayoutImagePlaceholder />

@@ -3,7 +3,21 @@ import {
     NAV_ITEM_TYPE_TITLE,
 } from '@/constants/navigation.constant'
 
+import {
+    ADMIN,
+    AGENT,
+    AGENCY_SUPERVISOR,
+    SUPERVISOR,
+    AGENT_CABINET_ROLES,
+    CONTENT_MANAGER_ALLOWED_ROLES,
+} from '@/constants/roles.constant'
+
 import type { NavigationTree } from '@/@types/navigation'
+
+const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
+const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
+const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR]
+const supervisorOnlyAuthority = [SUPERVISOR]
 
 const navigationConfig: NavigationTree[] = [
     {
@@ -13,7 +27,7 @@ const navigationConfig: NavigationTree[] = [
         translateKey: 'nav.main.main',
         icon: '',
         type: NAV_ITEM_TYPE_TITLE,
-        authority: [],
+        authority: contentManagerAllowedAuthority,
         subMenu: [
             {
                 key: 'home',
@@ -22,7 +36,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.home',
                 icon: 'home',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: agentCabinetAuthority,
                 subMenu: [],
             },
             {
@@ -32,7 +46,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.fixations',
                 icon: 'fixations',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: agentCabinetAuthority,
                 subMenu: [],
             },
             {
@@ -42,7 +56,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.objects',
                 icon: 'objects',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: objectsAuthority,
                 subMenu: [],
             },
             {
@@ -52,17 +66,27 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.favoritePremises',
                 icon: 'favoritePremises',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: objectsAuthority,
                 subMenu: [],
             },
             {
-                key: 'tools',
-                path: '/tools',
-                title: 'Инструменты',
-                translateKey: 'nav.tools',
-                icon: 'tools',
+                key: 'comparisonPremises',
+                path: '/comparison-premises',
+                title: 'Сравнение',
+                translateKey: 'nav.comparisonPremises',
+                icon: 'comparisonPremises',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: objectsAuthority,
+                subMenu: [],
+            },
+            {
+                key: 'mortgageCalculator',
+                path: '/tools/mortgage-calculator',
+                title: 'Калькулятор',
+                translateKey: 'nav.mortgageCalculator',
+                icon: 'calculator',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: agentCabinetAuthority,
                 subMenu: [],
             },
             {
@@ -72,7 +96,27 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.profile',
                 icon: 'profile',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: contentManagerAllowedAuthority,
+                subMenu: [],
+            },
+            {
+                key: 'agencyRequests',
+                path: '/agency/requests',
+                title: 'Заявки в агентство',
+                translateKey: 'nav.agencyRequests',
+                icon: 'agencyRequests',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
+                subMenu: [],
+            },
+            {
+                key: 'supervisorFixations',
+                path: '/supervisor/fixations',
+                title: 'Управление фиксациями',
+                translateKey: 'nav.supervisorFixations',
+                icon: 'supervisor',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: supervisorOnlyAuthority,
                 subMenu: [],
             },
         ],
@@ -84,7 +128,7 @@ const navigationConfig: NavigationTree[] = [
         translateKey: 'nav.content.content',
         icon: '',
         type: NAV_ITEM_TYPE_TITLE,
-        authority: [],
+        authority: contentManagerAllowedAuthority,
         subMenu: [
             {
                 key: 'news',
@@ -93,17 +137,17 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.content.news',
                 icon: 'news',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: contentManagerAllowedAuthority,
                 subMenu: [],
             },
             {
                 key: 'events',
-                path: '/events',
+                path: '/news/events',
                 title: 'События',
                 translateKey: 'nav.content.events',
                 icon: 'events',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: contentManagerAllowedAuthority,
                 subMenu: [],
             },
             {
@@ -113,7 +157,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.content.help',
                 icon: 'help',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: [],
+                authority: contentManagerAllowedAuthority,
                 subMenu: [],
             },
         ],

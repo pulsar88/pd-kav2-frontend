@@ -29,7 +29,7 @@ const CookieBanner = () => {
                     exit={{ opacity: 0, y: 32 }}
                     transition={{ duration: 0.25, ease: 'easeInOut' }}
                 >
-                    <div className="pointer-events-auto relative flex w-full flex-col items-stretch gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 pr-10 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:flex-row sm:items-center sm:gap-4 sm:pr-12">
+                    <div className="pointer-events-auto relative flex w-full flex-col items-stretch gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg dark:border-gray-700 dark:bg-gray-800 sm:flex-row sm:items-center sm:gap-4 sm:pr-12">
                         <button
                             type="button"
                             aria-label="Закрыть"

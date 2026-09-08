@@ -16,15 +16,9 @@ const Profile = () => {
             </div>
             <div className="flex flex-col gap-6">
                 <ProfileForm />
+                <ChangePassword />
+                <NotificationPreferences />
                 <PrimaryColor />
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
-                    <div className="xl:col-span-8">
-                        <ChangePassword />
-                    </div>
-                    <div className="xl:col-span-4">
-                        <NotificationPreferences />
-                    </div>
-                </div>
             </div>
         </Container>
     )

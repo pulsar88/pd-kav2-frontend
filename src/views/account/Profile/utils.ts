@@ -4,6 +4,7 @@ import {
     normalizeRuPhoneDigits,
 } from '@/views/fixations/utils'
 import type { GetSettingsProfileResponse } from './types'
+import { getUserRoleLabel } from '@/constants/roles.constant'
 
 const roleLabels: Record<string, string> = {
     agent: 'Агент',
@@ -18,10 +19,8 @@ export const mapUserToProfileForm = (
     phone: user.phone ? formatRuPhone(user.phone) : '',
     countryCode: user.countryCode || 'RU',
     img: user.avatar || '',
-    agency: '—',
-    role: user.authority?.[0]
-        ? roleLabels[user.authority[0]] ?? user.authority[0]
-        : '—',
+    agency: user.agencyName || user.agency?.name || '',
+    role: getUserRoleLabel(user.authority?.[0]),
     level: '—',
 })
 

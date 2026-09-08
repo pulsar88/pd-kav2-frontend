@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { CheckboardProperty } from '../../checkboard.types'
 
 export type CheckboardHoverTarget = {
@@ -15,10 +15,27 @@ export const useCheckboardSectionHover = () => {
     const [hover, setHover] = useState<CheckboardHoverTarget>(null)
     const [tooltipTarget, setTooltipTarget] =
         useState<CheckboardPropertyTooltipTarget>(null)
+    const hoverRef = useRef<CheckboardHoverTarget>(null)
+    const tooltipPropertyIdRef = useRef<number | null>(null)
 
     const handleEmptyCellHover = useCallback(
         (floor: number, columnKey: string) => {
-            setHover({ floor, columnKey })
+            const next = { floor, columnKey }
+            const prev = hoverRef.current
+            if (
+                prev?.floor === next.floor &&
+                prev?.columnKey === next.columnKey
+            ) {
+                if (tooltipPropertyIdRef.current != null) {
+                    tooltipPropertyIdRef.current = null
+                    setTooltipTarget(null)
+                }
+                return
+            }
+
+            hoverRef.current = next
+            tooltipPropertyIdRef.current = null
+            setHover(next)
             setTooltipTarget(null)
         },
         [],
@@ -31,13 +48,31 @@ export const useCheckboardSectionHover = () => {
             columnKey: string,
             element: HTMLElement,
         ) => {
-            setHover({ floor, columnKey })
-            setTooltipTarget({ property, element })
+            const next = { floor, columnKey }
+            const prev = hoverRef.current
+            const sameHover =
+                prev?.floor === next.floor &&
+                prev?.columnKey === next.columnKey
+            const sameTooltip = tooltipPropertyIdRef.current === property.id
+
+            if (sameHover && sameTooltip) return
+
+            hoverRef.current = next
+            tooltipPropertyIdRef.current = property.id
+
+            if (!sameHover) {
+                setHover(next)
+            }
+            if (!sameTooltip) {
+                setTooltipTarget({ property, element })
+            }
         },
         [],
     )
 
     const clearSectionHover = useCallback(() => {
+        hoverRef.current = null
+        tooltipPropertyIdRef.current = null
         setHover(null)
         setTooltipTarget(null)
     }, [])

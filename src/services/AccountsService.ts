@@ -16,13 +16,3 @@ export async function apiUpdateSettingsProfile<T, U extends Record<string, unkno
         data,
     })
 }
-
-export async function apiUpdatePassword<T, U extends Record<string, unknown>>(
-    data: U,
-) {
-    return ApiService.fetchDataWithAxios<T>({
-        url: '/setting/password',
-        method: 'put',
-        data,
-    })
-}

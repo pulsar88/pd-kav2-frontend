@@ -3,7 +3,7 @@ import { TbCalendar, TbMapPin, TbZoomIn } from 'react-icons/tb'
 import ImageGallery from '@/components/shared/ImageGallery'
 import { DEFAULT_COMPLEX_IMAGE } from '@/views/objects/constants'
 import type { Complex } from '../../types'
-import { parseComplexPromoText } from '../../utils'
+import { formatCompletionDate, isUndefinedValue, parseComplexPromoText } from '../../utils'
 
 type ComplexAboutTabProps = {
     complex: Complex | null
@@ -31,7 +31,10 @@ const ComplexAboutTab = ({
     const name = complex?.name || fallbackName || dash
     const image = complex?.image || DEFAULT_COMPLEX_IMAGE
     const address = complex?.address?.trim() || dash
-    const completionDate = complex?.completionDate?.trim() || 'Не указано'
+    const completionDate =
+        complex?.completionDate && !isUndefinedValue(complex.completionDate)
+            ? formatCompletionDate(complex.completionDate)
+            : dash
     const { title: promoTitle, features } = parseComplexPromoText(
         complex?.promoText,
     )

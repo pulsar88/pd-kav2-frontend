@@ -40,22 +40,24 @@ export type FixationCreateManagersApiResponse = {
 
 export type CreateFixationApiBody = {
     object_id: number
-    manager_id: number
+    manager_id?: number
     client_id?: number
     client?: {
         name: string
         second_name?: string
         last_name?: string
-        phone: string
-        country_code: string
+        phones: {
+            phone: string
+            country_code: string
+        }[]
     }
     // TODO(api): раскомментировать, когда POST /v2/fixations начнёт принимать поля
     // property_id?: number
-    // note?: string
-    // desired_area?: string
-    // desired_rooms?: string
-    // payment_format?: string
-    // budget?: string
-    // meeting_date?: string
+    comment?: string
+    preferred_area?: string
+    preferred_rooms_count?: string
+    preferred_payment?: string
+    budget?: string
+    meeting_date?: string
     // relatives?: Array<{ client_id: number; relation: string }>
 }

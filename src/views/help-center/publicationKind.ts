@@ -29,6 +29,10 @@ export type PublicationKindConfig = {
     previewRequired: string
     createError: string
     updateError: string
+    deleteSuccess: string
+    deleteError: string
+    deleteConfirmTitle: string
+    deleteConfirmText: string
     loadError: string
     icon: ComponentType<{ className?: string }>
 }
@@ -59,6 +63,11 @@ export const PUBLICATION_KIND: Record<PublicationKind, PublicationKindConfig> =
             previewRequired: 'Укажите превью текст статьи',
             createError: 'Не удалось создать статью',
             updateError: 'Не удалось сохранить статью',
+            deleteSuccess: 'Статья удалена',
+            deleteError: 'Не удалось удалить статью',
+            deleteConfirmTitle: 'Удалить статью?',
+            deleteConfirmText:
+                'Статья будет удалена без возможности восстановления.',
             loadError: 'Статья не найдена',
             icon: TbArticle,
         },
@@ -85,13 +94,18 @@ export const PUBLICATION_KIND: Record<PublicationKind, PublicationKindConfig> =
             previewRequired: 'Укажите превью текст новости',
             createError: 'Не удалось создать новость',
             updateError: 'Не удалось сохранить новость',
+            deleteSuccess: 'Новость удалена',
+            deleteError: 'Не удалось удалить новость',
+            deleteConfirmTitle: 'Удалить новость?',
+            deleteConfirmText:
+                'Новость будет удалена без возможности восстановления.',
             loadError: 'Новость не найдена',
             icon: TbNews,
         },
         event: {
             kind: 'event',
             type: NEWS_TYPE.EVENT,
-            basePath: '/events',
+            basePath: '/news/events',
             listEndpoint: endpointConfig.newsEvents,
             title: 'События',
             description: 'Мероприятия, встречи и важные даты.',
@@ -111,13 +125,21 @@ export const PUBLICATION_KIND: Record<PublicationKind, PublicationKindConfig> =
             previewRequired: 'Укажите превью текст события',
             createError: 'Не удалось создать событие',
             updateError: 'Не удалось сохранить событие',
+            deleteSuccess: 'Событие удалено',
+            deleteError: 'Не удалось удалить событие',
+            deleteConfirmTitle: 'Удалить событие?',
+            deleteConfirmText:
+                'Событие будет удалено без возможности восстановления.',
             loadError: 'Событие не найдено',
             icon: TbCalendarEvent,
         },
     }
 
 export const resolvePublicationKind = (pathname: string): PublicationKind => {
-    if (pathname === '/events' || pathname.startsWith('/events/')) {
+    if (
+        pathname === '/news/events' ||
+        pathname.startsWith('/news/events/')
+    ) {
         return 'event'
     }
 

@@ -2,6 +2,7 @@ import type { FixationStatus } from './types'
 
 export const FIXATION_STATUS_ORDER: FixationStatus[] = [
     'pending',
+    'moderation',
     'fixed',
     'registration',
     'success',
@@ -12,12 +13,14 @@ export const FIXATION_STATUS_ORDER: FixationStatus[] = [
 
 export const FIXATION_STATUS_COLORS: Record<FixationStatus, string> = {
     pending: '#0ea5e9',
+    moderation: '#a855f7',
     denied: '#f43f5e',
     fixed: '#10b981',
     registration: '#6366f1',
     success: '#14b8a6',
     failed: '#f59e0b',
     deleted: '#6b7280',
+    expired: '#ea580c',
 }
 
 export type FixationsStatusCounts = Record<FixationStatus, number>

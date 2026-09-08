@@ -1,11 +1,15 @@
+import { FixationApiBuildingState } from "./fixationApi.types"
+
 export type FixationStatus =
     | 'pending'
+    | 'moderation'
     | 'denied'
     | 'fixed'
     | 'registration'
     | 'success'
     | 'failed'
     | 'deleted'
+    | 'expired'
 
 export type FixationAgent = {
     email: string
@@ -51,7 +55,7 @@ export type FixationObject = {
     name: string
     facing?: string | null
     material?: string | null
-    building_state?: string | null
+    building_state?: FixationApiBuildingState | null
     development_start?: string | null
     development_end?: string | null
     address?: string | null
@@ -85,6 +89,8 @@ export type Fixation = {
     agent: FixationAgent
     crm: FixationCrm
     history: FixationHistoryItem[]
+    has_extend_request?: boolean
+    hasExtendRequest?: boolean
 }
 
 export type GetFixationsResponse = {

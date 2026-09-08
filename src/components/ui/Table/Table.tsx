@@ -27,11 +27,12 @@ const Table = (props: TableProps) => {
         hoverable && 'table-hover',
         compact && 'table-compact',
         cellBorder && 'table-border',
+        'w-full min-w-full',
         className,
     )
 
     return (
-        <div className={classNames(overflow && 'overflow-x-auto')}>
+        <div className={classNames(overflow && 'overflow-x-auto w-full')}>
             <Component className={tableClass} {...rest} ref={ref}>
                 {children}
             </Component>

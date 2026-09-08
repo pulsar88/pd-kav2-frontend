@@ -96,6 +96,12 @@ export type ResetPassword = {
     code: string
 }
 
+export type ChangePassword = {
+    old_password: string
+    password: string
+    password_confirmation: string
+}
+
 /** @deprecated legacy shape kept for Oauth helpers */
 export type SignInResponse = {
     token: string
@@ -125,6 +131,8 @@ export type User = {
     phone?: string | null
     countryCode?: string | null
     authority?: string[]
+    agency?: AgencyBrief | null
+    agencyName?: string | null
 }
 
 export type ProfilePicture = {
@@ -142,6 +150,12 @@ export type ProfilePicture = {
     url_path: string
 }
 
+export type AgencyBrief = {
+    id: number
+    fix_days: number
+    name: string
+}
+
 export type CurrentUserResponse = {
     id: number
     name: string
@@ -150,6 +164,7 @@ export type CurrentUserResponse = {
     country_code: string
     roles: string[]
     profile_picture: ProfilePicture | null
+    agency?: AgencyBrief | null
 }
 
 export type UpdateUserPayload = {

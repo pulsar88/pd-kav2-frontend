@@ -1,13 +1,13 @@
 import type { Fixation, FixationHistoryType, FixationStatus } from './types'
 
 export const fixationKinshipOptions = [
-    { value: 'spouse', label: 'Супруг / супруга' },
-    { value: 'child', label: 'Сын / дочь' },
-    { value: 'parent', label: 'Отец / мать' },
-    { value: 'sibling', label: 'Брат / сестра' },
-    { value: 'grandparent', label: 'Дедушка / бабушка' },
-    { value: 'grandchild', label: 'Внук / внучка' },
-    { value: 'other', label: 'Иной родственник' },
+    { value: '10', label: 'Супруг / супруга' },
+    { value: '20', label: 'Отец / мать' },
+    { value: '30', label: 'Сын / дочь' },
+    { value: '40', label: 'Дедушка / бабушка' },
+    { value: '50', label: 'Внук / внучка' },
+    { value: '60', label: 'Брат / сестра' },
+    // { value: 'other', label: 'Иной родственник' },
 ] as const
 
 export const fixationKinshipLabel: Record<string, string> = Object.fromEntries(
@@ -25,6 +25,11 @@ export const fixationStatusMap: Record<
         label: 'В ожидании',
         className:
             'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300',
+    },
+    moderation: {
+        label: 'Модерация',
+        className:
+            'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300',
     },
     denied: {
         label: 'Отклонена',
@@ -56,12 +61,18 @@ export const fixationStatusMap: Record<
         className:
             'bg-gray-100 text-gray-600 dark:bg-gray-500/20 dark:text-gray-300',
     },
+    expired: {
+        label: 'Истекла',
+        className:
+            'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+    },
 }
 
 export const getFixationStatusDisplay = (
     fixation: Pick<Fixation, 'status' | 'statusLabel'>,
 ) => {
-    const meta = fixationStatusMap[fixation.status]
+    const rawStatus = fixation.status ? (String(fixation.status).toLowerCase() as FixationStatus) : 'pending'
+    const meta = fixationStatusMap[rawStatus] || fixationStatusMap[fixation.status]
 
     if (!meta) {
         return {

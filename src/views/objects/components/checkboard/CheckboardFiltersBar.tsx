@@ -15,7 +15,6 @@ type CheckboardFiltersBarProps = {
     filters: CheckboardFilters
     typeOptions: Option[]
     total: number
-    available: number
     onChange: (filters: CheckboardFilters) => void
     onApply: () => void
     onReset: () => void
@@ -61,7 +60,6 @@ const CheckboardFiltersBar = ({
     filters,
     typeOptions,
     total,
-    available,
     onChange,
     onApply,
     onReset,
@@ -97,12 +95,6 @@ const CheckboardFiltersBar = ({
                             Всего:{' '}
                             <span className="ml-1 text-base tabular-nums">
                                 {total}
-                            </span>
-                        </span>
-                        <span className="inline-flex items-center rounded-lg bg-[#a4f4cf] px-2.5 py-1 text-sm font-semibold text-[#006045]">
-                            Свободно:{' '}
-                            <span className="ml-1 text-base tabular-nums">
-                                {available}
                             </span>
                         </span>
                         {collapsed && activeCount > 0 ? (

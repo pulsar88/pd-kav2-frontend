@@ -11,6 +11,7 @@ import type {
     AuthStatusResponse,
     AuthTokenResponse,
     CheckPhoneCredential,
+    ChangePassword,
     CurrentUserResponse,
     ForgotPassword,
     ForgotPasswordResponse,
@@ -38,6 +39,11 @@ export const mapCurrentUserToUser = (
     phone: data.phone,
     countryCode: data.country_code,
     authority: data.roles,
+    agency: typeof data.agency === 'object' ? data.agency : null,
+    agencyName:
+        typeof data.agency === 'string'
+            ? data.agency
+            : data.agency?.name || null,
     avatar:
         data.profile_picture !== undefined
             ? resolveProfilePictureUrl(data.profile_picture)
@@ -169,7 +175,8 @@ export async function apiUploadProfilePicture(file: File): Promise<User> {
     formData.append('profile_picture', file)
 
     const response = await ApiService.fetchDataWithAxios<
-        ApiDataEnvelope<CurrentUserResponse>
+        ApiDataEnvelope<CurrentUserResponse>,
+        FormData
     >({
         url: endpointConfig.userProfilePicture,
         method: 'post',
@@ -214,6 +221,14 @@ export async function apiForgotPassword(data: ForgotPassword) {
 export async function apiResetPassword(data: ResetPassword) {
     return ApiService.fetchDataWithAxios<AuthMessageResponse>({
         url: endpointConfig.authResetPassword,
+        method: 'post',
+        data,
+    })
+}
+
+export async function apiChangePassword(data: ChangePassword) {
+    return ApiService.fetchDataWithAxios<AuthMessageResponse>({
+        url: endpointConfig.authChangePassword,
         method: 'post',
         data,
     })

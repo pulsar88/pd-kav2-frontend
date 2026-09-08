@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useCallback } from 'react'
 import classNames from '@/utils/classNames'
 import type {
     CheckboardBuilding,
     CheckboardCellLabel,
+    CheckboardProperty,
     CheckboardSection,
     SectionColumn,
 } from '../../checkboard.types'
@@ -16,17 +17,26 @@ import {
     getSectionFloors,
 } from '../../checkboardUtils'
 import DualHorizontalScroll from './DualHorizontalScroll'
-import CheckboardPropertyCellTooltip from './CheckboardPropertyCellTooltip'
+import CheckboardSharedPropertyTooltip from './CheckboardSharedPropertyTooltip'
+import {
+    isCheckboardCrosshair,
+    isCheckboardExactHover,
+} from './checkboardHoverUtils'
+import {
+    useCheckboardSectionHover,
+    type CheckboardHoverTarget,
+} from './useCheckboardSectionHover'
 
 type CheckboardClassicProps = {
     building: CheckboardBuilding
     labelMode: CheckboardCellLabel
     activePropertyIds?: Set<number> | null
     selectedPropertyId?: number | null
+    isPropertySelectable?: (property: CheckboardProperty) => boolean
     onPropertySelect?: (propertyId: number) => void
+    zoom?: number
+    onZoomChange?: (zoom: number) => void
 }
-
-type HoverTarget = { floor: number; columnKey: string } | null
 
 const CELL_SIZE_PX = 35
 const CELL = 'minmax(35px, 35px)'
@@ -38,33 +48,22 @@ const FLOOR_ROW_PITCH_PX = CELL_SIZE_PX + GRID_GAP_PX
 const buildBlockColumns = (columns: SectionColumn[]) =>
     `${FLOOR} ${columns.map(() => CELL).join(' ')} ${FLOOR}`
 
-const isCrosshair = (
-    hover: HoverTarget,
-    floor: number,
-    columnKey: string,
-) =>
-    Boolean(
-        hover && (hover.floor === floor || hover.columnKey === columnKey),
-    )
-
-const isExactHover = (
-    hover: HoverTarget,
-    floor: number,
-    columnKey: string,
-) =>
-    Boolean(
-        hover && hover.floor === floor && hover.columnKey === columnKey,
-    )
-
 type BlockProps = {
     section: CheckboardSection
     columns: SectionColumn[]
     floors: number[]
     labelMode: CheckboardCellLabel
     activePropertyIds?: Set<number> | null
-    hover: HoverTarget
-    onHover: (value: HoverTarget) => void
+    hover: CheckboardHoverTarget
+    onEmptyHover: (floor: number, columnKey: string) => void
+    onPropertyHover: (
+        property: CheckboardProperty,
+        floor: number,
+        columnKey: string,
+        element: HTMLElement,
+    ) => void
     selectedPropertyId?: number | null
+    isPropertySelectable?: (property: CheckboardProperty) => boolean
     onPropertySelect?: (propertyId: number) => void
 }
 
@@ -75,8 +74,10 @@ const ClassicBlock = ({
     labelMode,
     activePropertyIds,
     hover,
-    onHover,
+    onEmptyHover,
+    onPropertyHover,
     selectedPropertyId,
+    isPropertySelectable,
     onPropertySelect,
 }: BlockProps) => {
     if (columns.length === 0) return null
@@ -88,7 +89,7 @@ const ClassicBlock = ({
                 <div
                     key={`${position}-${column.key}`}
                     className={classNames(
-                        'truncate rounded px-0.5 text-center text-xs font-semibold transition-colors',
+                        'truncate rounded px-0.5 text-center text-xs font-semibold',
                         activeCol
                             ? 'bg-primary/15 font-semibold text-primary'
                             : 'text-gray-500',
@@ -115,7 +116,7 @@ const ClassicBlock = ({
                     <div key={`floor-row-${floor}`} className="contents">
                         <div
                             className={classNames(
-                                'flex items-center justify-center whitespace-nowrap rounded text-xs font-semibold transition-colors',
+                                'flex items-center justify-center whitespace-nowrap rounded text-xs font-semibold',
                                 rowActive
                                     ? 'bg-primary/15 text-primary'
                                     : 'text-gray-500',
@@ -129,14 +130,9 @@ const ClassicBlock = ({
                                 floor,
                                 column,
                             )
-                            const setCellHover = () =>
-                                onHover({
-                                    floor,
-                                    columnKey: column.key,
-                                })
 
                             if (!property) {
-                                const highlighted = isCrosshair(
+                                const highlighted = isCheckboardCrosshair(
                                     hover,
                                     floor,
                                     column.key,
@@ -146,12 +142,14 @@ const ClassicBlock = ({
                                         key={`${floor}-${column.key}`}
                                         className={classNames(
                                             CELL_CLASS,
-                                            'rounded-lg transition-colors',
+                                            'rounded-lg',
                                             highlighted
                                                 ? 'bg-primary/15 dark:bg-primary/20'
                                                 : 'bg-gray-50 dark:bg-gray-900/50',
                                         )}
-                                        onMouseEnter={setCellHover}
+                                        onMouseEnter={() =>
+                                            onEmptyHover(floor, column.key)
+                                        }
                                     />
                                 )
                             }
@@ -159,51 +157,62 @@ const ClassicBlock = ({
                             const active =
                                 !activePropertyIds ||
                                 activePropertyIds.has(property.id)
-                            const exact = isExactHover(
+                            const exact = isCheckboardExactHover(
                                 hover,
                                 floor,
                                 column.key,
                             )
                             const isSelected =
                                 selectedPropertyId === property.id
+                            const isSelectable =
+                                !isPropertySelectable ||
+                                isPropertySelectable(property)
 
                             return (
-                                <CheckboardPropertyCellTooltip
+                                <button
                                     key={property.id}
-                                    property={property}
-                                    wrapperClass="flex shrink-0"
+                                    type="button"
+                                    data-property-id={property.id}
+                                    disabled={!isSelectable}
+                                    className={classNames(
+                                        CELL_CLASS,
+                                        'relative z-0 flex shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold leading-none',
+                                        (!active || !isSelectable) &&
+                                            DIMMED_CELL_CLASS,
+                                        !isSelectable &&
+                                            '!cursor-not-allowed opacity-40',
+                                        isSelected &&
+                                            'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
+                                        exact &&
+                                            !isSelected &&
+                                            isSelectable &&
+                                            'z-[1] shadow-md ring-2 ring-primary/70',
+                                    )}
+                                    style={{
+                                        backgroundColor:
+                                            property.status.color,
+                                        color: property.status.text_color,
+                                    }}
+                                    onMouseEnter={(event) =>
+                                        onPropertyHover(
+                                            property,
+                                            floor,
+                                            column.key,
+                                            event.currentTarget,
+                                        )
+                                    }
+                                    onClick={() => {
+                                        if (!isSelectable) return
+                                        onPropertySelect?.(property.id)
+                                    }}
                                 >
-                                    <button
-                                        type="button"
-                                        data-property-id={property.id}
-                                        className={classNames(
-                                            CELL_CLASS,
-                                            'relative z-0 flex shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold leading-none transition-[opacity,filter,box-shadow]',
-                                            !active && DIMMED_CELL_CLASS,
-                                            isSelected &&
-                                                'z-[2] shadow-md ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-gray-900',
-                                            exact &&
-                                                !isSelected &&
-                                                'z-[1] shadow-md ring-2 ring-primary/70',
-                                        )}
-                                        style={{
-                                            backgroundColor:
-                                                property.status.color,
-                                            color: property.status.text_color,
-                                        }}
-                                        onMouseEnter={setCellHover}
-                                        onClick={() =>
-                                            onPropertySelect?.(property.id)
-                                        }
-                                    >
-                                        {getCellLabel(property, labelMode)}
-                                    </button>
-                                </CheckboardPropertyCellTooltip>
+                                    {getCellLabel(property, labelMode)}
+                                </button>
                             )
                         })}
                         <div
                             className={classNames(
-                                'flex items-center justify-center whitespace-nowrap rounded text-xs font-semibold transition-colors',
+                                'flex items-center justify-center whitespace-nowrap rounded text-xs font-semibold',
                                 rowActive
                                     ? 'bg-primary/15 text-primary'
                                     : 'text-gray-500',
@@ -228,6 +237,7 @@ type SectionProps = {
     labelMode: CheckboardCellLabel
     activePropertyIds?: Set<number> | null
     selectedPropertyId?: number | null
+    isPropertySelectable?: (property: CheckboardProperty) => boolean
     onPropertySelect?: (propertyId: number) => void
 }
 
@@ -237,17 +247,44 @@ const ClassicSection = ({
     labelMode,
     activePropertyIds,
     selectedPropertyId,
+    isPropertySelectable,
     onPropertySelect,
 }: SectionProps) => {
-    const [hover, setHover] = useState<HoverTarget>(null)
+    const {
+        hover,
+        tooltipTarget,
+        handleEmptyCellHover,
+        handlePropertyCellHover,
+        clearSectionHover,
+    } = useCheckboardSectionHover()
+
     const floors = getSectionFloors(section)
     const columns = getSectionColumns(section)
     const offsetColumns = columns.filter((column) => column.kind === 'offset')
     const stackColumns = columns.filter((column) => column.kind === 'stack')
 
+    const onEmptyHover = useCallback(
+        (floor: number, columnKey: string) => {
+            handleEmptyCellHover(floor, columnKey)
+        },
+        [handleEmptyCellHover],
+    )
+
+    const onPropertyHover = useCallback(
+        (
+            property: CheckboardProperty,
+            floor: number,
+            columnKey: string,
+            element: HTMLElement,
+        ) => {
+            handlePropertyCellHover(property, floor, columnKey, element)
+        },
+        [handlePropertyCellHover],
+    )
+
     return (
         <div
-            className="shrink-0 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700"
+            className="shrink-0 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 [content-visibility:auto] [contain-intrinsic-size:auto_520px]"
             style={
                 alignOffsetPx > 0
                     ? { marginTop: alignOffsetPx }
@@ -259,7 +296,7 @@ const ClassicSection = ({
             </div>
             <div
                 className="flex items-start gap-5 p-3"
-                onMouseLeave={() => setHover(null)}
+                onMouseLeave={clearSectionHover}
             >
                 <ClassicBlock
                     section={section}
@@ -268,8 +305,10 @@ const ClassicSection = ({
                     labelMode={labelMode}
                     activePropertyIds={activePropertyIds}
                     hover={hover}
-                    onHover={setHover}
+                    onEmptyHover={onEmptyHover}
+                    onPropertyHover={onPropertyHover}
                     selectedPropertyId={selectedPropertyId}
+                    isPropertySelectable={isPropertySelectable}
                     onPropertySelect={onPropertySelect}
                 />
                 <ClassicBlock
@@ -279,11 +318,17 @@ const ClassicSection = ({
                     labelMode={labelMode}
                     activePropertyIds={activePropertyIds}
                     hover={hover}
-                    onHover={setHover}
+                    onEmptyHover={onEmptyHover}
+                    onPropertyHover={onPropertyHover}
                     selectedPropertyId={selectedPropertyId}
+                    isPropertySelectable={isPropertySelectable}
                     onPropertySelect={onPropertySelect}
                 />
             </div>
+            <CheckboardSharedPropertyTooltip
+                property={tooltipTarget?.property ?? null}
+                referenceElement={tooltipTarget?.element ?? null}
+            />
         </div>
     )
 }
@@ -293,7 +338,10 @@ const CheckboardClassic = ({
     labelMode,
     activePropertyIds,
     selectedPropertyId,
+    isPropertySelectable,
     onPropertySelect,
+    zoom = 1,
+    onZoomChange,
 }: CheckboardClassicProps) => {
     const sections = building.sections.filter((section) => {
         const columns = getSectionColumns(section)
@@ -310,7 +358,7 @@ const CheckboardClassic = ({
     }
 
     return (
-        <DualHorizontalScroll>
+        <DualHorizontalScroll zoom={zoom} onZoomChange={onZoomChange}>
             {sections.map((section) => (
                 <ClassicSection
                     key={section.id}
@@ -323,6 +371,7 @@ const CheckboardClassic = ({
                     labelMode={labelMode}
                     activePropertyIds={activePropertyIds}
                     selectedPropertyId={selectedPropertyId}
+                    isPropertySelectable={isPropertySelectable}
                     onPropertySelect={onPropertySelect}
                 />
             ))}

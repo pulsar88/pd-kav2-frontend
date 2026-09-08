@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import classNames from '@/utils/classNames'
+import useResponsive from '@/utils/hooks/useResponsive'
 import Button from '@/components/ui/Button'
 import Dialog from '@/components/ui/Dialog'
 import Steps from '@/components/ui/Steps'
 import Table from '@/components/ui/Table'
 import Input from '@/components/ui/Input'
 import Select, { Option as SelectMenuOption } from '@/components/ui/Select'
+import Dropdown from '@/components/ui/Dropdown'
+import Spinner from '@/components/ui/Spinner'
 import Pagination from '@/components/ui/Pagination'
 import CloseButton from '@/components/ui/CloseButton'
 import AsyncSelect from 'react-select/async'
+import { components } from 'react-select'
+import type { GroupBase, MenuListProps } from 'react-select'
 import DatePicker from '@/components/ui/DatePicker'
 import { Form, FormItem } from '@/components/ui/Form'
 import PhoneInput from '@/components/shared/PhoneInput'
@@ -16,14 +21,15 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import {
     apiCreateFixation,
+    apiCreateFixationClient,
     apiGetFixationClients,
     apiGetFixationHouses,
     apiGetFixationManagers,
+    apiSetRelatedClientsForFixation,
 } from '@/services/FixationsService'
-import { apiGetCheckboard } from '@/services/ObjectsService'
+import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
-import useSWR, { useSWRConfig } from 'swr'
 import { z } from 'zod'
 import 'dayjs/locale/ru'
 import debounce from 'lodash/debounce'
@@ -46,7 +52,11 @@ import {
     collectStatuses,
     findBuildingPropertyById,
 } from '@/views/objects/checkboardUtils'
-import type { CheckboardCellLabel } from '@/views/objects/checkboard.types'
+import type {
+    CheckboardBuilding,
+    CheckboardCellLabel,
+    CheckboardProperty,
+} from '@/views/objects/checkboard.types'
 import type {
     FixationApartment,
     FixationClient,
@@ -57,33 +67,31 @@ import type {
 import {
     formatFixationKinship,
     fixationKinshipOptions,
-    normalizeRuPhoneDigits,
     RU_PHONE_REGEX,
 } from '../utils'
 
 const { THead, TBody, Tr, Th, Td } = Table
 
-type WizardStep = 'client' | 'client-create' | 'complex' | 'note' | 'confirm'
+type WizardStep =
+    | 'client'
+    | 'client-create'
+    | 'complex'
+    | 'note'
+    | 'relatives'
+    | 'confirm'
 
 type SelectedRelative = {
     client: FixationClient
     relation: string
 }
 
-// type ManagerSelection = FixationManager | 'any' // TODO(api): «Любой менеджер» — когда API поддержит
-type ManagerSelection = FixationManager
+type ManagerSelection = FixationManager | 'any'
 
 type FixationsCreateWizardDialogProps = {
     isOpen: boolean
     initialSelection?: FixationCreateInitialSelection | null
     onClose: () => void
-}
-
-type ClientCreateSchema = {
-    lastName: string
-    firstName: string
-    middleName?: string
-    phone: string
+    onSuccess?: () => void
 }
 
 type SelectOption = {
@@ -99,34 +107,33 @@ const CLIENTS_PAGE_SIZES = [20, 50, 100]
 
 /**
  * Расширенные шаги wizard (помещение, предпочтения, родственники, комментарий).
- * UI и state сохранены — скрыты флагом до появления полей в POST /v2/fixations.
- * После обновления API:
- * 1. поставить true
- * 2. раскомментировать маппинг в fixationCreateMapper.ts
- * 3. раскомментировать поля в CreateFixationApiBody
  */
-const WIZARD_EXTENDED_FIELDS_ENABLED = false
+const WIZARD_EXTENDED_FIELDS_ENABLED = true
 
 const STEP_INDEX: Record<
-    Exclude<WizardStep, 'client-create' | 'note'>,
+    Exclude<WizardStep, 'client-create'>,
     number
 > = {
     client: 0,
     complex: 1,
-    confirm: 2,
+    note: 2,
+    relatives: 3,
+    confirm: 4,
 }
 
 const STEP_BY_INDEX: Record<
     number,
-    Exclude<WizardStep, 'client-create' | 'note'>
+    Exclude<WizardStep, 'client-create'>
 > = {
     0: 'client',
     1: 'complex',
-    2: 'confirm',
+    2: 'note',
+    3: 'relatives',
+    4: 'confirm',
 }
 
 const STEP_META: Record<
-    Exclude<WizardStep, 'client-create' | 'note'>,
+    Exclude<WizardStep, 'client-create'>,
     { title: string; description: string }
 > = {
     client: {
@@ -135,12 +142,16 @@ const STEP_META: Record<
     },
     complex: {
         title: 'Дом и менеджер',
-        description: 'Выберите дом и менеджера',
+        description: 'Выберите дом и при необходимости менеджера',
     },
-    // note: {
-    //     title: 'Предпочтения',
-    //     description: 'Добавьте пожелания к фиксации при необходимости',
-    // },
+    note: {
+        title: 'Предпочтения',
+        description: 'Укажите комментарий и пожелания к объекту',
+    },
+    relatives: {
+        title: 'Родственники',
+        description: 'Добавьте родственников клиента при необходимости',
+    },
     confirm: {
         title: 'Подтверждение',
         description: 'Проверьте данные перед созданием фиксации',
@@ -180,6 +191,34 @@ const formatSelectedPremiseLabel = (premise: FixationApartment) => {
     return parts.join(' · ')
 }
 
+const formatPremiseInterestComment = (premise: FixationApartment) => {
+    const details = [`№${premise.number}`]
+
+    if (premise.rooms && premise.rooms > 0) {
+        details.push(`${premise.rooms}-комн.`)
+    }
+
+    return `Интересует помещение ${details.join(', ')}`
+}
+
+const buildFixationComment = (
+    premise: FixationApartment | null,
+    note: string,
+) => {
+    const parts: string[] = []
+
+    if (premise) {
+        parts.push(formatPremiseInterestComment(premise))
+    }
+
+    const trimmedNote = note.trim()
+    if (trimmedNote) {
+        parts.push(trimmedNote)
+    }
+
+    return parts.length > 0 ? parts.join('\n') : undefined
+}
+
 type PremiseSelectionControlsProps = {
     selectedApartment: FixationApartment | null
     onClearSelection: () => void
@@ -217,6 +256,8 @@ const PremiseSelectionControls = ({
 }
 
 const SELECT_MENU_CLOSE_SCROLL_PX = 56
+const HOUSES_PER_PAGE = 20
+const MANAGERS_PER_PAGE = 20
 
 const selectMenuProps = {
     menuPortalTarget:
@@ -229,6 +270,39 @@ const selectMenuProps = {
             zIndex: 60,
         }),
     },
+}
+
+type InfiniteSelectProps = {
+    isLoadingMore?: boolean
+}
+
+const mergeById = <T extends { id: string }>(prev: T[], next: T[]): T[] => {
+    if (next.length === 0) return prev
+
+    const seen = new Set(prev.map((item) => item.id))
+    const uniqueNext = next.filter((item) => !seen.has(item.id))
+
+    return uniqueNext.length > 0 ? [...prev, ...uniqueNext] : prev
+}
+
+const InfiniteSelectMenuList = (
+    props: MenuListProps<SelectOption, false, GroupBase<SelectOption>>,
+) => {
+    const isLoadingMore = Boolean(
+        (props.selectProps as InfiniteSelectProps).isLoadingMore,
+    )
+
+    return (
+        <>
+            <components.MenuList {...props} />
+            {isLoadingMore ? (
+                <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
+                    <Spinner size={14} />
+                    Загрузка...
+                </div>
+            ) : null}
+        </>
+    )
 }
 
 const isSelectControlFocused = () => {
@@ -252,30 +326,30 @@ const closeOpenSelectMenus = () => {
 }
 
 const desiredAreaOptions: SelectOption[] = [
-    { value: '0-30', label: '0-30' },
-    { value: '30-50', label: '30-50' },
-    { value: '50-70', label: '50-70' },
-    { value: '70-90', label: '70-90' },
-    { value: '90+', label: '90+' },
+    { value: '10', label: '0-30' },
+    { value: '20', label: '30-50' },
+    { value: '30', label: '50-70' },
+    { value: '40', label: '70-90' },
+    { value: '50', label: '90+' },
 ]
 
 const desiredRoomsOptions: SelectOption[] = [
-    { value: 'Студия', label: 'Студия' },
-    { value: '1 / 1+', label: '1 / 1+' },
-    { value: '2 / 2+', label: '2 / 2+' },
-    { value: '3 / 3+', label: '3 / 3+' },
-    { value: '4 / 4+', label: '4 / 4+' },
-    { value: 'Другое', label: 'Другое' },
+    { value: '10', label: 'Студия' },
+    { value: '20', label: '1 / 1+' },
+    { value: '30', label: '2 / 2+' },
+    { value: '40', label: '3 / 3+' },
+    { value: '50', label: '4 / 4+' },
+    { value: '1000', label: 'Другое' },
 ]
 
 const paymentFormatOptions: SelectOption[] = [
-    { value: 'Наличные', label: 'Наличные' },
-    { value: 'Ипотека', label: 'Ипотека' },
-    { value: 'Рассрочка', label: 'Рассрочка' },
-    { value: 'Материнский капитал', label: 'Материнский капитал' },
-    { value: 'Сертификаты', label: 'Сертификаты' },
-    { value: 'Трейд-ин', label: 'Трейд-ин' },
-    { value: 'Неизвестно', label: 'Неизвестно' },
+    { value: '10', label: 'Наличные' },
+    { value: '20', label: 'Ипотека' },
+    { value: '30', label: 'Рассрочка' },
+    { value: '40', label: 'Материнский капитал' },
+    { value: '50', label: 'Сертификаты' },
+    { value: '60', label: 'Трейд-ин' },
+    { value: '1000', label: 'Неизвестно' },
 ]
 
 const clientCreateSchema = z.object({
@@ -290,11 +364,36 @@ const clientCreateSchema = z.object({
         }),
 })
 
+type ClientCreateSchema = z.infer<typeof clientCreateSchema>
+
+const relativeCreateSchema = z.object({
+    lastName: z.string().min(1, { message: 'Введите фамилию' }),
+    firstName: z.string().min(1, { message: 'Введите имя' }),
+    middleName: z.string().optional(),
+    phone: z
+        .string()
+        .min(1, { message: 'Введите номер телефона' })
+        .regex(RU_PHONE_REGEX, {
+            message: 'Введите номер телефона',
+        }),
+    relation: z.string().min(1, { message: 'Выберите степень родства' }),
+})
+
+type RelativeCreateSchema = z.infer<typeof relativeCreateSchema>
+
 const emptyClientForm: ClientCreateSchema = {
     lastName: '',
     firstName: '',
     middleName: '',
     phone: '',
+}
+
+const emptyRelativeForm: RelativeCreateSchema = {
+    lastName: '',
+    firstName: '',
+    middleName: '',
+    phone: '',
+    relation: '',
 }
 
 const SummaryCard = ({
@@ -363,13 +462,25 @@ const FixationsCreateWizardDialog = ({
     isOpen,
     initialSelection = null,
     onClose,
+    onSuccess,
 }: FixationsCreateWizardDialogProps) => {
-    const { mutate } = useSWRConfig()
+    const { smaller } = useResponsive()
+    const isMobile = Boolean(smaller?.sm)
+
     const [step, setStep] = useState<WizardStep>('client')
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isCreatingClient, setIsCreatingClient] = useState(false)
+    const [isCreatingRelative, setIsCreatingRelative] = useState(false)
+    const contentScrollRef = useRef<HTMLDivElement | null>(null)
+    const clientsTableScrollRef = useRef<HTMLDivElement | null>(null)
     const initialSelectionAppliedRef = useRef(false)
     const selectMenuScrollAnchorRef = useRef<number | null>(null)
+    const complexesPageRef = useRef(1)
+    const complexesHasMoreRef = useRef(false)
+    const complexesLoadingMoreRef = useRef(false)
+    const managersPageRef = useRef(1)
+    const managersHasMoreRef = useRef(false)
+    const managersLoadingMoreRef = useRef(false)
 
     const [clients, setClients] = useState<FixationClient[]>([])
     const [clientsTotal, setClientsTotal] = useState(0)
@@ -380,7 +491,9 @@ const FixationsCreateWizardDialog = ({
     const [managers, setManagers] = useState<FixationManager[]>([])
     const [isClientsLoading, setIsClientsLoading] = useState(false)
     const [isComplexesLoading, setIsComplexesLoading] = useState(false)
+    const [isComplexesLoadingMore, setIsComplexesLoadingMore] = useState(false)
     const [isManagersLoading, setIsManagersLoading] = useState(false)
+    const [isManagersLoadingMore, setIsManagersLoadingMore] = useState(false)
 
     const [clientPhoneQuery, setClientPhoneQuery] = useState('')
     const [clientSearchQuery, setClientSearchQuery] = useState('')
@@ -411,13 +524,24 @@ const FixationsCreateWizardDialog = ({
     const [meetingDate, setMeetingDate] = useState('')
 
     const {
-        control,
-        handleSubmit,
+        control: clientControl,
+        handleSubmit: handleClientSubmit,
         reset: resetClientForm,
         formState: { errors: clientErrors, isValid: isClientFormValid },
     } = useForm<ClientCreateSchema>({
         defaultValues: emptyClientForm,
         resolver: zodResolver(clientCreateSchema),
+        mode: 'onChange',
+    })
+
+    const {
+        control: relativeControl,
+        handleSubmit: handleRelativeSubmit,
+        reset: resetRelativeForm,
+        formState: { errors: relativeErrors, isValid: isRelativeFormValid },
+    } = useForm<RelativeCreateSchema>({
+        defaultValues: emptyRelativeForm,
+        resolver: zodResolver(relativeCreateSchema),
         mode: 'onChange',
     })
 
@@ -431,6 +555,7 @@ const FixationsCreateWizardDialog = ({
         setIsCheckboardFullscreen(false)
         setSelectedManager(null)
         setSelectedRelatives([])
+        setIsCreatingRelative(false)
         setNote('')
         setClientPhoneQuery('')
         setClientSearchQuery('')
@@ -438,12 +563,25 @@ const FixationsCreateWizardDialog = ({
         setClientsPageIndex(1)
         setClientsPageSize(20)
         setHasClientsLoaded(false)
+        setComplexes([])
+        setManagers([])
+        setIsComplexesLoading(false)
+        setIsComplexesLoadingMore(false)
+        setIsManagersLoading(false)
+        setIsManagersLoadingMore(false)
+        complexesPageRef.current = 1
+        complexesHasMoreRef.current = false
+        complexesLoadingMoreRef.current = false
+        managersPageRef.current = 1
+        managersHasMoreRef.current = false
+        managersLoadingMoreRef.current = false
         setDesiredArea('')
         setDesiredRooms('')
         setPaymentFormat('')
         setBudget('')
         setMeetingDate('')
         resetClientForm(emptyClientForm)
+        resetRelativeForm(emptyRelativeForm)
         initialSelectionAppliedRef.current = false
     }
 
@@ -453,6 +591,15 @@ const FixationsCreateWizardDialog = ({
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
+
+    useEffect(() => {
+        if (contentScrollRef.current) {
+            contentScrollRef.current.scrollTop = 0
+        }
+        if (clientsTableScrollRef.current) {
+            clientsTableScrollRef.current.scrollTop = 0
+        }
+    }, [step])
 
     useEffect(() => {
         if (!isOpen || step !== 'client') {
@@ -566,38 +713,154 @@ const FixationsCreateWizardDialog = ({
             return
         }
 
+        let cancelled = false
+
         const loadComplexes = async () => {
             setIsComplexesLoading(true)
+            complexesPageRef.current = 1
+            complexesHasMoreRef.current = false
+            complexesLoadingMoreRef.current = false
+
             try {
-                const response = await apiGetFixationHouses()
-                setComplexes(response || [])
+                const response = await apiGetFixationHouses({
+                    page: 1,
+                    per_page: HOUSES_PER_PAGE,
+                })
+                if (cancelled) return
+
+                let list = response.list || []
+                const currentPage = response.meta.current_page
+                const lastPage = response.meta.last_page
+                const more = currentPage < lastPage
+
+                if (
+                    initialSelection?.complexId &&
+                    !list.some((item) => item.id === initialSelection.complexId)
+                ) {
+                    try {
+                        const selectedObject = await apiGetRealtyObject(
+                            initialSelection.complexId,
+                        )
+                        if (selectedObject && !cancelled) {
+                            list = [
+                                {
+                                    id: selectedObject.id,
+                                    name: selectedObject.name,
+                                    address:
+                                        selectedObject.address?.trim() || '',
+                                    apartments: [],
+                                    managers: [],
+                                },
+                                ...list,
+                            ]
+                        }
+                    } catch {
+                        // keep first page as-is if preselected object fetch fails
+                    }
+                }
+
+                if (cancelled) return
+
+                setComplexes(list)
+                complexesPageRef.current = currentPage
+                complexesHasMoreRef.current = more
             } catch {
-                setComplexes([])
+                if (!cancelled) {
+                    setComplexes([])
+                    complexesPageRef.current = 1
+                    complexesHasMoreRef.current = false
+                }
             } finally {
-                setIsComplexesLoading(false)
+                if (!cancelled) {
+                    setIsComplexesLoading(false)
+                }
             }
         }
 
         void loadComplexes()
+
+        return () => {
+            cancelled = true
+        }
     }, [isOpen, step, initialSelection?.complexId, complexes.length])
 
+    const handleComplexesMenuScrollToBottom = useCallback(async () => {
+        if (
+            complexesLoadingMoreRef.current ||
+            !complexesHasMoreRef.current ||
+            isComplexesLoading
+        ) {
+            return
+        }
+
+        complexesLoadingMoreRef.current = true
+        setIsComplexesLoadingMore(true)
+
+        const nextPage = complexesPageRef.current + 1
+
+        try {
+            const response = await apiGetFixationHouses({
+                page: nextPage,
+                per_page: HOUSES_PER_PAGE,
+            })
+            const currentPage = response.meta.current_page
+            const lastPage = response.meta.last_page
+            const more = currentPage < lastPage
+
+            setComplexes((prev) => mergeById(prev, response.list || []))
+            complexesPageRef.current = currentPage
+            complexesHasMoreRef.current = more
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : 'Не удалось загрузить список домов'
+            toast.push(<Notification type="danger">{message}</Notification>, {
+                placement: 'top-center',
+            })
+        } finally {
+            complexesLoadingMoreRef.current = false
+            setIsComplexesLoadingMore(false)
+        }
+    }, [isComplexesLoading])
+
     useEffect(() => {
-        if (!isOpen || step !== 'complex' || managers.length > 0) {
+        if (!isOpen || step !== 'complex' || !selectedComplex?.id) {
+            if (!selectedComplex?.id) {
+                setManagers([])
+                managersPageRef.current = 1
+                managersHasMoreRef.current = false
+            }
             return
         }
 
         let cancelled = false
+        const objectId = selectedComplex.id
 
         const loadManagers = async () => {
             setIsManagersLoading(true)
+            setManagers([])
+            managersPageRef.current = 1
+            managersHasMoreRef.current = false
+            managersLoadingMoreRef.current = false
+
             try {
-                const response = await apiGetFixationManagers()
+                const response = await apiGetFixationManagers({
+                    page: 1,
+                    page_size: MANAGERS_PER_PAGE,
+                    object_id: objectId,
+                })
                 if (!cancelled) {
-                    setManagers(response || [])
+                    setManagers(response.list || [])
+                    managersPageRef.current = response.meta.current_page
+                    managersHasMoreRef.current =
+                        response.meta.current_page < response.meta.last_page
                 }
             } catch {
                 if (!cancelled) {
                     setManagers([])
+                    managersPageRef.current = 1
+                    managersHasMoreRef.current = false
                 }
             } finally {
                 if (!cancelled) {
@@ -611,7 +874,49 @@ const FixationsCreateWizardDialog = ({
         return () => {
             cancelled = true
         }
-    }, [isOpen, step, managers.length])
+    }, [isOpen, step, selectedComplex?.id])
+
+    const handleManagersMenuScrollToBottom = useCallback(async () => {
+        if (
+            managersLoadingMoreRef.current ||
+            !managersHasMoreRef.current ||
+            isManagersLoading ||
+            !selectedComplex?.id
+        ) {
+            return
+        }
+
+        managersLoadingMoreRef.current = true
+        setIsManagersLoadingMore(true)
+
+        const nextPage = managersPageRef.current + 1
+
+        try {
+            const response = await apiGetFixationManagers({
+                page: nextPage,
+                page_size: MANAGERS_PER_PAGE,
+                object_id: selectedComplex.id,
+            })
+            const currentPage = response.meta.current_page
+            const lastPage = response.meta.last_page
+            const more = currentPage < lastPage
+
+            setManagers((prev) => mergeById(prev, response.list || []))
+            managersPageRef.current = currentPage
+            managersHasMoreRef.current = more
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error
+                    ? err.message
+                    : 'Не удалось загрузить список менеджеров'
+            toast.push(<Notification type="danger">{message}</Notification>, {
+                placement: 'top-center',
+            })
+        } finally {
+            managersLoadingMoreRef.current = false
+            setIsManagersLoadingMore(false)
+        }
+    }, [isManagersLoading, selectedComplex?.id])
 
     useEffect(() => {
         if (!isOpen || initialSelectionAppliedRef.current) return
@@ -622,7 +927,6 @@ const FixationsCreateWizardDialog = ({
             null
 
         if (!complex) {
-            initialSelectionAppliedRef.current = true
             return
         }
 
@@ -661,14 +965,27 @@ const FixationsCreateWizardDialog = ({
         initialSelectionAppliedRef.current = true
     }, [complexes, initialSelection, isOpen])
 
-    const complexOptions: SelectOption[] = useMemo(
-        () =>
-            complexes.map((item) => ({
-                value: item.id,
-                label: item.name,
-            })),
-        [complexes],
-    )
+    const complexOptions: SelectOption[] = useMemo(() => {
+        const options = complexes.map((item) => ({
+            value: item.id,
+            label: item.name,
+        }))
+
+        if (
+            selectedComplex &&
+            !options.some((item) => item.value === selectedComplex.id)
+        ) {
+            return [
+                {
+                    value: selectedComplex.id,
+                    label: selectedComplex.name,
+                },
+                ...options,
+            ]
+        }
+
+        return options
+    }, [complexes, selectedComplex])
 
     const apartmentCheckboardItems = useMemo(() => {
         const apartments = selectedComplex?.apartments ?? []
@@ -686,18 +1003,44 @@ const FixationsCreateWizardDialog = ({
         })
     }, [selectedComplex])
 
-    const managerOptions: SelectOption[] = useMemo(
-        () =>
-            managers.map((item) => ({
-                value: item.id,
-                label: item.fullName,
-            })),
-        [managers],
-    )
+    const managerOptions: SelectOption[] = useMemo(() => {
+        const anyOption: SelectOption = {
+            value: 'any',
+            label: 'Любой',
+        }
+
+        const listOptions = managers.map((item) => ({
+            value: item.id,
+            label: item.fullName,
+        }))
+
+        const allOptions = [anyOption, ...listOptions]
+
+        if (
+            selectedManager &&
+            selectedManager !== 'any' &&
+            !allOptions.some((item) => item.value === selectedManager.id)
+        ) {
+            return [
+                anyOption,
+                {
+                    value: selectedManager.id,
+                    label: selectedManager.fullName,
+                },
+                ...listOptions,
+            ]
+        }
+
+        return allOptions
+    }, [managers, selectedManager])
 
     const selectedManagerOption = useMemo(() => {
         if (!selectedManager) {
             return null
+        }
+
+        if (selectedManager === 'any') {
+            return { value: 'any', label: 'Любой' }
         }
 
         return (
@@ -707,24 +1050,32 @@ const FixationsCreateWizardDialog = ({
     }, [managerOptions, selectedManager])
 
     const currentStepIndex =
-        step === 'client-create'
-            ? STEP_INDEX.client
-            : step === 'note'
-              ? STEP_INDEX.confirm
-              : STEP_INDEX[step]
+        step === 'client-create' ? STEP_INDEX.client : STEP_INDEX[step]
     const checkboardLabelMode: CheckboardCellLabel = 'number'
+
+    const canProceedFromRelatives = selectedRelatives.every(
+        (relative) => Boolean(relative.relation),
+    )
 
     const canGoToStep = (index: number) => {
         if (index === 0) return true
         if (index === 1) return Boolean(selectedClient)
         if (index === 2)
-            return Boolean(selectedClient && selectedComplex && selectedManager)
+            return Boolean(selectedClient && selectedComplex)
+        if (index === 3) {
+            return Boolean(selectedClient && selectedComplex)
+        }
+        if (index === 4) {
+            return Boolean(
+                selectedClient &&
+                    selectedComplex &&
+                    canProceedFromRelatives,
+            )
+        }
         return false
     }
 
-    const canProceedFromComplex = Boolean(
-        selectedComplex && selectedManager,
-    )
+    const canProceedFromComplex = Boolean(selectedComplex)
 
     const handleStepIndexChange = (index: number) => {
         if (!canGoToStep(index)) return
@@ -783,6 +1134,37 @@ const FixationsCreateWizardDialog = ({
         }
     }
 
+    const handleCreateRelative = (values: RelativeCreateSchema) => {
+        const fullName = [values.lastName, values.firstName, values.middleName]
+            .map((part) => part?.trim())
+            .filter(Boolean)
+            .join(' ')
+
+        const newClient: FixationClient = {
+            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            fullName,
+            phone: values.phone,
+            isNew: true,
+            lastName: values.lastName,
+            firstName: values.firstName,
+            secondName: values.middleName,
+            countryCode: 'RU',
+        }
+
+        setSelectedRelatives((prev) => [
+            ...prev,
+            { client: newClient, relation: values.relation },
+        ])
+        setIsCreatingRelative(false)
+        resetRelativeForm(emptyRelativeForm)
+        toast.push(
+            <Notification type="success">
+                Родственник добавлен
+            </Notification>,
+            { placement: 'top-center' },
+        )
+    }
+
     const handleComplexChange = (option: SelectOption | null) => {
         const complex =
             complexes.find((item) => item.id === option?.value) || null
@@ -798,18 +1180,35 @@ const FixationsCreateWizardDialog = ({
         Boolean(selectedComplex?.id) &&
         (!isApartmentCheckboardCollapsed || isCheckboardFullscreen)
 
-    const { data: selectedComplexCheckboard, isLoading: isCheckboardLoading } =
-        useSWR(
-            shouldLoadCheckboard
-                ? ['/api/v2/realty_objects/chess', selectedComplex?.id]
-                : null,
-            () => apiGetCheckboard(selectedComplex?.id || ''),
-            {
-                revalidateOnFocus: false,
-                revalidateIfStale: false,
-                revalidateOnReconnect: false,
-            },
-        )
+    const [selectedComplexCheckboard, setSelectedComplexCheckboard] =
+        useState<CheckboardBuilding | null>(null)
+    const [isCheckboardLoading, setIsCheckboardLoading] = useState(false)
+
+    useEffect(() => {
+        if (!shouldLoadCheckboard || !selectedComplex?.id) {
+            setSelectedComplexCheckboard(null)
+            setIsCheckboardLoading(false)
+            return
+        }
+
+        let cancelled = false
+        setIsCheckboardLoading(true)
+
+        void apiGetCheckboard(selectedComplex.id)
+            .then((response) => {
+                if (!cancelled) setSelectedComplexCheckboard(response)
+            })
+            .catch(() => {
+                if (!cancelled) setSelectedComplexCheckboard(null)
+            })
+            .finally(() => {
+                if (!cancelled) setIsCheckboardLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [shouldLoadCheckboard, selectedComplex?.id])
 
     const checkboardStatuses = useMemo(
         () =>
@@ -845,6 +1244,14 @@ const FixationsCreateWizardDialog = ({
         setSelectedPropertyId(matchingProperty?.id ?? null)
     }, [selectedApartment, selectedComplexCheckboard])
 
+    const isCheckboardPropertySelectable = useCallback(
+        (property: CheckboardProperty) => {
+            const baseStatus = property.status.base_status
+            return baseStatus !== 30 && baseStatus !== 40
+        },
+        [],
+    )
+
     const handleCheckboardPropertySelect = (propertyId: number) => {
         if (!selectedComplexCheckboard) return
 
@@ -853,6 +1260,9 @@ const FixationsCreateWizardDialog = ({
             propertyId,
         )
         if (!property) return
+
+        const baseStatus = property.status.base_status
+        if (baseStatus === 30 || baseStatus === 40) return
 
         setSelectedPropertyId(propertyId)
         setSelectedApartment({
@@ -938,10 +1348,6 @@ const FixationsCreateWizardDialog = ({
         )
     }
 
-    const canProceedFromNote = selectedRelatives.every(
-        (relative) => Boolean(relative.relation),
-    )
-
     const relativesSummary = useMemo(() => {
         if (selectedRelatives.length === 0) return ''
         return selectedRelatives
@@ -963,9 +1369,32 @@ const FixationsCreateWizardDialog = ({
     const preferencesSummary = useMemo(() => {
         const parts: string[] = []
 
-        if (desiredArea) parts.push(`Площадь: ${desiredArea} м²`)
-        if (desiredRooms) parts.push(`Комнат: ${desiredRooms}`)
-        if (paymentFormat) parts.push(`Оплата: ${paymentFormat}`)
+        if (desiredArea) {
+            parts.push(
+                `Площадь: ${
+                    desiredAreaOptions.find((item) => item.value === desiredArea)
+                        ?.label
+                } м²`,
+            )
+        }
+        if (desiredRooms) {
+            parts.push(
+                `Комнат: ${
+                    desiredRoomsOptions.find(
+                        (item) => item.value === desiredRooms,
+                    )?.label
+                }`,
+            )
+        }
+        if (paymentFormat) {
+            parts.push(
+                `Оплата: ${
+                    paymentFormatOptions.find(
+                        (item) => item.value === paymentFormat,
+                    )?.label
+                }`,
+            )
+        }
         if (budget.trim()) {
             parts.push(`Бюджет: ${formatBudgetValue(budget)} ₽`)
         }
@@ -1000,37 +1429,92 @@ const FixationsCreateWizardDialog = ({
     }, [selectedApartment, selectedComplex])
 
     const handleCreateFixation = async () => {
-        if (!selectedClient || !selectedComplex || !selectedManager) return
+        if (!selectedClient || !selectedComplex) return
 
         try {
             setIsSubmitting(true)
-            await apiCreateFixation({
+            const fixationResponse = await apiCreateFixation({
                 objectId: Number(selectedComplex.id),
-                managerId: Number(selectedManager.id),
+                ...(selectedManager && selectedManager !== 'any'
+                    ? { managerId: Number(selectedManager.id) }
+                    : {}),
                 ...(selectedClient.isNew
                     ? { client: selectedClient }
                     : { clientId: Number(selectedClient.id) }),
-                // TODO(api): раскомментировать вместе с WIZARD_EXTENDED_FIELDS_ENABLED
-                // apartmentId: selectedApartment?.id,
-                // propertyId: selectedPropertyId ?? undefined,
-                // relatives: selectedRelatives.map((relative) => ({
-                //     clientId: relative.client.id,
-                //     relation: relative.relation,
-                // })),
-                // note: note.trim() || undefined,
-                // desiredArea: desiredArea || undefined,
-                // desiredRooms: desiredRooms || undefined,
-                // paymentFormat: paymentFormat || undefined,
-                // budget: budget.trim() || undefined,
-                // meetingDate: meetingDate || undefined,
+                note: buildFixationComment(selectedApartment, note),
+                desiredArea: desiredArea || undefined,
+                desiredRooms: desiredRooms || undefined,
+                paymentFormat: paymentFormat || undefined,
+                budget: budget.trim() || undefined,
+                meetingDate: meetingDate ? formatYMDToDMY(meetingDate) : undefined,
             })
-            await mutate((key) =>
-                Array.isArray(key) && key[0] === '/api/v2/fixations',
-            )
+
+            const fixationId =
+                fixationResponse?.data?.id ||
+                (fixationResponse as unknown as { id?: string })?.id
+
+            if (fixationId && selectedRelatives.length > 0) {
+                try {
+                    const relatedClientsToAttach: {
+                        client_id: number
+                        relation: number
+                    }[] = []
+
+                    for (const relative of selectedRelatives) {
+                        let clientId: number | null = null
+
+                        if (relative.client.isNew) {
+                            // First create new client via API to get their ID
+                            const createdClient = await apiCreateFixationClient(
+                                {
+                                    firstName:
+                                        relative.client.firstName?.trim() ||
+                                        relative.client.fullName,
+                                    lastName:
+                                        relative.client.lastName?.trim() || '',
+                                    middleName:
+                                        relative.client.secondName?.trim() ||
+                                        undefined,
+                                    phone: relative.client.phone,
+                                },
+                            )
+                            clientId = Number(createdClient.id)
+                        } else {
+                            clientId = Number(relative.client.id)
+                        }
+
+                        if (clientId && !isNaN(clientId) && relative.relation) {
+                            relatedClientsToAttach.push({
+                                client_id: clientId,
+                                relation: Number(relative.relation),
+                            })
+                        }
+                    }
+
+                    if (relatedClientsToAttach.length > 0) {
+                        await apiSetRelatedClientsForFixation({
+                            fixationId: String(fixationId),
+                            clients: relatedClientsToAttach,
+                        })
+                    }
+                } catch {
+                    toast.push(
+                        <Notification type="warning">
+                            Фиксация создана, но не удалось прикрепить родственников
+                        </Notification>,
+                        { placement: 'top-center' },
+                    )
+                    onSuccess?.()
+                    onClose()
+                    return
+                }
+            }
+
             toast.push(
                 <Notification type="success">Фиксация создана</Notification>,
                 { placement: 'top-center' },
             )
+            onSuccess?.()
             onClose()
         } catch (err: unknown) {
             const message =
@@ -1052,384 +1536,457 @@ const FixationsCreateWizardDialog = ({
                   description:
                       'Заполните данные — клиент будет создан вместе с фиксацией',
               }
-            : step === 'note'
-              ? STEP_META.confirm
-              : STEP_META[step as Exclude<WizardStep, 'client-create' | 'note'>]
+            : STEP_META[step]
 
     const isClientStep = step === 'client' || step === 'client-create'
 
     return (
         <>
-        <Dialog
-            isOpen={isOpen}
-            width={820}
-            height={
-                isClientStep ? 'min(90vh, calc(100dvh - 8rem))' : undefined
-            }
-            className="max-h-[calc(100dvh-8rem)]"
-            style={{
-                content: {
-                    position: 'fixed',
-                    inset: 'unset',
-                    top: '50%',
-                    left: '50%',
-                    margin: 0,
-                    transform: 'translate(-50%, -50%)',
-                },
-            }}
-            onClose={onClose}
-            onRequestClose={onClose}
-            contentClassName={classNames(
-                'flex min-h-0 flex-col overflow-hidden !p-4 sm:!p-6 !my-0 max-h-[calc(100dvh-8rem)]',
-                isClientStep && 'h-full',
-            )}
-        >
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
-                <div className="shrink-0 pr-12">
-                    <Steps
-                        className="mb-3 sm:mb-4 [&_.step-item-content]:hidden sm:[&_.step-item-content]:block [&_.step-item-icon]:h-8 [&_.step-item-icon]:min-w-8 [&_.step-item-icon]:w-8 [&_.step-item-icon]:text-sm sm:[&_.step-item-icon]:h-9 sm:[&_.step-item-icon]:min-w-9 sm:[&_.step-item-icon]:w-9 sm:[&_.step-item-icon]:text-lg [&_.step-connect]:!ml-0 sm:[&_.step-connect.step-title]:!ml-2.5"
-                        current={currentStepIndex}
-                        isStepEnabled={canGoToStep}
-                        onChange={handleStepIndexChange}
-                    >
-                        <Steps.Item title="Клиент" />
-                        <Steps.Item title="Дом" />
-                        {WIZARD_EXTENDED_FIELDS_ENABLED ? (
+            <Dialog
+                isOpen={isOpen}
+                width={isMobile ? undefined : 820}
+                height={
+                    isMobile
+                        ? '100dvh'
+                        : isClientStep
+                          ? 'min(90vh, calc(100dvh - 8rem))'
+                          : undefined
+                }
+                className={classNames(
+                    isMobile
+                        ? '!m-0 !p-0 !h-[100dvh] !max-h-[100dvh] !w-full !max-w-full !inset-0'
+                        : 'max-h-[calc(100dvh-8rem)]',
+                )}
+                overlayClassName={isMobile ? '!p-0' : undefined}
+                style={
+                    isMobile
+                        ? {
+                              content: {
+                                  position: 'fixed',
+                                  inset: 0,
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  width: '100vw',
+                                  height: '100dvh',
+                                  maxHeight: '100dvh',
+                                  maxWidth: '100vw',
+                                  margin: 0,
+                                  padding: 0,
+                                  transform: 'none',
+                                  borderRadius: 0,
+                              },
+                          }
+                        : {
+                              content: {
+                                  position: 'fixed',
+                                  inset: 'unset',
+                                  top: '50%',
+                                  left: '50%',
+                                  margin: 0,
+                                  transform: 'translate(-50%, -50%)',
+                              },
+                          }
+                }
+                onClose={onClose}
+                onRequestClose={onClose}
+                contentClassName={classNames(
+                    'flex min-h-0 flex-col overflow-hidden',
+                    isMobile
+                        ? '!h-[100dvh] !max-h-[100dvh] !rounded-none !p-4 !w-full !max-w-full !mx-0 !my-0'
+                        : '!p-4 sm:!p-6 !my-0 !mx-0 sm:!mx-auto max-h-[calc(100dvh-8rem)] rounded-2xl',
+                    (isClientStep || isMobile) && 'h-full',
+                )}
+            >
+                <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4">
+                    <div className="shrink-0 pr-10 sm:pr-12">
+                        <Steps
+                            className="mb-2 sm:mb-4 [&_.step-item-content]:hidden sm:[&_.step-item-content]:block [&_.step-item-icon]:!h-7 [&_.step-item-icon]:!min-w-7 [&_.step-item-icon]:!w-7 [&_.step-item-icon]:!text-xs sm:[&_.step-item-icon]:!h-9 sm:[&_.step-item-icon]:!min-w-9 sm:[&_.step-item-icon]:!w-9 sm:[&_.step-item-icon]:!text-base [&_.step-connect]:!ml-0 sm:[&_.step-connect.step-title]:!ml-2.5"
+                            current={currentStepIndex}
+                            isStepEnabled={canGoToStep}
+                            onChange={handleStepIndexChange}
+                        >
+                            <Steps.Item title="Клиент" />
+                            <Steps.Item title="Дом" />
                             <Steps.Item title="Предпочтения" />
-                        ) : null}
-                        <Steps.Item title="Итог" />
-                    </Steps>
-                    <h5 className="mb-1 text-base font-semibold sm:text-lg">
-                        {meta.title}
-                    </h5>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {meta.description}
-                    </p>
-                </div>
+                            <Steps.Item title="Родственники" />
+                            <Steps.Item title="Итог" />
+                        </Steps>
+                        <h5 className="mb-0.5 text-base font-semibold sm:text-lg">
+                            {meta.title}
+                        </h5>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
+                            {meta.description}
+                        </p>
+                    </div>
 
-                <div
-                    className={classNames(
-                        'min-h-0 flex-1',
-                        step === 'client'
-                            ? 'flex flex-col overflow-hidden'
-                            : 'overflow-y-auto overscroll-contain px-1',
-                    )}
-                    onScroll={(event) => {
-                        if (event.target !== event.currentTarget) return
+                    <div
+                        ref={contentScrollRef}
+                        className={classNames(
+                            'min-h-0 flex-1',
+                            step === 'client'
+                                ? 'flex flex-col overflow-hidden'
+                                : 'overflow-y-auto overscroll-contain px-0.5 sm:px-1',
+                        )}
+                        onScroll={(event) => {
+                            if (event.target !== event.currentTarget) return
 
-                        if (!isSelectControlFocused()) {
-                            selectMenuScrollAnchorRef.current = null
-                            return
-                        }
+                            if (!isSelectControlFocused()) {
+                                selectMenuScrollAnchorRef.current = null
+                                return
+                            }
 
-                        const scrollTop = event.currentTarget.scrollTop
+                            const scrollTop = event.currentTarget.scrollTop
 
-                        if (selectMenuScrollAnchorRef.current === null) {
-                            selectMenuScrollAnchorRef.current = scrollTop
-                            return
-                        }
+                            if (selectMenuScrollAnchorRef.current === null) {
+                                selectMenuScrollAnchorRef.current = scrollTop
+                                return
+                            }
 
-                        if (
-                            Math.abs(
-                                scrollTop - selectMenuScrollAnchorRef.current,
-                            ) >= SELECT_MENU_CLOSE_SCROLL_PX
-                        ) {
-                            closeOpenSelectMenus()
-                            selectMenuScrollAnchorRef.current = null
-                        }
-                    }}
-                >                    {step === 'client-create' ? (
-                        <Form onSubmit={handleSubmit(handleCreateClient)}>
-                            <div className="grid gap-y-3 md:grid-cols-3 md:gap-x-4 md:gap-y-3">
-                                <FormItem
-                                    asterisk
-                                    label="Фамилия"
-                                    invalid={Boolean(clientErrors.lastName)}
-                                    errorMessage={
-                                        clientErrors.lastName?.message
-                                    }
-                                >
-                                    <Controller
-                                        name="lastName"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Input
-                                                placeholder="Иванов"
-                                                autoComplete="family-name"
-                                                {...field}
-                                            />
-                                        )}
-                                    />
-                                </FormItem>
-                                <FormItem
-                                    asterisk
-                                    label="Имя"
-                                    invalid={Boolean(clientErrors.firstName)}
-                                    errorMessage={
-                                        clientErrors.firstName?.message
-                                    }
-                                >
-                                    <Controller
-                                        name="firstName"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Input
-                                                placeholder="Иван"
-                                                autoComplete="given-name"
-                                                {...field}
-                                            />
-                                        )}
-                                    />
-                                </FormItem>
-                                <FormItem
-                                    label="Отчество"
-                                    invalid={Boolean(clientErrors.middleName)}
-                                    errorMessage={
-                                        clientErrors.middleName?.message
-                                    }
-                                >
-                                    <Controller
-                                        name="middleName"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Input
-                                                placeholder="Иванович"
-                                                autoComplete="additional-name"
-                                                {...field}
-                                            />
-                                        )}
-                                    />
-                                </FormItem>
-                            </div>
-                            <FormItem
-                                asterisk
-                                label="Телефон"
-                                className="mt-1"
-                                invalid={Boolean(clientErrors.phone)}
-                                errorMessage={clientErrors.phone?.message}
-                            >
-                                <Controller
-                                    name="phone"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <PhoneInput
-                                            value={field.value ?? ''}
-                                            onBlur={field.onBlur}
-                                            onChange={field.onChange}
+                            if (
+                                Math.abs(
+                                    scrollTop -
+                                        selectMenuScrollAnchorRef.current,
+                                ) >= SELECT_MENU_CLOSE_SCROLL_PX
+                            ) {
+                                closeOpenSelectMenus()
+                                selectMenuScrollAnchorRef.current = null
+                            }
+                        }}
+                    >
+                        {step === 'client-create' ? (
+                            <Form onSubmit={handleClientSubmit(handleCreateClient)}>
+                                <div className="grid gap-y-3 md:grid-cols-3 md:gap-x-4 md:gap-y-3">
+                                    <FormItem
+                                        asterisk
+                                        label="Фамилия"
+                                        invalid={Boolean(clientErrors.lastName)}
+                                        errorMessage={
+                                            clientErrors.lastName?.message
+                                        }
+                                    >
+                                        <Controller
+                                            name="lastName"
+                                            control={clientControl}
+                                            render={({ field }) => (
+                                                <Input
+                                                    placeholder="Иванов"
+                                                    autoComplete="family-name"
+                                                    {...field}
+                                                />
+                                            )}
                                         />
-                                    )}
-                                />
-                            </FormItem>
-                            <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                                <Button
-                                    type="button"
-                                    className="w-full sm:w-auto"
-                                    onClick={() => setStep('client')}
+                                    </FormItem>
+                                    <FormItem
+                                        asterisk
+                                        label="Имя"
+                                        invalid={Boolean(clientErrors.firstName)}
+                                        errorMessage={
+                                            clientErrors.firstName?.message
+                                        }
+                                    >
+                                        <Controller
+                                            name="firstName"
+                                            control={clientControl}
+                                            render={({ field }) => (
+                                                <Input
+                                                    placeholder="Иван"
+                                                    autoComplete="given-name"
+                                                    {...field}
+                                                />
+                                            )}
+                                        />
+                                    </FormItem>
+                                    <FormItem
+                                        label="Отчество"
+                                        invalid={Boolean(
+                                            clientErrors.middleName,
+                                        )}
+                                        errorMessage={
+                                            clientErrors.middleName?.message
+                                        }
+                                    >
+                                        <Controller
+                                            name="middleName"
+                                            control={clientControl}
+                                            render={({ field }) => (
+                                                <Input
+                                                    placeholder="Иванович"
+                                                    autoComplete="additional-name"
+                                                    {...field}
+                                                />
+                                            )}
+                                        />
+                                    </FormItem>
+                                </div>
+                                <FormItem
+                                    asterisk
+                                    label="Телефон"
+                                    className="mt-1"
+                                    invalid={Boolean(clientErrors.phone)}
+                                    errorMessage={clientErrors.phone?.message}
                                 >
-                                    Назад к списку
-                                </Button>
-                                <Button
-                                    variant="solid"
-                                    type="submit"
-                                    className="w-full sm:w-auto"
-                                    loading={isCreatingClient}
-                                    disabled={!isClientFormValid}
-                                >
-                                    Создать и выбрать
-                                </Button>
-                            </div>
-                        </Form>
-                    ) : null}
+                                    <Controller
+                                        name="phone"
+                                        control={clientControl}
+                                        render={({ field }) => (
+                                            <PhoneInput
+                                                value={field.value ?? ''}
+                                                onBlur={field.onBlur}
+                                                onChange={field.onChange}
+                                            />
+                                        )}
+                                    />
+                                </FormItem>
+                                <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+                                    <Button
+                                        type="button"
+                                        className="w-full sm:w-auto"
+                                        onClick={() => setStep('client')}
+                                    >
+                                        Назад к списку
+                                    </Button>
+                                    <Button
+                                        variant="solid"
+                                        type="submit"
+                                        className="w-full sm:w-auto"
+                                        loading={isCreatingClient}
+                                        disabled={!isClientFormValid}
+                                    >
+                                        Создать и выбрать
+                                    </Button>
+                                </div>
+                            </Form>
+                        ) : null}
 
-                    {step === 'client' ? (
-                        !hasClientsLoaded && isClientsLoading ? (
-                            <div className="flex h-full min-h-48 flex-1 items-center justify-center text-sm text-gray-500">
-                                Загрузка клиентов...
-                            </div>
-                        ) : (
-                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-                                <div className="shrink-0 space-y-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-                                    <Input
-                                        placeholder="Поиск по телефону или ФИО"
-                                        value={clientPhoneQuery}
-                                        suffix={
-                                            <CloseButton
-                                                resetDefaultClass
-                                                className={classNames(
-                                                    'text-base text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 outline-none focus:outline-none focus:ring-0',
-                                                    !clientPhoneQuery &&
-                                                        'invisible pointer-events-none',
+                        {step === 'client' ? (
+                            !hasClientsLoaded && isClientsLoading ? (
+                                <div className="flex h-full min-h-48 flex-1 items-center justify-center text-sm text-gray-500">
+                                    Загрузка клиентов...
+                                </div>
+                            ) : (
+                                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <div className="shrink-0 border-b border-gray-200 p-2.5 sm:px-4 sm:py-3 dark:border-gray-700">
+                                        <div className="flex items-center gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <Input
+                                                    placeholder="Поиск по телефону или ФИО"
+                                                    value={clientPhoneQuery}
+                                                    suffix={
+                                                        <CloseButton
+                                                            resetDefaultClass
+                                                            className={classNames(
+                                                                'text-base text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 outline-none focus:outline-none focus:ring-0',
+                                                                !clientPhoneQuery &&
+                                                                    'invisible pointer-events-none',
+                                                            )}
+                                                            onClick={() => {
+                                                                setClientPhoneQuery('')
+                                                                setClientSearchQuery('')
+                                                                setClientsPageIndex(1)
+                                                            }}
+                                                        />
+                                                    }
+                                                    onChange={(e) => {
+                                                        setClientPhoneQuery(
+                                                            e.target.value,
+                                                        )
+                                                        setClientsPageIndex(1)
+                                                    }}
+                                                />
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="solid"
+                                                className="shrink-0 flex items-center justify-center px-3 sm:px-4"
+                                                icon={<TbPlus className="text-lg" />}
+                                                title="Создать клиента"
+                                                aria-label="Создать клиента"
+                                                onClick={() =>
+                                                    setStep('client-create')
+                                                }
+                                            >
+                                                <span className="hidden sm:inline ml-1">
+                                                    Создать клиента
+                                                </span>
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        ref={clientsTableScrollRef}
+                                        className={classNames(
+                                            'min-h-0 flex-1 overflow-y-auto',
+                                            isClientsLoading && 'opacity-60',
+                                        )}
+                                    >
+                                        <Table overflow={false}>
+                                            <THead>
+                                                <Tr>
+                                                    <Th className="sticky top-0 z-10 bg-white dark:bg-gray-800">
+                                                        Клиент
+                                                    </Th>
+                                                    <Th className="sticky top-0 z-10 bg-white dark:bg-gray-800">
+                                                        Телефон
+                                                    </Th>
+                                                </Tr>
+                                            </THead>
+                                            <TBody>
+                                                {orderedClients.length === 0 ? (
+                                                    <Tr>
+                                                        <Td colSpan={2}>
+                                                            <div className="flex flex-col items-center py-8 text-center">
+                                                                <TbUsers className="mb-2 text-2xl text-primary" />
+                                                                <p className="font-medium">
+                                                                    Клиенты не найдены
+                                                                </p>
+                                                            </div>
+                                                        </Td>
+                                                    </Tr>
+                                                ) : (
+                                                    orderedClients.map(
+                                                        (client) => {
+                                                            const isSelected =
+                                                                selectedClient?.id ===
+                                                                client.id
+                                                            return (
+                                                                <Tr
+                                                                    key={
+                                                                        client.id
+                                                                    }
+                                                                    className={classNames(
+                                                                        'cursor-pointer transition-colors hover:bg-primary/5 dark:hover:bg-primary/10',
+                                                                        isSelected &&
+                                                                            SELECTED_ROW_CLASS,
+                                                                    )}
+                                                                    onClick={() =>
+                                                                        handleSelectClient(
+                                                                            client,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Td>
+                                                                        <span className="font-medium">
+                                                                            {
+                                                                                client.fullName
+                                                                            }
+                                                                        </span>
+                                                                    </Td>
+                                                                    <Td>
+                                                                        {
+                                                                            client.phone
+                                                                        }
+                                                                    </Td>
+                                                                </Tr>
+                                                            )
+                                                        },
+                                                    )
                                                 )}
-                                                onClick={() => {
-                                                    setClientPhoneQuery('')
-                                                    setClientSearchQuery('')
+                                            </TBody>
+                                        </Table>
+                                    </div>
+
+                                    <div className="flex shrink-0 flex-col gap-2.5 border-t border-gray-200 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:border-gray-700">
+                                        <div className="overflow-x-auto">
+                                            <Pagination
+                                                pageSize={clientsPageSize}
+                                                currentPage={clientsPageIndex}
+                                                total={clientsTotal}
+                                                pagerCount={5}
+                                                onChange={setClientsPageIndex}
+                                            />
+                                        </div>
+                                        <div className="w-[130px] shrink-0 self-end sm:self-auto">
+                                            <Select
+                                                size="sm"
+                                                menuPlacement="top"
+                                                isSearchable={false}
+                                                value={clientsPageSizeOptions.filter(
+                                                    (option) =>
+                                                        option.value ===
+                                                        clientsPageSize,
+                                                )}
+                                                options={
+                                                    clientsPageSizeOptions
+                                                }
+                                                onChange={(option) => {
+                                                    const size =
+                                                        (
+                                                            option as {
+                                                                value: number
+                                                            } | null
+                                                        )?.value || 20
+                                                    setClientsPageSize(size)
                                                     setClientsPageIndex(1)
                                                 }}
                                             />
-                                        }
-                                        onChange={(e) => {
-                                            setClientPhoneQuery(e.target.value)
-                                            setClientsPageIndex(1)
-                                        }}
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="solid"
-                                        block
-                                        icon={<TbPlus />}
-                                        onClick={() => setStep('client-create')}
-                                    >
-                                        Создать клиента
-                                    </Button>
-                                </div>
-
-                                <div
-                                    className={classNames(
-                                        'min-h-0 flex-1 overflow-y-auto',
-                                        isClientsLoading && 'opacity-60',
-                                    )}
-                                >
-                                    <Table overflow={false}>
-                                        <THead>
-                                            <Tr>
-                                                <Th className="sticky top-0 z-10 bg-white dark:bg-gray-800">
-                                                    Клиент
-                                                </Th>
-                                                <Th className="sticky top-0 z-10 bg-white dark:bg-gray-800">
-                                                    Телефон
-                                                </Th>
-                                            </Tr>
-                                        </THead>
-                                        <TBody>
-                                            {orderedClients.length === 0 ? (
-                                                <Tr>
-                                                    <Td colSpan={2}>
-                                                        <div className="flex flex-col items-center py-8 text-center">
-                                                            <TbUsers className="mb-2 text-2xl text-primary" />
-                                                            <p className="font-medium">
-                                                                Клиенты не найдены
-                                                            </p>
-                                                        </div>
-                                                    </Td>
-                                                </Tr>
-                                            ) : (
-                                                orderedClients.map((client) => {
-                                                    const isSelected =
-                                                        selectedClient?.id ===
-                                                        client.id
-                                                    return (
-                                                        <Tr
-                                                            key={client.id}
-                                                            className={classNames(
-                                                                'cursor-pointer transition-colors hover:bg-primary/5 dark:hover:bg-primary/10',
-                                                                isSelected &&
-                                                                    SELECTED_ROW_CLASS,
-                                                            )}
-                                                            onClick={() =>
-                                                                handleSelectClient(
-                                                                    client,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Td>
-                                                                <span className="font-medium">
-                                                                    {
-                                                                        client.fullName
-                                                                    }
-                                                                </span>
-                                                            </Td>
-                                                            <Td>
-                                                                {client.phone}
-                                                            </Td>
-                                                        </Tr>
-                                                    )
-                                                })
-                                            )}
-                                        </TBody>
-                                    </Table>
-                                </div>
-
-                                <div className="flex shrink-0 flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="overflow-x-auto">
-                                        <Pagination
-                                            pageSize={clientsPageSize}
-                                            currentPage={clientsPageIndex}
-                                            total={clientsTotal}
-                                            pagerCount={5}
-                                            onChange={setClientsPageIndex}
-                                        />
-                                    </div>
-                                    <div className="w-[130px] shrink-0 self-end sm:self-auto">
-                                        <Select
-                                            size="sm"
-                                            menuPlacement="top"
-                                            isSearchable={false}
-                                            value={clientsPageSizeOptions.filter(
-                                                (option) =>
-                                                    option.value ===
-                                                    clientsPageSize,
-                                            )}
-                                            options={clientsPageSizeOptions}
-                                            onChange={(option) => {
-                                                const size =
-                                                    (
-                                                        option as {
-                                                            value: number
-                                                        } | null
-                                                    )?.value || 20
-                                                setClientsPageSize(size)
-                                                setClientsPageIndex(1)
-                                            }}
-                                        />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )
-                    ) : null}
+                            )
+                        ) : null}
 
-                    {step === 'complex' ? (
-                        <div
-                            className={classNames(
-                                'grid min-w-0 gap-4',
-                                isComplexesLoading && 'opacity-60',
-                            )}
-                        >
-                            <FormItem asterisk label="Дом">
-                                <Select
-                                    {...selectMenuProps}
-                                    isLoading={isComplexesLoading}
-                                    placeholder={
-                                        isComplexesLoading
-                                            ? 'Загрузка домов...'
-                                            : 'Выберите дом'
-                                    }
-                                    options={complexOptions}
-                                    value={
-                                        complexOptions.find(
-                                            (item) =>
-                                                item.value ===
-                                                selectedComplex?.id,
-                                        ) || null
-                                    }
-                                    onChange={(option) =>
-                                        handleComplexChange(
-                                            option as SelectOption | null,
-                                        )
-                                    }
-                                />
-                                </FormItem>
-                                <FormItem asterisk label="Менеджер">
+                        {step === 'complex' ? (
+                            <div
+                                className={classNames(
+                                    'grid min-w-0 gap-4',
+                                    isComplexesLoading && 'opacity-60',
+                                )}
+                            >
+                                <FormItem asterisk label="Дом">
                                     <Select
                                         {...selectMenuProps}
+                                        isLoading={isComplexesLoading}
+                                        placeholder={
+                                            isComplexesLoading
+                                                ? 'Загрузка домов...'
+                                                : 'Выберите дом'
+                                        }
+                                        options={complexOptions}
+                                        value={
+                                            complexOptions.find(
+                                                (item) =>
+                                                    item.value ===
+                                                    selectedComplex?.id,
+                                            ) || null
+                                        }
+                                        components={{
+                                            MenuList: InfiniteSelectMenuList,
+                                        }}
+                                        onMenuScrollToBottom={() => {
+                                            void handleComplexesMenuScrollToBottom()
+                                        }}
+                                        onChange={(option) =>
+                                            handleComplexChange(
+                                                option as SelectOption | null,
+                                            )
+                                        }
+                                        {...({
+                                            isLoadingMore:
+                                                isComplexesLoadingMore,
+                                        } satisfies InfiniteSelectProps)}
+                                    />
+                                </FormItem>
+                                <FormItem label="Менеджер (необязательно)">
+                                    <Select
+                                        {...selectMenuProps}
+                                        isClearable
                                         isLoading={isManagersLoading}
                                         isDisabled={!selectedComplex}
                                         placeholder={
                                             isManagersLoading
                                                 ? 'Загрузка менеджеров...'
-                                                : 'Выберите менеджера'
+                                                : 'Назначить менеджера автоматически'
                                         }
                                         options={managerOptions}
                                         value={selectedManagerOption}
+                                        components={{
+                                            MenuList: InfiniteSelectMenuList,
+                                        }}
+                                        onMenuScrollToBottom={() => {
+                                            void handleManagersMenuScrollToBottom()
+                                        }}
                                         onChange={(option) => {
                                             const value = (
                                                 option as SelectOption | null
@@ -1440,444 +1997,912 @@ const FixationsCreateWizardDialog = ({
                                                 return
                                             }
 
+                                            if (value === 'any') {
+                                                setSelectedManager('any')
+                                                return
+                                            }
+
                                             const manager =
                                                 managers.find(
-                                                    (item) => item.id === value,
+                                                    (item) =>
+                                                        item.id === value,
                                                 ) || null
                                             setSelectedManager(manager)
                                         }}
+                                        {...({
+                                            isLoadingMore:
+                                                isManagersLoadingMore,
+                                        } satisfies InfiniteSelectProps)}
                                     />
                                 </FormItem>
                                 {WIZARD_EXTENDED_FIELDS_ENABLED ? (
-                                <FormItem className="min-w-0" label="Помещение (необязательно)">
-                                    {!selectedComplex ? (
-                                        <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                                            Сначала выберите дом
-                                        </div>
-                                    ) : isCheckboardLoading ? (
-                                        <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                                            Загрузка шахматки...
-                                        </div>
-                                    ) : !isApartmentCheckboardCollapsed &&
-                                      !selectedComplexCheckboard ? (
-                                        <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-                                            Не удалось загрузить шахматку для выбранного дома
-                                        </div>
-                                    ) : (
-                                        <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 p-3 dark:border-gray-700">
-                                            <div className="flex items-start gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
-                                                    onClick={() =>
-                                                        setIsApartmentCheckboardCollapsed(
-                                                            (prev) => !prev,
-                                                        )
-                                                    }
-                                                >
-                                                    <div className="min-w-0">
-                                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                            Выбор помещения на шахматке
-                                                        </p>
-                                                        {selectedApartment ? (
-                                                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                                                {formatSelectedPremiseLabel(
-                                                                    selectedApartment,
-                                                                )}
-                                                            </p>
-                                                        ) : null}
-                                                    </div>
-                                                    <HiChevronDown
-                                                        className={classNames(
-                                                            'shrink-0 text-xl text-gray-400 transition-transform',
-                                                            !isApartmentCheckboardCollapsed &&
-                                                                'rotate-180',
-                                                        )}
-                                                    />
-                                                </button>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    className="shrink-0"
-                                                    icon={<TbArrowsMaximize />}
-                                                    onClick={
-                                                        openCheckboardFullscreen
-                                                    }
-                                                >
-                                                    <span className="hidden sm:inline">
-                                                        На весь экран
-                                                    </span>
-                                                </Button>
+                                    <FormItem
+                                        className="min-w-0"
+                                        label="Помещение (необязательно)"
+                                    >
+                                        {!selectedComplex ? (
+                                            <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                                                Сначала выберите дом
                                             </div>
-
-                                            {!isApartmentCheckboardCollapsed ? (
-                                                <>
-                                                    <div className="mt-3 mb-3">
-                                                        <PremiseSelectionControls
-                                                            selectedApartment={
-                                                                selectedApartment
-                                                            }
-                                                            onClearSelection={
-                                                                clearPremiseSelection
-                                                            }
-                                                        />
-                                                    </div>
-
-                                                    {checkboardStatuses.length > 0 ? (
-                                                        <div className="mb-3">
-                                                            <CheckboardLegend
-                                                                statuses={
-                                                                    checkboardStatuses
-                                                                }
-                                                            />
-                                                        </div>
-                                                    ) : null}
-
-                                                    <div className="checkboard-scroll min-w-0 w-full max-w-full touch-pan-x overflow-x-auto overflow-y-visible rounded-lg border border-gray-200 p-2 dark:border-gray-700">
-                                                    {selectedComplexCheckboard ? (
-                                                        <CheckboardClassic
-                                                            building={
-                                                                selectedComplexCheckboard
-                                                            }
-                                                            labelMode={
-                                                                checkboardLabelMode
-                                                            }
-                                                            selectedPropertyId={
-                                                                selectedPropertyId
-                                                            }
-                                                            onPropertySelect={
-                                                                handleCheckboardPropertySelect
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                    </div>
-                                                </>
-                                            ) : null}
-                                        </div>
-                                    )}
-                                </FormItem>
-                                ) : null}
-                            </div>
-                    ) : null}
-
-                    {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'note' ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <FormItem label="Желаемая площадь от, м²">
-                                <Select
-                                    {...selectMenuProps}
-                                    isClearable
-                                    placeholder="Выберите диапазон"
-                                    options={desiredAreaOptions}
-                                    value={
-                                        desiredAreaOptions.find(
-                                            (o) => o.value === desiredArea,
-                                        ) || null
-                                    }
-                                    onChange={(option) =>
-                                        setDesiredArea(
-                                            (
-                                                option as SelectOption | null
-                                            )?.value || '',
-                                        )
-                                    }
-                                />
-                            </FormItem>
-
-                            <FormItem label="Кол-во комнат">
-                                <Select
-                                    {...selectMenuProps}
-                                    isClearable
-                                    placeholder="Выберите вариант"
-                                    options={desiredRoomsOptions}
-                                    value={
-                                        desiredRoomsOptions.find(
-                                            (o) => o.value === desiredRooms,
-                                        ) || null
-                                    }
-                                    onChange={(option) =>
-                                        setDesiredRooms(
-                                            (
-                                                option as SelectOption | null
-                                            )?.value || '',
-                                        )
-                                    }
-                                />
-                            </FormItem>
-
-                            <FormItem label="Формат оплаты">
-                                <Select
-                                    {...selectMenuProps}
-                                    isClearable
-                                    placeholder="Выберите вариант"
-                                    options={paymentFormatOptions}
-                                    value={
-                                        paymentFormatOptions.find(
-                                            (o) =>
-                                                o.value === paymentFormat,
-                                        ) || null
-                                    }
-                                    onChange={(option) =>
-                                        setPaymentFormat(
-                                            (
-                                                option as SelectOption | null
-                                            )?.value || '',
-                                        )
-                                    }
-                                />
-                            </FormItem>
-
-                            <FormItem label="Бюджет, ₽">
-                                <Input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="Укажите бюджет"
-                                    value={formatBudgetValue(budget)}
-                                    onChange={(e) =>
-                                        setBudget(e.target.value.replace(/\D/g, ''))
-                                    }
-                                />
-                            </FormItem>
-
-                            <FormItem
-                                className="md:col-span-2"
-                                label="Планируемая дата встречи"
-                            >
-                                <DatePicker
-                                    placeholder="Выберите дату"
-                                    locale="ru"
-                                    inputFormat="DD.MM.YYYY"
-                                    value={
-                                        meetingDate
-                                            ? new Date(meetingDate)
-                                            : null
-                                    }
-                                    onChange={(date) =>
-                                        setMeetingDate(
-                                            date ? formatYMD(date) : '',
-                                        )
-                                    }
-                                />
-                            </FormItem>
-
-                            <div className="md:col-span-2 space-y-3">
-                                <FormItem label="Родственники">
-                                    <Select
-                                        {...selectMenuProps}
-                                        key={[
-                                            selectedClient?.id || 'none',
-                                            ...selectedRelatives.map(
-                                                (relative) => relative.client.id,
-                                            ),
-                                        ].join('-')}
-                                        componentAs={AsyncSelect}
-                                        components={relativeOptionComponents}
-                                        defaultOptions
-                                        cacheOptions={false}
-                                        isClearable={false}
-                                        isSearchable
-                                        controlShouldRenderValue={false}
-                                        hideSelectedOptions
-                                        placeholder="Найти клиента по ФИО или телефону"
-                                        loadOptions={loadRelativeOptions}
-                                        value={null}
-                                        onChange={(option) =>
-                                            handleAddRelative(
-                                                option as ClientSelectOption | null,
-                                            )
-                                        }
-                                        noOptionsMessage={({ inputValue }) =>
-                                            inputValue
-                                                ? 'Клиенты не найдены'
-                                                : 'Начните вводить ФИО или телефон'
-                                        }
-                                        loadingMessage={() => 'Поиск...'}
-                                    />
-                                </FormItem>
-
-                                {selectedRelatives.length > 0 ? (
-                                    <div className="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
-                                        {selectedRelatives.map((relative) => (
-                                            <div
-                                                key={relative.client.id}
-                                                className="space-y-2"
-                                            >
+                                        ) : isCheckboardLoading ? (
+                                            <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                                                Загрузка шахматки...
+                                            </div>
+                                        ) : !isApartmentCheckboardCollapsed &&
+                                          !selectedComplexCheckboard ? (
+                                            <div className="rounded-xl border border-dashed border-gray-300 p-3 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                                                Не удалось загрузить шахматку для
+                                                выбранного дома
+                                            </div>
+                                        ) : (
+                                            <div className="min-w-0 max-w-full overflow-hidden rounded-xl border border-gray-200 p-3 dark:border-gray-700">
                                                 <div className="flex items-start gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                            {
-                                                                relative.client
-                                                                    .fullName
-                                                            }
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            {
-                                                                relative.client
-                                                                    .phone
-                                                            }
-                                                        </p>
-                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="flex min-w-0 flex-1 items-center justify-between gap-3 text-left"
+                                                        onClick={() =>
+                                                            setIsApartmentCheckboardCollapsed(
+                                                                (prev) => !prev,
+                                                            )
+                                                        }
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                                Выбор помещения на
+                                                                шахматке
+                                                            </p>
+                                                            {selectedApartment ? (
+                                                                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                    {formatSelectedPremiseLabel(
+                                                                        selectedApartment,
+                                                                    )}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                        <HiChevronDown
+                                                            className={classNames(
+                                                                'shrink-0 text-xl text-gray-400 transition-transform',
+                                                                !isApartmentCheckboardCollapsed &&
+                                                                    'rotate-180',
+                                                            )}
+                                                        />
+                                                    </button>
                                                     <Button
                                                         type="button"
                                                         size="sm"
-                                                        variant="plain"
-                                                        className="shrink-0 text-red-500 hover:text-red-600"
-                                                        icon={<TbTrash />}
-                                                        onClick={() =>
-                                                            handleRemoveRelative(
-                                                                relative.client
-                                                                    .id,
-                                                            )
+                                                        className="shrink-0"
+                                                        icon={
+                                                            <TbArrowsMaximize />
                                                         }
-                                                    />
+                                                        onClick={
+                                                            openCheckboardFullscreen
+                                                        }
+                                                    >
+                                                        <span className="hidden sm:inline">
+                                                            На весь экран
+                                                        </span>
+                                                    </Button>
                                                 </div>
-                                                <Select
-                                                    {...selectMenuProps}
-                                                    placeholder="Степень родства"
-                                                    options={
-                                                        kinshipSelectOptions
-                                                    }
-                                                    value={
-                                                        kinshipSelectOptions.find(
-                                                            (option) =>
-                                                                option.value ===
-                                                                relative.relation,
-                                                        ) || null
-                                                    }
-                                                    onChange={(option) => {
-                                                        const value =
-                                                            (
-                                                                option as SelectOption | null
-                                                            )?.value || ''
-                                                        setSelectedRelatives(
-                                                            (prev) =>
-                                                                prev.map(
-                                                                    (item) =>
-                                                                        item
-                                                                            .client
-                                                                            .id ===
-                                                                        relative
-                                                                            .client
-                                                                            .id
-                                                                            ? {
-                                                                                  ...item,
-                                                                                  relation:
-                                                                                      value,
-                                                                              }
-                                                                            : item,
-                                                                ),
-                                                        )
-                                                    }}
-                                                />
+
+                                                {!isApartmentCheckboardCollapsed ? (
+                                                    <>
+                                                        <div className="mt-3 mb-3">
+                                                            <PremiseSelectionControls
+                                                                selectedApartment={
+                                                                    selectedApartment
+                                                                }
+                                                                onClearSelection={
+                                                                    clearPremiseSelection
+                                                                }
+                                                            />
+                                                        </div>
+
+                                                        {checkboardStatuses.length >
+                                                        0 ? (
+                                                            <div className="mb-3">
+                                                                <CheckboardLegend
+                                                                    statuses={
+                                                                        checkboardStatuses
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        ) : null}
+
+                                                        <div className="checkboard-scroll min-w-0 w-full max-w-full touch-pan-x overflow-x-auto overflow-y-visible rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                                                            {selectedComplexCheckboard ? (
+                                                                <CheckboardClassic
+                                                                    building={
+                                                                        selectedComplexCheckboard
+                                                                    }
+                                                                    labelMode={
+                                                                        checkboardLabelMode
+                                                                    }
+                                                                    selectedPropertyId={
+                                                                        selectedPropertyId
+                                                                    }
+                                                                    isPropertySelectable={
+                                                                        isCheckboardPropertySelectable
+                                                                    }
+                                                                    onPropertySelect={
+                                                                        handleCheckboardPropertySelect
+                                                                    }
+                                                                />
+                                                            ) : null}
+                                                        </div>
+                                                    </>
+                                                ) : null}
                                             </div>
-                                        ))}
-                                    </div>
+                                        )}
+                                    </FormItem>
                                 ) : null}
                             </div>
+                        ) : null}
 
-                            <div className="md:col-span-2">
-                                <FormItem label="Предпочтения">
+                        {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'note' ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="md:col-span-2">
+                                    <FormItem label="Комментарий (необязательно)">
+                                        <Input
+                                            textArea
+                                            rows={4}
+                                            className="max-h-40 resize-none overflow-y-auto"
+                                            placeholder="Комментарий"
+                                            value={note}
+                                            onChange={(e) =>
+                                                setNote(e.target.value)
+                                            }
+                                        />
+                                    </FormItem>
+                                </div>
+
+                                <FormItem label="Желаемая площадь от, м² (необязательно)">
+                                    <Select
+                                        {...selectMenuProps}
+                                        isClearable
+                                        placeholder="Выберите диапазон"
+                                        options={desiredAreaOptions}
+                                        value={
+                                            desiredAreaOptions.find(
+                                                (o) => o.value === desiredArea,
+                                            ) || null
+                                        }
+                                        onChange={(option) =>
+                                            setDesiredArea(
+                                                (
+                                                    option as SelectOption | null
+                                                )?.value || '',
+                                            )
+                                        }
+                                    />
+                                </FormItem>
+
+                                <FormItem label="Кол-во комнат (необязательно)">
+                                    <Select
+                                        {...selectMenuProps}
+                                        isClearable
+                                        placeholder="Выберите вариант"
+                                        options={desiredRoomsOptions}
+                                        value={
+                                            desiredRoomsOptions.find(
+                                                (o) =>
+                                                    o.value === desiredRooms,
+                                            ) || null
+                                        }
+                                        onChange={(option) =>
+                                            setDesiredRooms(
+                                                (
+                                                    option as SelectOption | null
+                                                )?.value || '',
+                                            )
+                                        }
+                                    />
+                                </FormItem>
+
+                                <FormItem label="Формат оплаты (необязательно)">
+                                    <Select
+                                        {...selectMenuProps}
+                                        isClearable
+                                        placeholder="Выберите вариант"
+                                        options={paymentFormatOptions}
+                                        value={
+                                            paymentFormatOptions.find(
+                                                (o) =>
+                                                    o.value === paymentFormat,
+                                            ) || null
+                                        }
+                                        onChange={(option) =>
+                                            setPaymentFormat(
+                                                (
+                                                    option as SelectOption | null
+                                                )?.value || '',
+                                            )
+                                        }
+                                    />
+                                </FormItem>
+
+                                <FormItem label="Бюджет, ₽ (необязательно)">
                                     <Input
-                                        textArea
-                                        rows={5}
-                                        className="max-h-40 overflow-y-auto resize-none"
-                                        placeholder="Комментарий"
-                                        value={note}
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="Укажите бюджет"
+                                        value={formatBudgetValue(budget)}
                                         onChange={(e) =>
-                                            setNote(e.target.value)
+                                            setBudget(
+                                                e.target.value.replace(
+                                                    /\D/g,
+                                                    '',
+                                                ),
+                                            )
+                                        }
+                                    />
+                                </FormItem>
+
+                                <FormItem
+                                    className="md:col-span-2"
+                                    label="Планируемая дата встречи (необязательно)"
+                                >
+                                    <DatePicker
+                                        placeholder="Выберите дату"
+                                        locale="ru"
+                                        inputFormat="DD.MM.YYYY"
+                                        value={
+                                            meetingDate
+                                                ? new Date(meetingDate)
+                                                : null
+                                        }
+                                        onChange={(date) =>
+                                            setMeetingDate(
+                                                date ? formatYMD(date) : '',
+                                            )
                                         }
                                     />
                                 </FormItem>
                             </div>
+                        ) : null}
+
+                        {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'relatives' ? (
+                            <div className="space-y-4">
+                                {!isCreatingRelative ? (
+                                    <div className="space-y-3 rounded-xl border border-gray-200 p-3.5 sm:p-4 dark:border-gray-700">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <h6 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                    Добавить родственника
+                                                </h6>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    Найдите существующего клиента или создайте нового
+                                                </p>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="default"
+                                                icon={<TbPlus />}
+                                                onClick={() =>
+                                                    setIsCreatingRelative(true)
+                                                }
+                                            >
+                                                Создать нового родственника
+                                            </Button>
+                                        </div>
+
+                                        <FormItem
+                                            label="Поиск существующего клиента"
+                                            className="!mb-0"
+                                        >
+                                            <Select
+                                                {...selectMenuProps}
+                                                key={[
+                                                    selectedClient?.id ||
+                                                        'none',
+                                                    ...selectedRelatives.map(
+                                                        (relative) =>
+                                                            relative.client.id,
+                                                    ),
+                                                ].join('-')}
+                                                componentAs={AsyncSelect}
+                                                components={
+                                                    relativeOptionComponents
+                                                }
+                                                defaultOptions
+                                                cacheOptions={false}
+                                                isClearable={false}
+                                                isSearchable
+                                                controlShouldRenderValue={false}
+                                                hideSelectedOptions
+                                                placeholder="Найти клиента по ФИО или телефону"
+                                                loadOptions={
+                                                    loadRelativeOptions
+                                                }
+                                                value={null}
+                                                onChange={(option) =>
+                                                    handleAddRelative(
+                                                        option as ClientSelectOption | null,
+                                                    )
+                                                }
+                                                noOptionsMessage={({
+                                                    inputValue,
+                                                }) =>
+                                                    inputValue
+                                                        ? 'Клиенты не найдены'
+                                                        : 'Начните вводить ФИО или телефон'
+                                                }
+                                                loadingMessage={() =>
+                                                    'Поиск...'
+                                                }
+                                            />
+                                        </FormItem>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 dark:border-primary/40 dark:bg-primary/10">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <h6 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                Новый родственник
+                                            </h6>
+                                            <Button
+                                                type="button"
+                                                size="xs"
+                                                variant="plain"
+                                                onClick={() => {
+                                                    setIsCreatingRelative(false)
+                                                    resetRelativeForm(
+                                                        emptyRelativeForm,
+                                                    )
+                                                }}
+                                            >
+                                                Отмена
+                                            </Button>
+                                        </div>
+                                        <Form
+                                            onSubmit={handleRelativeSubmit(
+                                                handleCreateRelative,
+                                            )}
+                                        >
+                                            <div className="grid gap-3 sm:grid-cols-3">
+                                                <FormItem
+                                                    asterisk
+                                                    label="Фамилия"
+                                                    invalid={Boolean(
+                                                        relativeErrors.lastName,
+                                                    )}
+                                                    errorMessage={
+                                                        relativeErrors.lastName
+                                                            ?.message
+                                                    }
+                                                >
+                                                    <Controller
+                                                        name="lastName"
+                                                        control={
+                                                            relativeControl
+                                                        }
+                                                        render={({
+                                                            field,
+                                                        }) => (
+                                                            <Input
+                                                                placeholder="Иванов"
+                                                                autoComplete="family-name"
+                                                                {...field}
+                                                            />
+                                                        )}
+                                                    />
+                                                </FormItem>
+                                                <FormItem
+                                                    asterisk
+                                                    label="Имя"
+                                                    invalid={Boolean(
+                                                        relativeErrors.firstName,
+                                                    )}
+                                                    errorMessage={
+                                                        relativeErrors.firstName
+                                                            ?.message
+                                                    }
+                                                >
+                                                    <Controller
+                                                        name="firstName"
+                                                        control={
+                                                            relativeControl
+                                                        }
+                                                        render={({
+                                                            field,
+                                                        }) => (
+                                                            <Input
+                                                                placeholder="Иван"
+                                                                autoComplete="given-name"
+                                                                {...field}
+                                                            />
+                                                        )}
+                                                    />
+                                                </FormItem>
+                                                <FormItem
+                                                    label="Отчество"
+                                                    invalid={Boolean(
+                                                        relativeErrors.middleName,
+                                                    )}
+                                                    errorMessage={
+                                                        relativeErrors.middleName
+                                                            ?.message
+                                                    }
+                                                >
+                                                    <Controller
+                                                        name="middleName"
+                                                        control={
+                                                            relativeControl
+                                                        }
+                                                        render={({
+                                                            field,
+                                                        }) => (
+                                                            <Input
+                                                                placeholder="Иванович"
+                                                                autoComplete="additional-name"
+                                                                {...field}
+                                                            />
+                                                        )}
+                                                    />
+                                                </FormItem>
+                                            </div>
+                                            <div className="mt-1 grid gap-3 sm:grid-cols-2">
+                                                <FormItem
+                                                    asterisk
+                                                    label="Телефон"
+                                                    invalid={Boolean(
+                                                        relativeErrors.phone,
+                                                    )}
+                                                    errorMessage={
+                                                        relativeErrors.phone
+                                                            ?.message
+                                                    }
+                                                >
+                                                    <Controller
+                                                        name="phone"
+                                                        control={
+                                                            relativeControl
+                                                        }
+                                                        render={({
+                                                            field,
+                                                        }) => (
+                                                            <PhoneInput
+                                                                value={
+                                                                    field.value ??
+                                                                    ''
+                                                                }
+                                                                onBlur={
+                                                                    field.onBlur
+                                                                }
+                                                                onChange={
+                                                                    field.onChange
+                                                                }
+                                                            />
+                                                        )}
+                                                    />
+                                                </FormItem>
+                                                <FormItem
+                                                    asterisk
+                                                    label="Степень родства"
+                                                    invalid={Boolean(
+                                                        relativeErrors.relation,
+                                                    )}
+                                                    errorMessage={
+                                                        relativeErrors.relation
+                                                            ?.message
+                                                    }
+                                                >
+                                                    <Controller
+                                                        name="relation"
+                                                        control={
+                                                            relativeControl
+                                                        }
+                                                        render={({
+                                                            field,
+                                                        }) => (
+                                                            <Select
+                                                                {...selectMenuProps}
+                                                                placeholder="Выберите степень родства"
+                                                                options={
+                                                                    kinshipSelectOptions
+                                                                }
+                                                                value={
+                                                                    kinshipSelectOptions.find(
+                                                                        (
+                                                                            option,
+                                                                        ) =>
+                                                                            option.value ===
+                                                                            field.value,
+                                                                    ) || null
+                                                                }
+                                                                onChange={(
+                                                                    option,
+                                                                ) =>
+                                                                    field.onChange(
+                                                                        (
+                                                                            option as SelectOption | null
+                                                                        )
+                                                                            ?.value ||
+                                                                            '',
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    />
+                                                </FormItem>
+                                            </div>
+                                            <div className="mt-3 flex justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setIsCreatingRelative(
+                                                            false,
+                                                        )
+                                                        resetRelativeForm(
+                                                            emptyRelativeForm,
+                                                        )
+                                                    }}
+                                                >
+                                                    Отмена
+                                                </Button>
+                                                <Button
+                                                    variant="solid"
+                                                    type="submit"
+                                                    size="sm"
+                                                    disabled={
+                                                        !isRelativeFormValid
+                                                    }
+                                                >
+                                                    Добавить родственника
+                                                </Button>
+                                            </div>
+                                        </Form>
+                                    </div>
+                                )}
+
+                                {selectedRelatives.length > 0 ? (
+                                    <div className="space-y-3">
+                                        <h6 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                            Добавленные родственники (
+                                            {selectedRelatives.length})
+                                        </h6>
+                                        <div className="space-y-3">
+                                            {selectedRelatives.map(
+                                                (relative) => {
+                                                    const hasRelation = Boolean(
+                                                        relative.relation,
+                                                    )
+                                                    const kinshipLabel =
+                                                        hasRelation
+                                                            ? formatFixationKinship(
+                                                                  relative.relation,
+                                                              )
+                                                            : 'Степень родства не указана'
+
+                                                    return (
+                                                        <div
+                                                            key={
+                                                                relative.client
+                                                                    .id
+                                                            }
+                                                            className={classNames(
+                                                                'rounded-xl border bg-white p-3.5 transition-colors dark:bg-gray-800',
+                                                                hasRelation
+                                                                    ? 'border-gray-200 dark:border-gray-700'
+                                                                    : 'border-red-500 ring-1 ring-red-500/30 dark:border-red-500/80',
+                                                            )}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                                            {
+                                                                                relative
+                                                                                    .client
+                                                                                    .fullName
+                                                                            }
+                                                                        </p>
+                                                                        {relative
+                                                                            .client
+                                                                            .isNew ? (
+                                                                            <span className="shrink-0 rounded-md bg-sky-100 px-1.5 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
+                                                                                Новый
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </div>
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                                                                        <span className="text-gray-500 dark:text-gray-400">
+                                                                            {relative
+                                                                                .client
+                                                                                .phone ||
+                                                                                '—'}
+                                                                        </span>
+                                                                        <span className="text-gray-300 dark:text-gray-600">
+                                                                            •
+                                                                        </span>
+                                                                        <span
+                                                                            className={
+                                                                                hasRelation
+                                                                                    ? 'font-medium text-gray-700 dark:text-gray-300'
+                                                                                    : 'font-medium text-red-500 dark:text-red-400'
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                kinshipLabel
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <Dropdown
+                                                                        placement="bottom-end"
+                                                                        renderTitle={
+                                                                            <Button
+                                                                                type="button"
+                                                                                size="sm"
+                                                                                variant="plain"
+                                                                                className="shrink-0 text-gray-500 hover:text-primary dark:text-gray-400 dark:hover:text-primary"
+                                                                                icon={
+                                                                                    <TbUsers className="text-lg" />
+                                                                                }
+                                                                                title="Выбрать степень родства"
+                                                                            />
+                                                                        }
+                                                                    >
+                                                                        <Dropdown.Item variant="header">
+                                                                            <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                                                Степень
+                                                                                родства
+                                                                            </div>
+                                                                        </Dropdown.Item>
+                                                                        {kinshipSelectOptions.map(
+                                                                            (
+                                                                                option,
+                                                                            ) => (
+                                                                                <Dropdown.Item
+                                                                                    key={
+                                                                                        option.value
+                                                                                    }
+                                                                                    active={
+                                                                                        relative.relation ===
+                                                                                        option.value
+                                                                                    }
+                                                                                    onClick={() => {
+                                                                                        setSelectedRelatives(
+                                                                                            (
+                                                                                                prev,
+                                                                                            ) =>
+                                                                                                prev.map(
+                                                                                                    (
+                                                                                                        item,
+                                                                                                    ) =>
+                                                                                                        item
+                                                                                                            .client
+                                                                                                            .id ===
+                                                                                                        relative
+                                                                                                            .client
+                                                                                                            .id
+                                                                                                            ? {
+                                                                                                                  ...item,
+                                                                                                                  relation:
+                                                                                                                      option.value,
+                                                                                                              }
+                                                                                                            : item,
+                                                                                                ),
+                                                                                        )
+                                                                                    }}
+                                                                                >
+                                                                                    {
+                                                                                        option.label
+                                                                                    }
+                                                                                </Dropdown.Item>
+                                                                            ),
+                                                                        )}
+                                                                    </Dropdown>
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="plain"
+                                                                        className="shrink-0 text-red-500 hover:text-red-600"
+                                                                        icon={
+                                                                            <TbTrash className="text-lg" />
+                                                                        }
+                                                                        title="Удалить"
+                                                                        onClick={() =>
+                                                                            handleRemoveRelative(
+                                                                                relative
+                                                                                    .client
+                                                                                    .id,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                },
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : !isCreatingRelative ? (
+                                    <div className="rounded-xl border border-dashed border-gray-200 py-6 text-center dark:border-gray-700">
+                                        <TbUsers className="mx-auto mb-2 text-2xl text-gray-400" />
+                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Родственники не добавлены
+                                        </p>
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Вы можете найти существующего клиента, создать нового или перейти к следующему шагу
+                                        </p>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        {step === 'confirm' ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <SummaryCard
+                                    icon={<TbUser />}
+                                    label="Клиент"
+                                    title={selectedClient?.fullName || '—'}
+                                    subtitle={selectedClient?.phone}
+                                    isFilled={Boolean(selectedClient)}
+                                    onEdit={() => setStep('client')}
+                                />
+                                <SummaryCard
+                                    icon={<TbBuilding />}
+                                    label="Дом"
+                                    title={selectedComplex?.name || '—'}
+                                    subtitle={
+                                        WIZARD_EXTENDED_FIELDS_ENABLED
+                                            ? propertySubtitle
+                                            : selectedComplex?.address
+                                    }
+                                    isFilled={Boolean(selectedComplex)}
+                                    onEdit={() => setStep('complex')}
+                                />
+                                <SummaryCard
+                                    icon={<TbUsers />}
+                                    label="Менеджер"
+                                    title={
+                                        selectedManager &&
+                                        selectedManager !== 'any'
+                                            ? selectedManager.fullName
+                                            : selectedManager === 'any'
+                                              ? 'Любой'
+                                              : 'Назначить автоматически'
+                                    }
+                                    subtitle={
+                                        selectedManager &&
+                                        selectedManager !== 'any'
+                                            ? selectedManager.phone
+                                            : undefined
+                                    }
+                                    isFilled={Boolean(
+                                        selectedManager &&
+                                            selectedManager !== 'any',
+                                    )}
+                                    onEdit={() => setStep('complex')}
+                                />
+                                {WIZARD_EXTENDED_FIELDS_ENABLED ? (
+                                    <>
+                                        <SummaryCard
+                                            icon={<TbNote />}
+                                            label="Предпочтения"
+                                            title={
+                                                preferencesSummary ||
+                                                'Не указано'
+                                            }
+                                            isFilled={hasPreferences}
+                                            scrollableContent
+                                            onEdit={() => setStep('note')}
+                                        />
+                                        <SummaryCard
+                                            icon={<TbUsers />}
+                                            label="Родственники"
+                                            title={
+                                                relativesSummary ||
+                                                'Не указаны'
+                                            }
+                                            subtitle={
+                                                selectedRelatives.length > 0
+                                                    ? selectedRelatives
+                                                          .map(
+                                                              (relative) =>
+                                                                  relative
+                                                                      .client
+                                                                      .phone,
+                                                          )
+                                                          .join(', ')
+                                                    : undefined
+                                            }
+                                            isFilled={
+                                                selectedRelatives.length > 0
+                                            }
+                                            onEdit={() =>
+                                                setStep('relatives')
+                                            }
+                                        />
+                                        <SummaryCard
+                                            icon={<TbMessage />}
+                                            label="Комментарий"
+                                            title={note.trim() || 'Не указано'}
+                                            isFilled={hasComment}
+                                            scrollableContent
+                                            onEdit={() => setStep('note')}
+                                        />
+                                    </>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {step !== 'client-create' && step !== 'client' ? (
+                        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 pt-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                            <Button
+                                type="button"
+                                className="w-full sm:w-auto"
+                                icon={<TbArrowLeft />}
+                                onClick={() => {
+                                    if (step === 'complex') setStep('client')
+                                    if (step === 'note') setStep('complex')
+                                    if (step === 'relatives') setStep('note')
+                                    if (step === 'confirm') {
+                                        setStep('relatives')
+                                    }
+                                }}
+                            >
+                                Назад
+                            </Button>
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                                <Button
+                                    type="button"
+                                    className="w-full sm:w-auto"
+                                    onClick={onClose}
+                                >
+                                    Отмена
+                                </Button>
+                                {step === 'complex' ? (
+                                    <Button
+                                        variant="solid"
+                                        className="w-full sm:w-auto"
+                                        disabled={!canProceedFromComplex}
+                                        onClick={() => setStep('note')}
+                                    >
+                                        Далее
+                                    </Button>
+                                ) : null}
+                                {step === 'note' ? (
+                                    <Button
+                                        variant="solid"
+                                        className="w-full sm:w-auto"
+                                        onClick={() => setStep('relatives')}
+                                    >
+                                        Далее
+                                    </Button>
+                                ) : null}
+                                {step === 'relatives' ? (
+                                    <Button
+                                        variant="solid"
+                                        className="w-full sm:w-auto"
+                                        disabled={!canProceedFromRelatives}
+                                        onClick={() => setStep('confirm')}
+                                    >
+                                        Далее
+                                    </Button>
+                                ) : null}
+                                {step === 'confirm' ? (
+                                    <Button
+                                        variant="solid"
+                                        className="w-full sm:w-auto"
+                                        loading={isSubmitting}
+                                        onClick={() =>
+                                            void handleCreateFixation()
+                                        }
+                                    >
+                                        Создать
+                                    </Button>
+                                ) : null}
+                            </div>
                         </div>
                     ) : null}
 
-                    {step === 'confirm' ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <SummaryCard
-                                icon={<TbUser />}
-                                label="Клиент"
-                                title={selectedClient?.fullName || '—'}
-                                subtitle={selectedClient?.phone}
-                                isFilled={Boolean(selectedClient)}
-                                onEdit={() => setStep('client')}
-                            />
-                            <SummaryCard
-                                icon={<TbBuilding />}
-                                label="Дом"
-                                title={selectedComplex?.name || '—'}
-                                subtitle={
-                                    WIZARD_EXTENDED_FIELDS_ENABLED
-                                        ? propertySubtitle
-                                        : selectedComplex?.address
-                                }
-                                isFilled={Boolean(selectedComplex)}
-                                onEdit={() => setStep('complex')}
-                            />
-                            <SummaryCard
-                                icon={<TbUsers />}
-                                label="Менеджер"
-                                title={selectedManager?.fullName || '—'}
-                                subtitle={selectedManager?.phone}
-                                isFilled={Boolean(selectedManager)}
-                                onEdit={() => setStep('complex')}
-                            />
-                            {WIZARD_EXTENDED_FIELDS_ENABLED ? (
-                                <>
-                            <SummaryCard
-                                icon={<TbUsers />}
-                                label="Родственники"
-                                title={
-                                    relativesSummary || 'Не указаны'
-                                }
-                                subtitle={
-                                    selectedRelatives.length > 0
-                                        ? selectedRelatives
-                                              .map(
-                                                  (relative) =>
-                                                      relative.client.phone,
-                                              )
-                                              .join(', ')
-                                        : undefined
-                                }
-                                isFilled={selectedRelatives.length > 0}
-                                onEdit={() => setStep('note')}
-                            />
-                            <SummaryCard
-                                icon={<TbNote />}
-                                label="Предпочтения"
-                                title={preferencesSummary || 'Не указано'}
-                                isFilled={hasPreferences}
-                                scrollableContent
-                                onEdit={() => setStep('note')}
-                            />
-                            <SummaryCard
-                                icon={<TbMessage />}
-                                label="Комментарий"
-                                title={note.trim() || 'Не указано'}
-                                isFilled={hasComment}
-                                scrollableContent
-                                onEdit={() => setStep('note')}
-                            />
-                                </>
-                            ) : null}
-                        </div>
-                    ) : null}
-                </div>
-
-                {step !== 'client-create' && step !== 'client' ? (
-                    <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 pt-3 dark:border-gray-700 sm:flex-row sm:items-center sm:justify-between">
-                        <Button
-                            type="button"
-                            className="w-full sm:w-auto"
-                            icon={<TbArrowLeft />}
-                            onClick={() => {
-                                if (step === 'complex') setStep('client')
-                                if (step === 'confirm') setStep('complex')
-                            }}
-                        >
-                            Назад
-                        </Button>
-                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    {step === 'client' ? (
+                        <div className="flex shrink-0 justify-end border-t border-gray-200 pt-3 dark:border-gray-700">
                             <Button
                                 type="button"
                                 className="w-full sm:w-auto"
@@ -1885,139 +2910,99 @@ const FixationsCreateWizardDialog = ({
                             >
                                 Отмена
                             </Button>
-                            {step === 'complex' ? (
-                                <Button
-                                    variant="solid"
-                                    className="w-full sm:w-auto"
-                                    disabled={!canProceedFromComplex}
-                                    onClick={() => setStep('confirm')}
-                                >
-                                    Далее
-                                </Button>
-                            ) : null}
-                            {WIZARD_EXTENDED_FIELDS_ENABLED && step === 'note' ? (
-                                <Button
-                                    variant="solid"
-                                    className="w-full sm:w-auto"
-                                    disabled={!canProceedFromNote}
-                                    onClick={() => setStep('confirm')}
-                                >
-                                    Далее
-                                </Button>
-                            ) : null}
-                            {step === 'confirm' ? (
-                                <Button
-                                    variant="solid"
-                                    className="w-full sm:w-auto"
-                                    loading={isSubmitting}
-                                    onClick={() => void handleCreateFixation()}
-                                >
-                                    Создать
-                                </Button>
-                            ) : null}
                         </div>
-                    </div>
-                ) : null}
+                    ) : null}
+                </div>
+            </Dialog>
 
-                {step === 'client' ? (
-                    <div className="flex shrink-0 justify-end border-t border-gray-200 pt-3 dark:border-gray-700">
+            <Dialog
+                isOpen={isCheckboardFullscreen}
+                width={
+                    typeof window !== 'undefined'
+                        ? Math.max(window.innerWidth - 24, 320)
+                        : 1200
+                }
+                height="100%"
+                className="!relative !m-0 !h-full !max-h-full !w-full !max-w-full"
+                overlayClassName="!z-[60] !box-border !flex !flex-col !p-2 sm:!p-3"
+                contentClassName="flex h-full max-h-full min-h-0 flex-col overflow-hidden !mx-0 !my-0 !p-3.5 sm:!p-5"
+                style={{
+                    content: {
+                        position: 'relative',
+                        inset: 'unset',
+                        top: 'auto',
+                        left: 'auto',
+                        right: 'auto',
+                        bottom: 'auto',
+                        margin: 0,
+                        transform: 'none',
+                        flex: '1 1 auto',
+                        minHeight: 0,
+                    },
+                }}
+                onClose={() => setIsCheckboardFullscreen(false)}
+                onRequestClose={() => setIsCheckboardFullscreen(false)}
+            >
+                <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
+                    <div className="shrink-0 pr-10">
+                        <h5 className="mb-1 text-base font-semibold sm:text-lg">
+                            Выбор помещения на шахматке
+                        </h5>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {selectedComplex?.name || '—'}
+                        </p>
+                    </div>
+
+                    <PremiseSelectionControls
+                        selectedApartment={selectedApartment}
+                        onClearSelection={clearPremiseSelection}
+                    />
+
+                    {checkboardStatuses.length > 0 ? (
+                        <CheckboardLegend statuses={checkboardStatuses} />
+                    ) : null}
+
+                    <div className="checkboard-scroll max-h-[calc(100dvh-14rem)] min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-auto rounded-xl border border-gray-200 p-2 dark:border-gray-700">
+                        {isCheckboardLoading ? (
+                            <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
+                                Загрузка шахматки...
+                            </div>
+                        ) : selectedComplexCheckboard ? (
+                            <CheckboardClassic
+                                building={selectedComplexCheckboard}
+                                labelMode={checkboardLabelMode}
+                                selectedPropertyId={selectedPropertyId}
+                                isPropertySelectable={
+                                    isCheckboardPropertySelectable
+                                }
+                                onPropertySelect={
+                                    handleCheckboardPropertySelect
+                                }
+                            />
+                        ) : (
+                            <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
+                                Не удалось загрузить шахматку для выбранного дома
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
                         <Button
                             type="button"
-                            className="w-full sm:w-auto"
-                            onClick={onClose}
+                            onClick={() => setIsCheckboardFullscreen(false)}
                         >
-                            Отмена
+                            Закрыть
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="solid"
+                            onClick={() => setIsCheckboardFullscreen(false)}
+                        >
+                            Готово
                         </Button>
                     </div>
-                ) : null}
-            </div>
-        </Dialog>
-
-        <Dialog
-            isOpen={isCheckboardFullscreen}
-            width={
-                typeof window !== 'undefined'
-                    ? Math.max(window.innerWidth - 24, 320)
-                    : 1200
-            }
-            height="100%"
-            className="!relative !m-0 !h-full !max-h-full !w-full !max-w-full"
-            overlayClassName="!z-[60] !box-border !flex !flex-col !p-3"
-            contentClassName="flex h-full max-h-full min-h-0 flex-col overflow-hidden !mx-0 !my-0 !p-4 sm:!p-5"
-            style={{
-                content: {
-                    position: 'relative',
-                    inset: 'unset',
-                    top: 'auto',
-                    left: 'auto',
-                    right: 'auto',
-                    bottom: 'auto',
-                    margin: 0,
-                    transform: 'none',
-                    flex: '1 1 auto',
-                    minHeight: 0,
-                },
-            }}
-            onClose={() => setIsCheckboardFullscreen(false)}
-            onRequestClose={() => setIsCheckboardFullscreen(false)}
-        >
-            <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden">
-                <div className="shrink-0 pr-10">
-                    <h5 className="mb-1 text-base font-semibold sm:text-lg">
-                        Выбор помещения на шахматке
-                    </h5>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {selectedComplex?.name || '—'}
-                    </p>
                 </div>
-
-                <PremiseSelectionControls
-                    selectedApartment={selectedApartment}
-                    onClearSelection={clearPremiseSelection}
-                />
-
-                {checkboardStatuses.length > 0 ? (
-                    <CheckboardLegend statuses={checkboardStatuses} />
-                ) : null}
-
-                <div
-                    className="checkboard-scroll min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto overscroll-y-auto max-h-[calc(100dvh-14rem)] rounded-xl border border-gray-200 p-2 dark:border-gray-700"
-                >
-                    {isCheckboardLoading ? (
-                        <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
-                            Загрузка шахматки...
-                        </div>
-                    ) : selectedComplexCheckboard ? (
-                        <CheckboardClassic
-                            building={selectedComplexCheckboard}
-                            labelMode={checkboardLabelMode}
-                            selectedPropertyId={selectedPropertyId}
-                            onPropertySelect={handleCheckboardPropertySelect}
-                        />
-                    ) : (
-                        <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-gray-500">
-                            Не удалось загрузить шахматку для выбранного дома
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-gray-200 pt-3 dark:border-gray-700">
-                    <Button
-                        type="button"
-                        onClick={() => setIsCheckboardFullscreen(false)}
-                    >
-                        Закрыть
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="solid"
-                        onClick={() => setIsCheckboardFullscreen(false)}
-                    >
-                        Готово
-                    </Button>
-                </div>
-            </div>
-        </Dialog>
+            </Dialog>
         </>
     )
 }
