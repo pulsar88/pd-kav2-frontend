@@ -13,6 +13,25 @@ export { formatNotificationTypeDescription, formatNotificationTypeTitle }
 export const getPreferenceKey = (typeId: number, channelId: number) =>
     `${typeId}:${channelId}`
 
+export const isChannelHiddenForType = (
+    type: NotificationTypeDictionaryItem,
+    channel: NotificationChannelDictionaryItem,
+) =>
+    Boolean(channel.is_hidden) ||
+    (type.hidden_channels ?? []).includes(channel.id)
+
+export const isChannelReadonlyForType = (
+    type: NotificationTypeDictionaryItem,
+    channel: NotificationChannelDictionaryItem,
+) =>
+    isChannelHiddenForType(type, channel) ||
+    (type.readonly_channels ?? []).includes(channel.id)
+
+export const visibleChannelsForType = (
+    type: NotificationTypeDictionaryItem,
+    channels: NotificationChannelDictionaryItem[],
+) => channels.filter((channel) => !isChannelHiddenForType(type, channel))
+
 export const buildPreferenceState = (
     types: NotificationTypeDictionaryItem[],
     channels: NotificationChannelDictionaryItem[],
@@ -21,7 +40,7 @@ export const buildPreferenceState = (
     const state: Record<string, boolean> = {}
 
     types.forEach((type) => {
-        channels.forEach((channel) => {
+        visibleChannelsForType(type, channels).forEach((channel) => {
             const key = getPreferenceKey(type.id, channel.id)
             const preference = preferences.find(
                 (item) =>

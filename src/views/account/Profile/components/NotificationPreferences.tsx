@@ -17,7 +17,9 @@ import {
     formatNotificationTypeDescription,
     formatNotificationTypeTitle,
     getPreferenceKey,
+    isChannelReadonlyForType,
     preferenceStateToPayload,
+    visibleChannelsForType,
 } from '../utils/notificationPreferences'
 
 const NOTIFICATION_LOCALE = 'ru'
@@ -86,6 +88,16 @@ const NotificationPreferences = () => {
         channelId: number,
         checked: boolean,
     ) => {
+        const type = types.find((item) => item.id === typeId)
+        const channel = channels.find((item) => item.id === channelId)
+        if (
+            type &&
+            channel &&
+            isChannelReadonlyForType(type, channel)
+        ) {
+            return
+        }
+
         const key = getPreferenceKey(typeId, channelId)
         setPreferences((prevState) => ({
             ...prevState,
@@ -185,12 +197,20 @@ const NotificationPreferences = () => {
                                         </p>
                                     ) : null}
                                 </div>
-                                <div className="flex flex-col gap-2">
-                                    {channels.map((channel) => {
+                                <div className="flex flex-col gap-3">
+                                    {visibleChannelsForType(
+                                        type,
+                                        channels,
+                                    ).map((channel) => {
                                         const key = getPreferenceKey(
                                             type.id,
                                             channel.id,
                                         )
+                                        const isReadonly =
+                                            isChannelReadonlyForType(
+                                                type,
+                                                channel,
+                                            )
 
                                         return (
                                             <label
@@ -205,6 +225,8 @@ const NotificationPreferences = () => {
                                                         preferences[key] ??
                                                         false
                                                     }
+                                                    disabled={isReadonly}
+                                                    readOnly={isReadonly}
                                                     onChange={(checked) =>
                                                         handleToggle(
                                                             type.id,

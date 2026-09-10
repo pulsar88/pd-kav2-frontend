@@ -15,6 +15,26 @@ const TYPE_DESCRIPTION_BY_CODE: Record<string, string> = {
     SYSTEM: 'Важные сообщения о работе аккаунта и сервиса',
 }
 
+const unwrapList = <T>(value: unknown): T[] => {
+    if (Array.isArray(value)) {
+        return value
+    }
+
+    if (
+        value &&
+        typeof value === 'object' &&
+        'data' in value &&
+        Array.isArray((value as { data: T[] }).data)
+    ) {
+        return (value as { data: T[] }).data
+    }
+
+    return []
+}
+
+const bySort = <T extends { sort?: number; id: number }>(left: T, right: T) =>
+    (left.sort ?? 0) - (right.sort ?? 0) || left.id - right.id
+
 export const parseNotificationDictionaries = (
     payload: ApiDataEnvelope<NotificationDictionaries> | NotificationDictionaries,
 ): NotificationDictionaries => {
@@ -27,14 +47,12 @@ export const parseNotificationDictionaries = (
         'notification_channels' in unwrapped
     ) {
         return {
-            notification_types: Array.isArray(unwrapped.notification_types)
-                ? unwrapped.notification_types
-                : [],
-            notification_channels: Array.isArray(
+            notification_types: unwrapList<NotificationTypeDictionaryItem>(
+                unwrapped.notification_types,
+            ).sort(bySort),
+            notification_channels: unwrapList<NotificationChannelDictionaryItem>(
                 unwrapped.notification_channels,
-            )
-                ? unwrapped.notification_channels
-                : [],
+            ).sort(bySort),
         }
     }
 
