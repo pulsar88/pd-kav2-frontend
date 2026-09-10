@@ -25,7 +25,10 @@ type MotionDefault = {
     bottom?: string | number
     transform?: string
     display?: string
+    flexDirection?: string
+    alignItems?: string
     justifyContent?: string
+    gap?: string | number
 }
 
 type MotionTransition = {
@@ -102,7 +105,10 @@ const scaleTransition = (
                 left: 0,
                 right: 0,
                 display: 'flex',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: 8,
             },
             variants: {
                 ...scaleMotionProps,
@@ -132,7 +138,10 @@ const scaleTransition = (
                 left: 0,
                 right: 0,
                 display: 'flex',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 8,
             },
             variants: {
                 ...scaleMotionProps,
@@ -170,7 +179,10 @@ const fadeTransition = (
                 left: 0,
                 right: 0,
                 display: 'flex',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                gap: 8,
             },
             variants: {
                 ...fadeMotionProps,
@@ -200,7 +212,10 @@ const fadeTransition = (
                 left: 0,
                 right: 0,
                 display: 'flex',
-                justifyContent: 'center',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 8,
             },
             variants: {
                 ...fadeMotionProps,

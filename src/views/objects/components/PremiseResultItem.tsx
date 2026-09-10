@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
@@ -33,6 +33,8 @@ import {
     houseStatusLabel,
     houseTypeLabel,
 } from '../utils'
+import SpecialOfferBadges from './SpecialOfferBadges'
+import { hasPremiseDiscount } from '../specialOfferUtils'
 
 const PendingRemovalBanner = ({
     startedAt,
@@ -122,7 +124,7 @@ const Detail = ({
     value,
 }: {
     label: string
-    value: string | number | undefined
+    value: ReactNode
 }) => (
     <div>
         <p className="text-xs text-gray-400">{label}</p>
@@ -205,7 +207,11 @@ const PremiseResultItem = ({
     const toggleComparison = useComparisonStore((state) => state.togglePremise)
 
     const typeLabel = getPremiseTypeLabel(premise)
-    const pricePerSqm = getPremisePricePerSqm(premise.price, premise.area)
+    const showDiscount = hasPremiseDiscount(premise)
+    const pricePerSqm = getPremisePricePerSqm(
+        showDiscount ? premise.discountPrice : premise.price,
+        premise.area,
+    )
     const coverImage = getPremiseCoverImage(premise)
     const coverImageLabel = premise.layoutImage ? 'Планировка' : 'План этажа'
     const canPreviewImages = hasPremisePreviewImages(premise)
@@ -259,7 +265,25 @@ const PremiseResultItem = ({
             {premise.price !== undefined ? (
                 <Detail
                     label="Стоимость"
-                    value={formatPrice(premise.price)}
+                    value={
+                        showDiscount ? (
+                            <span className="text-gray-400 line-through dark:text-gray-500">
+                                {formatPrice(premise.price)}
+                            </span>
+                        ) : (
+                            formatPrice(premise.price)
+                        )
+                    }
+                />
+            ) : null}
+            {showDiscount && premise.discountPrice != null ? (
+                <Detail
+                    label="Акционная цена"
+                    value={
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            {formatPrice(premise.discountPrice)}
+                        </span>
+                    }
                 />
             ) : null}
             {pricePerSqm !== undefined ? (
@@ -332,7 +356,30 @@ const PremiseResultItem = ({
 
     const priceBlock = (
         <>
-            {premise.price !== undefined ? (
+            {showDiscount && premise.discountPrice != null ? (
+                <>
+                    <p
+                        className={classNames(
+                            'font-bold leading-snug text-emerald-600 dark:text-emerald-400',
+                            open && '!text-emerald-300',
+                        )}
+                    >
+                        {formatPrice(premise.discountPrice)}
+                    </p>
+                    {premise.price !== undefined ? (
+                        <p
+                            className={classNames(
+                                'text-xs leading-snug line-through',
+                                open
+                                    ? 'text-gray-400'
+                                    : 'text-gray-400 dark:text-gray-500',
+                            )}
+                        >
+                            {formatPrice(premise.price)}
+                        </p>
+                    ) : null}
+                </>
+            ) : premise.price !== undefined ? (
                 <p
                     className={classNames(
                         'font-semibold leading-snug',
@@ -360,7 +407,9 @@ const PremiseResultItem = ({
     )
 
     const hasPriceInfo =
-        premise.price !== undefined || pricePerSqm !== undefined
+        premise.price !== undefined ||
+        showDiscount ||
+        pricePerSqm !== undefined
 
     const statusName = premise.statusName ?? premise.status?.name
     const statusColor = premise.statusColor ?? premise.status?.color
@@ -388,11 +437,20 @@ const PremiseResultItem = ({
         </span>
     ) : null
 
+    const offerBadges =
+        premise.specialOffers && premise.specialOffers.length > 0 ? (
+            <SpecialOfferBadges
+                offers={premise.specialOffers}
+                interactiveDetails
+            />
+        ) : null
+
     const badgesRow =
-        complexBadge || statusBadge ? (
+        complexBadge || statusBadge || offerBadges ? (
             <div className="mb-1.5 flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
                 {complexBadge}
                 {statusBadge}
+                {offerBadges}
             </div>
         ) : null
 
@@ -650,7 +708,10 @@ const PremiseResultItem = ({
                             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-stretch">
                                 {coverImage ? (
                                     <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
-                                        <div className="flex shrink-0 items-center justify-end gap-3 border-b border-gray-700 px-3 py-2.5">
+                                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-700 px-3 py-2.5">
+                                            <div className="min-w-0 flex-1">
+                                                {offerBadges}
+                                            </div>
                                             <button
                                                 type="button"
                                                 className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-gray-400 transition-colors hover:text-primary"

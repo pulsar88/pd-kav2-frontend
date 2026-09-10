@@ -1,11 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import {
-    ImageSlide,
-    isImageSlide,
-    type RenderSlideProps,
-} from 'yet-another-react-lightbox'
 import Drawer from '@/components/ui/Drawer'
 import { Button, Carousel } from '@/components/ui'
 import ImageGallery from '@/components/shared/ImageGallery'
@@ -35,8 +30,14 @@ import {
 } from '../../checkboardUtils'
 import { useThemeStore } from '@/store/themeStore'
 import presetThemeSchemaConfig from '@/configs/preset-theme-schema.config'
-import { hexToRgba } from '@/utils/hetToRgba'
 import { useCommonStore } from '@/store/commonStore'
+import {
+    FLOOR_PLAN_HIGHLIGHT_COLOR,
+    FloorPlanGallerySlide,
+    FloorPlanPathOverlay,
+} from '../FloorPlanOverlay'
+import SpecialOfferBadges from '../SpecialOfferBadges'
+import { resolveDiscountPrice } from '../../specialOfferUtils'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -96,84 +97,6 @@ const LayoutImagePlaceholder = () => (
         </span>
     </div>
 )
-
-const FloorPlanPathOverlay = ({
-    path,
-    width,
-    height,
-    color = '#3b82f6',
-}: {
-    path: string
-    width: number
-    height: number
-    color: string
-}) => (
-    <svg
-        aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
-    >
-        <path d={path} fill={hexToRgba(color)} stroke={color} strokeWidth={4} />
-    </svg>
-)
-
-const FloorPlanGallerySlide = ({
-    slide,
-    offset,
-    rect,
-    floorPath,
-    color,
-}: RenderSlideProps & {
-    floorPath: string
-    color: string
-}) => {
-    if (!isImageSlide(slide)) {
-        return null
-    }
-
-    const hasSize = Boolean(slide.width && slide.height)
-
-    return (
-        <div
-            style={{
-                position: 'relative',
-                ...(hasSize
-                    ? {
-                          maxWidth: `min(${slide.width}px, 100%)`,
-                          maxHeight: `min(${slide.height}px, 100%)`,
-                          aspectRatio: `${slide.width} / ${slide.height}`,
-                      }
-                    : null),
-            }}
-        >
-            <ImageSlide
-                slide={slide}
-                offset={offset}
-                rect={rect}
-                style={{
-                    display: 'block',
-                    ...(hasSize
-                        ? {
-                              width: '100%',
-                              height: 'auto',
-                              maxWidth: undefined,
-                              maxHeight: undefined,
-                          }
-                        : null),
-                }}
-            />
-            {hasSize ? (
-                <FloorPlanPathOverlay
-                    path={floorPath}
-                    width={slide.width!}
-                    height={slide.height!}
-                    color={color}
-                />
-            ) : null}
-        </div>
-    )
-}
 
 const formatSectionValue = (section?: string, sectionName?: string) => {
     const raw = section ?? sectionName
@@ -328,6 +251,25 @@ const CheckboardPropertyDrawer = ({
         const price =
             propertyDetails?.price ??
             (property.price > 0 ? property.price : undefined)
+        const discountPrice = resolveDiscountPrice(
+            propertyDetails?.discountPrice ?? property.discount_price,
+            {
+                basePrice:
+                    propertyDetails?.price ??
+                    (property.price > 0 ? property.price : undefined),
+                hasOffers: Boolean(
+                    (
+                        propertyDetails?.specialOffers ??
+                        property.special_offers
+                    )?.length,
+                ),
+            },
+        )
+        const specialOffers =
+            propertyDetails?.specialOffers ??
+            (property.special_offers?.length
+                ? property.special_offers
+                : undefined)
 
         return {
             section,
@@ -339,6 +281,8 @@ const CheckboardPropertyDrawer = ({
             typeName,
             hasRooms,
             price,
+            discountPrice,
+            specialOffers,
         }
     }, [property, propertyDetails])
 
@@ -559,7 +503,17 @@ const CheckboardPropertyDrawer = ({
                             <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 Изображения
                             </h5>
-                            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
+                            <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
+                                {display.specialOffers?.length ? (
+                                    <div className="absolute left-4 top-4 z-20 max-w-[calc(100%-2rem)]">
+                                        <SpecialOfferBadges
+                                            offers={display.specialOffers}
+                                            max={3}
+                                            interactiveDetails
+                                            showPremisesAction
+                                        />
+                                    </div>
+                                ) : null}
                                 {hasImages ? (
                                     <Carousel
                                         opts={{ loop: imageUrls.length > 1 }}
@@ -721,13 +675,38 @@ const CheckboardPropertyDrawer = ({
                                         label="Цена"
                                         value={
                                             display.price != null &&
-                                            display.price > 0
-                                                ? formatCheckboardPrice(
-                                                      display.price,
-                                                  )
-                                                : '—'
+                                            display.price > 0 ? (
+                                                display.discountPrice !=
+                                                    null &&
+                                                display.discountPrice > 0 ? (
+                                                    <span className="text-gray-400 line-through dark:text-gray-500">
+                                                        {formatCheckboardPrice(
+                                                            display.price,
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    formatCheckboardPrice(
+                                                        display.price,
+                                                    )
+                                                )
+                                            ) : (
+                                                '—'
+                                            )
                                         }
                                     />
+                                    {display.discountPrice != null &&
+                                    display.discountPrice > 0 ? (
+                                        <InfoRow
+                                            label="Акционная цена"
+                                            value={
+                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCheckboardPrice(
+                                                        display.discountPrice,
+                                                    )}
+                                                </span>
+                                            }
+                                        />
+                                    ) : null}
                                     <InfoRow
                                         label="Статус"
                                         value={
@@ -788,7 +767,7 @@ const CheckboardPropertyDrawer = ({
                                 <FloorPlanGallerySlide
                                     {...props}
                                     floorPath={propertyDetails.floorPath}
-                                    color="#7ae061ff"
+                                    color={FLOOR_PLAN_HIGHLIGHT_COLOR}
                                 />
                             )
                         },

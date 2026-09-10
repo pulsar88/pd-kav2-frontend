@@ -22,7 +22,7 @@ const ToolButtonTextColor = ({ editor }: BaseToolButtonProps) => {
     return (
         <Dropdown
             renderTitle={
-                <ToolButton title="Цвет текста">
+                <ToolButton title="Цвет текста" active={Boolean(current)}>
                     <span className="relative inline-flex flex-col items-center">
                         <LuPalette />
                         <span

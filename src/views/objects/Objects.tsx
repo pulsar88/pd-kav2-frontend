@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import Tabs from '@/components/ui/Tabs'
-import Select from '@/components/ui/Select'
 import Pagination from '@/components/ui/Pagination'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
@@ -35,12 +34,7 @@ const { TabList, TabNav, TabContent } = Tabs
 
 const emptyFilters = createEmptyObjectsSearchFilters()
 
-const pageSizeOptions = [20, 50, 100].map((number) => ({
-    value: number,
-    label: `${number} / стр.`,
-}))
-
-type PageSizeOption = { value: number; label: string }
+const PAGE_SIZE = 20
 
 const hasAppliedCatalogFilters = (filters: ObjectsSearchFilters) =>
     hasActiveObjectsSearchFilters(filters)
@@ -69,11 +63,11 @@ const Objects = () => {
         () => hasAppliedCatalogFilters(filtersFromUrl),
     )
     const [premisesPage, setPremisesPage] = useState(1)
-    const [premisesPageSize, setPremisesPageSize] = useState(20)
+    const premisesPageSize = PAGE_SIZE
     const [premisesSortKey, setPremisesSortKey] =
         useState<PremiseSortState>(null)
     const [complexesPage, setComplexesPage] = useState(1)
-    const [complexesPageSize, setComplexesPageSize] = useState(20)
+    const complexesPageSize = PAGE_SIZE
     const [hasOpenedPremisesTab, setHasOpenedPremisesTab] = useState(
         () => tabFromUrl === 'premises',
     )
@@ -288,6 +282,16 @@ const Objects = () => {
 
     const handleFiltersChange = (nextFilters: ObjectsSearchFilters) => {
         setFilters(nextFilters)
+
+        const offerCleared =
+            Boolean(appliedFilters.specialOfferId) &&
+            !nextFilters.specialOfferId
+        if (!offerCleared) return
+
+        setAppliedFilters(nextFilters)
+        setPremisesPage(1)
+        setComplexesPage(1)
+        syncCatalogToUrl(nextFilters)
     }
 
     const handleSearch = () => {
@@ -390,52 +394,22 @@ const Objects = () => {
                                                 />
                                             ))}
                                         </div>
-                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="overflow-x-auto">
-                                                <Pagination
-                                                    currentPage={
-                                                        complexesData?.meta
-                                                            .current_page ??
-                                                        complexesPage
-                                                    }
-                                                    pageSize={
-                                                        complexesData?.meta
-                                                            .per_page ??
-                                                        complexesPageSize
-                                                    }
-                                                    total={complexesTotal}
-                                                    pagerCount={5}
-                                                    onChange={setComplexesPage}
-                                                />
-                                            </div>
-                                            <div className="shrink-0 self-end sm:self-auto" style={{ minWidth: 130 }}>
-                                                <Select
-                                                    instanceId="objects-complexes-page-size"
-                                                    size="sm"
-                                                    menuPlacement="top"
-                                                    isSearchable={false}
-                                                    value={pageSizeOptions.filter(
-                                                        (option) =>
-                                                            option.value ===
-                                                            complexesPageSize,
-                                                    )}
-                                                    options={pageSizeOptions}
-                                                    onChange={(option) => {
-                                                        const size = (
-                                                            option as PageSizeOption | null
-                                                        )?.value
-                                                        if (
-                                                            typeof size ===
-                                                            'number'
-                                                        ) {
-                                                            setComplexesPageSize(
-                                                                size,
-                                                            )
-                                                            setComplexesPage(1)
-                                                        }
-                                                    }}
-                                                />
-                                            </div>
+                                        <div>
+                                            <Pagination
+                                                currentPage={
+                                                    complexesData?.meta
+                                                        .current_page ??
+                                                    complexesPage
+                                                }
+                                                pageSize={
+                                                    complexesData?.meta
+                                                        .per_page ??
+                                                    complexesPageSize
+                                                }
+                                                total={complexesTotal}
+                                                pagerCount={5}
+                                                onChange={setComplexesPage}
+                                            />
                                         </div>
                                     </div>
                                 )}
@@ -463,10 +437,6 @@ const Objects = () => {
                                         )}
                                         searchFilters={appliedFilters}
                                         onPageChange={setPremisesPage}
-                                        onPageSizeChange={(size) => {
-                                            setPremisesPageSize(size)
-                                            setPremisesPage(1)
-                                        }}
                                         onSortChange={(
                                             sortKey: PremiseSortState,
                                         ) => {

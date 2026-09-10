@@ -1,10 +1,14 @@
 @layer components {
   .pagination {
-    @apply relative z-0 inline-flex items-center rounded-lg;
+    @apply relative z-0 inline-flex flex-nowrap items-center rounded-lg;
+  }
+
+  .pagination ul {
+    @apply m-0 inline-flex list-none flex-nowrap items-center p-0;
   }
 
   .pagination-pager {
-    @apply cursor-pointer relative mx-1 rounded-lg inline-flex items-center h-8 w-8 justify-center text-sm font-semibold select-none;
+    @apply cursor-pointer relative mx-0.5 shrink-0 rounded-md inline-flex items-center justify-center h-7 min-w-7 px-1 text-xs font-semibold select-none whitespace-nowrap sm:mx-1 sm:h-8 sm:min-w-8 sm:rounded-lg sm:px-1.5 sm:text-sm;
   }
 
   .pagination-pager-inactive {
@@ -20,10 +24,10 @@
   }
 
   .pagination-pager-next {
-    @apply mr-1 rtl:rotate-180;
+    @apply mr-0.5 sm:mr-1 rtl:rotate-180;
   }
 
   .pagination-pager-prev {
-    @apply ml-1 rtl:rotate-180;
+    @apply ml-0.5 sm:ml-1 rtl:rotate-180;
   }
 }

@@ -189,7 +189,7 @@ const ExtendRequestsTab = () => {
     const [requests, setRequests] = useState<FixationExtendRequest[]>([])
     const [total, setTotal] = useState(0)
     const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(20)
+    const pageSize = 20
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [columnVisibility, setColumnVisibility] =
@@ -601,10 +601,6 @@ const ExtendRequestsTab = () => {
                     pageSize,
                 }}
                 onPaginationChange={setPageIndex}
-                onSelectChange={(size) => {
-                    setPageSize(size)
-                    setPageIndex(1)
-                }}
                 onRowClick={(row) => {
                     const fixationId = row.fixation?.id ?? row.fixation_id
                     if (fixationId) {

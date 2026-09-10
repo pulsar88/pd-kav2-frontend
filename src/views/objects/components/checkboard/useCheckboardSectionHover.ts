@@ -53,9 +53,6 @@ export const useCheckboardSectionHover = () => {
             const sameHover =
                 prev?.floor === next.floor &&
                 prev?.columnKey === next.columnKey
-            const sameTooltip = tooltipPropertyIdRef.current === property.id
-
-            if (sameHover && sameTooltip) return
 
             hoverRef.current = next
             tooltipPropertyIdRef.current = property.id
@@ -63,9 +60,8 @@ export const useCheckboardSectionHover = () => {
             if (!sameHover) {
                 setHover(next)
             }
-            if (!sameTooltip) {
-                setTooltipTarget({ property, element })
-            }
+            // Всегда обновляем property — нужны актуальные special_offers / discount_price
+            setTooltipTarget({ property, element })
         },
         [],
     )

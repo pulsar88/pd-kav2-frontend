@@ -1,5 +1,6 @@
 import {
     FIXATION_STATUS_ORDER,
+    createEmptyFixationsStatusCounts,
     formatFixationsDashboardMonthLabel,
     type FixationsDashboardMonth,
     type FixationsDashboardStats,
@@ -38,13 +39,17 @@ const buildMonthStats = (
     const daysInMonth = getDaysInMonth(monthValue)
 
     const endCounts: FixationsStatusCounts = {
+        ...createEmptyFixationsStatusCounts(),
         pending: Math.floor(rand() * 6) + 3,
+        moderation: Math.floor(rand() * 5) + 2,
         fixed: Math.floor(rand() * 14) + 10,
+        clinch: Math.floor(rand() * 4) + 1,
         registration: Math.floor(rand() * 5) + 2,
         success: Math.floor(rand() * 8) + 4,
         failed: Math.floor(rand() * 9) + 4,
         denied: Math.floor(rand() * 5) + 2,
         deleted: Math.floor(rand() * 3) + 1,
+        expired: Math.floor(rand() * 4) + 1,
     }
 
     const timeline: FixationsTimelinePoint[] = []

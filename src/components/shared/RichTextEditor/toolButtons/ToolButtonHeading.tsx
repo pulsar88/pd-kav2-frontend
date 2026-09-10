@@ -12,7 +12,7 @@ import Dropdown from '@/components/ui/Dropdown'
 import type { BaseToolButtonProps, HeadingLevel } from './types'
 import type { ReactNode } from 'react'
 
-type ToolButtonCodeBlockProp = BaseToolButtonProps & {
+type ToolButtonHeadingProps = BaseToolButtonProps & {
     headingLevel?: HeadingLevel[]
 }
 
@@ -34,45 +34,55 @@ const headingMap: HeadingMap = {
     6: { label: 'Заголовок 6', value: 6, icon: <LuHeading6 /> },
 }
 
-const ToolButtonCodeBlock = ({
+const ToolButtonHeading = ({
     editor,
     headingLevel = [1, 2, 3, 4, 5, 6],
-}: ToolButtonCodeBlockProp) => {
+}: ToolButtonHeadingProps) => {
+    const activeLevel = headingLevel.find((level) =>
+        editor.isActive('heading', { level }),
+    )
+    const triggerIcon = activeLevel
+        ? headingMap[activeLevel].icon
+        : <LuHeading />
+
     return (
-        <>
-            <Dropdown
-                renderTitle={
-                    <ToolButton title="Заголовок">
-                        <LuHeading />
-                    </ToolButton>
-                }
-            >
-                {headingLevel.map((level) => (
-                    <Dropdown.Item
-                        key={`heading-${level}`}
-                        eventKey={`heading-${level}`}
-                        active={editor.isActive('heading', {
-                            level: headingMap[level].value,
-                        })}
-                        onClick={() =>
-                            editor
-                                .chain()
-                                .focus()
-                                .toggleHeading({
-                                    level: headingMap[level].value,
-                                })
-                                .run()
-                        }
-                    >
-                        <span className="text-lg">
-                            {headingMap[level].icon}
-                        </span>
-                        {headingMap[level].label}
-                    </Dropdown.Item>
-                ))}
-            </Dropdown>
-        </>
+        <Dropdown
+            renderTitle={
+                <ToolButton
+                    title={
+                        activeLevel
+                            ? headingMap[activeLevel].label
+                            : 'Заголовок'
+                    }
+                    active={Boolean(activeLevel)}
+                >
+                    {triggerIcon}
+                </ToolButton>
+            }
+        >
+            {headingLevel.map((level) => (
+                <Dropdown.Item
+                    key={`heading-${level}`}
+                    eventKey={`heading-${level}`}
+                    active={editor.isActive('heading', {
+                        level: headingMap[level].value,
+                    })}
+                    onClick={() =>
+                        editor
+                            .chain()
+                            .focus()
+                            .toggleHeading({
+                                level: headingMap[level].value,
+                            })
+                            .run()
+                    }
+                >
+                    <span className="text-lg">{headingMap[level].icon}</span>
+                    {headingMap[level].label}
+                </Dropdown.Item>
+            ))}
+        </Dropdown>
     )
 }
 
-export default ToolButtonCodeBlock
+export default ToolButtonHeading

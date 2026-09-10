@@ -21,9 +21,12 @@ import ToolButtonAlignCenter from './toolButtons/ToolButtonAlignCenter'
 import ToolButtonAlignRight from './toolButtons/ToolButtonAlignRight'
 import ToolButtonImage from './toolButtons/ToolButtonImage'
 import ToolButtonDeleteImage from './toolButtons/ToolButtonDeleteImage'
+import ToolButtonTable from './toolButtons/ToolButtonTable'
 import FontSize from './extensions/FontSize'
 import BlockSpacing from './extensions/BlockSpacing'
 import CustomImage from './extensions/Image'
+import { tableExtensions } from './extensions/tableExtensions'
+import { richTextTableClass } from './tableStyles'
 import {
     focusEditorAtPointer,
     proseMirrorSurfaceClass,
@@ -93,6 +96,7 @@ type RichTextEditorProps = {
                 onDelete?: () => void
                 disabled?: boolean
             }) => JSX.Element | null
+            ToolButtonTable: ({ editor }: BaseToolButtonProps) => JSX.Element
         },
     ) => ReactNode
     onChange?: (content: {
@@ -208,15 +212,16 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                   FontSize,
                   BlockSpacing,
                   TextAlign.configure({
-                      types: ['heading', 'paragraph', 'image'],
+                      types: ['heading', 'paragraph', 'listItem', 'image'],
                   }),
                   CustomImage.configure({
                       allowBase64: true,
                   }),
+                  ...tableExtensions,
               ],
               editorProps: {
                   attributes: {
-                      class: `m-2 focus:outline-hidden ${proseMirrorSurfaceClass} [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100 ${imageEditorClass}`,
+                      class: `m-2 focus:outline-hidden ${proseMirrorSurfaceClass} [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100 ${imageEditorClass} ${richTextTableClass}`,
                   },
                   handleKeyDown: (view, event) => {
                       if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -363,6 +368,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                         ToolButtonRedo,
                         ToolButtonImage,
                         ToolButtonDeleteImage,
+                        ToolButtonTable,
                     })
                 ) : (
                     <>
@@ -382,6 +388,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                         <ToolButtonOrderedList editor={editor} />
                         <ToolButtonCodeBlock editor={editor} />
                         <ToolButtonHorizontalRule editor={editor} />
+                        <ToolButtonTable editor={editor} />
                         <ToolButtonImage
                             editor={editor}
                             disabled={isUploading}
@@ -420,6 +427,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                     className={classNames(
                         'max-h-[600px] prose prose-p:text-sm dark:prose-invert dark:prose-p:text-gray-400 max-w-full prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:min-h-[320px] [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100',
                         imageEditorClass,
+                        richTextTableClass,
                         editorContentClass,
                     )}
                     editor={editor}

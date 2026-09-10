@@ -15,6 +15,11 @@ import {
     normalizeRealtyPropertyTypeCode,
     toAxiosParams,
 } from '@/views/objects/realtyPropertyQuery'
+import {
+    resolveDiscountPrice,
+    resolveSpecialOffers,
+    toFiniteNumber,
+} from '@/views/objects/specialOfferUtils'
 import type { PremiseSortKey } from '@/views/objects/utils'
 import { toPremiseSortParams } from '@/views/objects/utils'
 import type { CheckboardBuilding } from '@/views/objects/checkboard.types'
@@ -97,6 +102,19 @@ type RealtyPropertyStatusApi = {
     show_as?: string | null
 }
 
+type RealtyPropertySpecialOfferApi = {
+    id: number
+    name: string
+    active?: number
+    color?: string
+    text_color?: string
+    description?: string
+    start_date?: string
+    end_date?: string
+    badge_icon?: string | null
+    badge_text?: string | null
+}
+
 type RealtyPropertyApi = {
     id: number
     number: string
@@ -110,6 +128,8 @@ type RealtyPropertyApi = {
     external_id: number
     price?: number
     price_per_sqm?: number
+    discount_price?: number | null
+    special_offers?: RealtyPropertySpecialOfferApi[] | null
     preset?: RealtyPropertyPresetApi | null
     realty_floor?: RealtyFloorApi | null
     realty_object_id?: number
@@ -121,7 +141,7 @@ type RealtyPropertyApi = {
 }
 
 export const REALTY_PROPERTY_WITH =
-    'preset.image,object,realtyFloor.floorPlan,project,object.image,status'
+    'preset.image,object,realtyFloor.floorPlan,project,object.image,status,specialOffers'
 
 const REALTY_OBJECT_WITH = 'image,project'
 
@@ -366,6 +386,15 @@ const mapRealtyObjectFields = (realtyObject?: RealtyObjectBriefApi | null) => ({
 export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => {
     const realtyObject = item.object ?? item.realty_object
     const objectFields = mapRealtyObjectFields(realtyObject)
+    const rawItem = item as RealtyPropertyApi & {
+        specialOffers?: RealtyPropertySpecialOfferApi[] | null
+        discountPrice?: number | null
+    }
+    const specialOffers = resolveSpecialOffers(
+        item.special_offers ?? rawItem.specialOffers,
+    )
+    const basePrice = toFiniteNumber(item.price)
+    const hasOffers = specialOffers.length > 0
 
     return {
         id: String(item.id),
@@ -380,8 +409,16 @@ export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => 
         area: item.area,
         goodArea: item.good_area,
         floor: item.floor,
-        price: item.price,
-        pricePerSqm: item.price_per_sqm,
+        price: basePrice,
+        pricePerSqm: toFiniteNumber(item.price_per_sqm),
+        discountPrice: resolveDiscountPrice(
+            item.discount_price ?? rawItem.discountPrice,
+            {
+                basePrice,
+                hasOffers,
+            },
+        ),
+        specialOffers: hasOffers ? specialOffers : undefined,
         layout: resolvePremiseLayoutLabel(item),
         layoutName: resolvePremiseLayoutName(item),
         layoutImage: resolvePresetImageUrl(item.preset),
@@ -538,6 +575,9 @@ export async function apiGetCheckboard(
     }>({
         url: endpointConfig.realtyObjectChess(complexId),
         method: 'get',
+        params: {
+            with: 'specialOffers',
+        },
     })
 
     if (!response.data) return null

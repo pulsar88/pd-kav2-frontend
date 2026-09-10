@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import classNames from 'classnames'
+import { isImageSlide } from 'yet-another-react-lightbox'
 import { TbArrowDown, TbArrowUp } from 'react-icons/tb'
-import Select from '@/components/ui/Select'
 import Pagination from '@/components/ui/Pagination'
 import Spinner from '@/components/ui/Spinner'
 import ImageGallery from '@/components/shared/ImageGallery'
@@ -11,12 +11,16 @@ import {
     parsePremiseSortKey,
     premiseSortFields,
     toPremiseSortKey,
+    type PremisePreviewSlide,
     type PremiseSortField,
     type PremiseSortState,
 } from '../utils'
 import PremiseResultItem from './PremiseResultItem'
-
-type Option = { value: string | number; label: string }
+import {
+    FLOOR_PLAN_HIGHLIGHT_COLOR,
+    FloorPlanGallerySlide,
+    loadImageSize,
+} from './FloorPlanOverlay'
 
 type ObjectsPremisesResultsProps = {
     results: Premise[]
@@ -28,14 +32,8 @@ type ObjectsPremisesResultsProps = {
     filtersActive?: boolean
     searchFilters?: ObjectsSearchFilters
     onPageChange: (page: number) => void
-    onPageSizeChange: (size: number) => void
     onSortChange: (sortKey: PremiseSortState) => void
 }
-
-const pageSizeOptions = [20, 50, 100].map((number) => ({
-    value: number,
-    label: `${number} / стр.`,
-}))
 
 const ObjectsPremisesResults = ({
     results,
@@ -47,13 +45,12 @@ const ObjectsPremisesResults = ({
     filtersActive = false,
     searchFilters,
     onPageChange,
-    onPageSizeChange,
     onSortChange,
 }: ObjectsPremisesResultsProps) => {
     const [previewIndex, setPreviewIndex] = useState(-1)
-    const [previewSlides, setPreviewSlides] = useState<
-        Array<{ src: string; title?: string }>
-    >([])
+    const [previewSlides, setPreviewSlides] = useState<PremisePreviewSlide[]>(
+        [],
+    )
 
     const sortState = sortKey ? parsePremiseSortKey(sortKey) : null
     const sortField = sortState?.field
@@ -70,11 +67,32 @@ const ObjectsPremisesResults = ({
         onSortChange(toPremiseSortKey(field, 'asc'))
     }
 
-    const handlePreviewLayout = (premise: Premise) => {
+    const handlePreviewLayout = async (premise: Premise) => {
         if (isRefreshing) return
 
         const slides = getPremisePreviewSlides(premise)
         if (slides.length === 0) return
+
+        const floorSlide = slides.find((slide) => Boolean(slide.floorPath))
+        if (floorSlide) {
+            const size = await loadImageSize(floorSlide.src)
+            if (size) {
+                setPreviewSlides(
+                    slides.map((slide) =>
+                        slide.src === floorSlide.src
+                            ? {
+                                  ...slide,
+                                  width: size.width,
+                                  height: size.height,
+                              }
+                            : slide,
+                    ),
+                )
+                setPreviewIndex(0)
+                return
+            }
+        }
+
         setPreviewSlides(slides)
         setPreviewIndex(0)
     }
@@ -163,49 +181,24 @@ const ObjectsPremisesResults = ({
                                 premise={premise}
                                 searchFilters={searchFilters}
                                 onPreviewLayout={() =>
-                                    handlePreviewLayout(premise)
+                                    void handlePreviewLayout(premise)
                                 }
                             />
                         ))}
                     </div>
                     <div
                         className={classNames(
-                            'mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between',
+                            'mt-4',
                             isRefreshing && 'pointer-events-none opacity-60',
                         )}
                     >
-                        <div className="overflow-x-auto">
-                            <Pagination
-                                currentPage={pageIndex}
-                                pageSize={pageSize}
-                                total={total}
-                                pagerCount={5}
-                                onChange={onPageChange}
-                            />
-                        </div>
-                        <div
-                            className="shrink-0 self-end sm:self-auto"
-                            style={{ minWidth: 130 }}
-                        >
-                            <Select
-                                instanceId="objects-page-size"
-                                size="sm"
-                                menuPlacement="top"
-                                isSearchable={false}
-                                isDisabled={isRefreshing}
-                                value={pageSizeOptions.filter(
-                                    (option) => option.value === pageSize,
-                                )}
-                                options={pageSizeOptions}
-                                onChange={(option) => {
-                                    const size = (option as Option | null)
-                                        ?.value
-                                    if (typeof size === 'number') {
-                                        onPageSizeChange(size)
-                                    }
-                                }}
-                            />
-                        </div>
+                        <Pagination
+                            currentPage={pageIndex}
+                            pageSize={pageSize}
+                            total={total}
+                            pagerCount={5}
+                            onChange={onPageChange}
+                        />
                     </div>
                 </>
             )}
@@ -213,6 +206,25 @@ const ObjectsPremisesResults = ({
             <ImageGallery
                 index={previewIndex}
                 slides={previewSlides}
+                render={{
+                    slide: (props) => {
+                        if (
+                            !isImageSlide(props.slide) ||
+                            !('floorPath' in props.slide) ||
+                            !props.slide.floorPath
+                        ) {
+                            return undefined
+                        }
+
+                        return (
+                            <FloorPlanGallerySlide
+                                {...props}
+                                floorPath={String(props.slide.floorPath)}
+                                color={FLOOR_PLAN_HIGHLIGHT_COLOR}
+                            />
+                        )
+                    },
+                }}
                 onClose={() => setPreviewIndex(-1)}
             />
         </div>

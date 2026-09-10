@@ -5,6 +5,7 @@ import type {
     CheckboardPropertyType,
     CheckboardSection,
 } from './checkboard.types'
+import { resolveSpecialOffers, toFiniteNumber } from './specialOfferUtils'
 
 type ChessPropertyStatusApi = {
     id: number
@@ -32,16 +33,19 @@ type ChessPropertyApi = {
     rooms_count: number
     external_id: number
     price?: number
-    studio?: boolean
-    euro?: boolean
-    free_destination?: boolean
+    discount_price?: number | null
+    special_offers?: unknown
+    studio?: boolean | number
+    euro?: boolean | number
+    free_destination?: boolean | number
     status: ChessPropertyStatusApi
+    [key: string]: unknown
 }
 
 type ChessSectionApi = {
     id: number
     name: string
-    properties: Record<string, ChessPropertyApi[]>
+    properties: Record<string, ChessPropertyApi[] | ChessPropertyApi>
     checkboard_data: {
         max_per_floor: number
         max_floor: number
@@ -105,37 +109,60 @@ const mapStatus = (status: ChessPropertyStatusApi): CheckboardPropertyStatus => 
     }
 }
 
+const toBool = (value: unknown) =>
+    value === true || value === 1 || value === '1'
+
 const mapProperty = (
     item: ChessPropertyApi,
     checkboardOffset: number,
-): CheckboardProperty => ({
-    id: item.id,
-    stack_id: null,
-    number: item.number,
-    external_id: String(item.external_id),
-    floor: item.floor,
-    area: item.area,
-    good_area: item.good_area,
-    rooms_count: item.rooms_count,
-    studio: item.studio ?? false,
-    euro: item.euro ?? false,
-    free_destination: item.free_destination ?? false,
-    price: item.price ?? 0,
-    account_id: 0,
-    checkboard_offset: checkboardOffset,
-    type: mapType(item.type),
-    status: mapStatus(item.status),
-    floor_plan_ids: [],
-    plans: [],
-})
+): CheckboardProperty => {
+    const specialOffers = resolveSpecialOffers(
+        item.special_offers ?? item.specialOffers,
+    )
+    const basePrice = toFiniteNumber(item.price) ?? 0
+    const discount = toFiniteNumber(
+        item.discount_price ?? item.discountPrice,
+    )
+
+    return {
+        id: item.id,
+        stack_id: null,
+        number: item.number,
+        external_id: String(item.external_id),
+        floor: item.floor,
+        area: item.area,
+        good_area: item.good_area,
+        rooms_count: item.rooms_count,
+        studio: toBool(item.studio),
+        euro: toBool(item.euro),
+        free_destination: toBool(item.free_destination),
+        price: basePrice,
+        discount_price:
+            discount != null && discount > 0 ? discount : undefined,
+        special_offers: specialOffers,
+        account_id: 0,
+        checkboard_offset: checkboardOffset,
+        type: mapType(item.type),
+        status: mapStatus(item.status),
+        floor_plan_ids: [],
+        plans: [],
+    }
+}
+
+const asPropertyList = (
+    items: ChessPropertyApi[] | ChessPropertyApi | null | undefined,
+): ChessPropertyApi[] => {
+    if (!items) return []
+    return Array.isArray(items) ? items : [items]
+}
 
 const mapSectionProperties = (
-    properties: Record<string, ChessPropertyApi[]>,
+    properties: Record<string, ChessPropertyApi[] | ChessPropertyApi>,
 ): Record<string, CheckboardProperty[]> => {
     const result: Record<string, CheckboardProperty[]> = {}
 
     Object.entries(properties).forEach(([floor, items]) => {
-        result[floor] = items.map((item, index) =>
+        result[floor] = asPropertyList(items).map((item, index) =>
             mapProperty(item, index + 1),
         )
     })

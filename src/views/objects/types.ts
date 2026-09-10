@@ -11,6 +11,20 @@ export type HouseType = 'monolith' | 'brick' | 'panel'
 export type FinishingType = 'none' | 'rough' | 'fine'
 export type HouseStatus = 'under_construction' | 'commissioned'
 
+/** Акция, привязанная к помещению (из special_offers) */
+export type PremiseSpecialOffer = {
+    id: number
+    name: string
+    active?: number
+    color?: string
+    text_color?: string
+    description?: string
+    start_date?: string
+    end_date?: string
+    badge_icon?: string | null
+    badge_text?: string | null
+}
+
 export type RealtyProject = {
     id: string
     name: string
@@ -64,6 +78,9 @@ export type Premise = {
     floorsInBuilding?: number
     price?: number
     pricePerSqm?: number
+    /** Акционная цена из discount_price */
+    discountPrice?: number
+    specialOffers?: PremiseSpecialOffer[]
     houseType?: HouseType
     finishing?: FinishingType
     houseStatus?: HouseStatus
@@ -108,4 +125,13 @@ export type ObjectsSearchFilters = {
     areaTo?: number | ''
     floorFrom?: number | ''
     floorTo?: number | ''
+    /** '' = все, '1' = да, '0' = нет */
+    fromInvestor?: '' | '1' | '0'
+    /**
+     * Скрытый фильтр (не в форме объектов).
+     * В URL — special_offer_id, в API — special_offer_id[].
+     */
+    specialOfferId?: string
+    /** Фильтр по акциям на шахматке (мультивыбор) */
+    specialOfferIds?: string[]
 }

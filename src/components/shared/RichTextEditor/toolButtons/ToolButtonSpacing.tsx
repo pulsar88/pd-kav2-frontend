@@ -20,11 +20,48 @@ const presets: { label: string; value: BlockSpacingAttrs | null }[] = [
     },
 ]
 
+const normalizeSpacing = (value: string | null | undefined) =>
+    (value || '')
+        .split(';')
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .sort()
+        .join('; ')
+
+const spacingToStyle = (attrs: BlockSpacingAttrs | null) => {
+    if (!attrs) return ''
+    const parts: string[] = []
+    if (attrs.marginTop) parts.push(`margin-top: ${attrs.marginTop}`)
+    if (attrs.marginBottom) parts.push(`margin-bottom: ${attrs.marginBottom}`)
+    if (attrs.paddingLeft) parts.push(`padding-left: ${attrs.paddingLeft}`)
+    return normalizeSpacing(parts.join('; '))
+}
+
 const ToolButtonSpacing = ({ editor }: BaseToolButtonProps) => {
+    const currentSpacing = normalizeSpacing(
+        (editor.getAttributes('paragraph').spacingStyle as string | undefined) ||
+            (editor.getAttributes('heading').spacingStyle as
+                | string
+                | undefined) ||
+            '',
+    )
+    const activePreset =
+        presets.find(
+            (preset) => spacingToStyle(preset.value) === currentSpacing,
+        ) || null
+    const hasCustomSpacing = Boolean(currentSpacing)
+
     return (
         <Dropdown
             renderTitle={
-                <ToolButton title="Отступы">
+                <ToolButton
+                    title={
+                        activePreset && activePreset.value
+                            ? `Отступы: ${activePreset.label}`
+                            : 'Отступы'
+                    }
+                    active={hasCustomSpacing}
+                >
                     <TbSpacingVertical />
                 </ToolButton>
             }
@@ -33,6 +70,11 @@ const ToolButtonSpacing = ({ editor }: BaseToolButtonProps) => {
                 <Dropdown.Item
                     key={preset.label}
                     eventKey={`spacing-${preset.label}`}
+                    active={
+                        preset.value === null
+                            ? !hasCustomSpacing
+                            : spacingToStyle(preset.value) === currentSpacing
+                    }
                     onClick={() => {
                         if (!preset.value) {
                             editor.chain().focus().unsetBlockSpacing().run()

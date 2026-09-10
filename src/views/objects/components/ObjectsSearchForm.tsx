@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
 import classNames from 'classnames'
@@ -6,6 +7,7 @@ import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
 import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
+import { apiGetSpecialOffer } from '@/services/SpecialOffersService'
 import RangeInputGroup from './RangeInputGroup'
 import type {
     ObjectsSearchFilters,
@@ -23,15 +25,36 @@ type ObjectsSearchFormProps = {
     multiComplexSelect?: boolean
     /** На xl+ кнопки в одной сетке с инпутами, справа */
     desktopActionsInGrid?: boolean
+    /** Опции акций для фильтра (не на шахматке) */
+    specialOfferOptions?: Option[]
+    /** Показывать фильтр «От инвестора» (на шахматке скрыт) */
+    showFromInvestorFilter?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
     onChange: (filters: ObjectsSearchFilters) => void
     onSearch: () => void
     onReset: () => void
 }
 
+const FROM_INVESTOR_OPTIONS: Option[] = [
+    { value: '1', label: 'Да' },
+    { value: '0', label: 'Нет' },
+]
+
 const isFilled = (
-    value: string | number | Array<string | number> | '' | undefined | null,
-) => (Array.isArray(value) ? value.length > 0 : value !== '' && value !== undefined && value !== null)
+    value:
+        | string
+        | number
+        | boolean
+        | Array<string | number>
+        | ''
+        | undefined
+        | null,
+) => {
+    if (typeof value === 'boolean') return value
+    return Array.isArray(value)
+        ? value.length > 0
+        : value !== '' && value !== undefined && value !== null
+}
 
 /** Сохраняет порядок выбора, а не порядок options в меню */
 const optionsInSelectionOrder = (
@@ -64,11 +87,14 @@ const ObjectsSearchForm = ({
     collapsed: collapsedProp,
     multiComplexSelect = false,
     desktopActionsInGrid = false,
+    specialOfferOptions,
+    showFromInvestorFilter = true,
     onCollapsedChange,
     onChange,
     onSearch,
     onReset,
 }: ObjectsSearchFormProps) => {
+    const navigate = useNavigate()
     const [internalCollapsed, setInternalCollapsed] = useState(false)
     const collapsed = collapsedProp ?? internalCollapsed
     const setCollapsed = (value: boolean) => {
@@ -81,6 +107,7 @@ const ObjectsSearchForm = ({
     const [filterOptions, setFilterOptions] = useState<
         RealtyPropertiesFilters | undefined
     >()
+    const [lockedOfferLabel, setLockedOfferLabel] = useState('')
 
     useEffect(() => {
         let cancelled = false
@@ -93,6 +120,45 @@ const ObjectsSearchForm = ({
             cancelled = true
         }
     }, [])
+
+    useEffect(() => {
+        const offerId = filters.specialOfferId?.trim()
+        if (!offerId) {
+            setLockedOfferLabel('')
+            return
+        }
+
+        let cancelled = false
+        const fromOptions = specialOfferOptions?.find(
+            (item) => item.value === offerId,
+        )
+        if (fromOptions?.label) {
+            setLockedOfferLabel(fromOptions.label)
+            return
+        }
+
+        setLockedOfferLabel(`Акция #${offerId}`)
+        void apiGetSpecialOffer(offerId)
+            .then((offer) => {
+                if (!cancelled && offer.name?.trim()) {
+                    setLockedOfferLabel(offer.name.trim())
+                }
+            })
+            .catch(() => {
+                /* оставляем fallback */
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [filters.specialOfferId, specialOfferOptions])
+
+    const lockedOfferOption: Option | null = filters.specialOfferId
+        ? {
+              value: filters.specialOfferId,
+              label: lockedOfferLabel || `Акция #${filters.specialOfferId}`,
+          }
+        : null
 
     const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
         (item) => ({
@@ -116,8 +182,7 @@ const ObjectsSearchForm = ({
     )
 
     const activeFiltersCount = useMemo(
-        () =>
-            Object.values(filters).filter((value) => isFilled(value)).length,
+        () => Object.entries(filters).filter(([, value]) => isFilled(value)).length,
         [filters],
     )
 
@@ -296,6 +361,105 @@ const ObjectsSearchForm = ({
                                         }
                                     />
                                 </FormItem>
+                                {showFromInvestorFilter ? (
+                                    <FormItem label="От инвестора">
+                                        <Select<Option>
+                                            {...selectMenuProps}
+                                            isClearable
+                                            placeholder="Все"
+                                            options={FROM_INVESTOR_OPTIONS}
+                                            value={
+                                                FROM_INVESTOR_OPTIONS.find(
+                                                    (item) =>
+                                                        item.value ===
+                                                        filters.fromInvestor,
+                                                ) ?? null
+                                            }
+                                            onChange={(option) =>
+                                                patch({
+                                                    fromInvestor: option
+                                                        ? (option.value as
+                                                              | '1'
+                                                              | '0')
+                                                        : '',
+                                                })
+                                            }
+                                        />
+                                    </FormItem>
+                                ) : null}
+                                <FormItem label="Акция">
+                                    <div className="relative">
+                                        <Select<Option, false>
+                                            {...selectMenuProps}
+                                            isDisabled={!lockedOfferOption}
+                                            isClearable={Boolean(
+                                                lockedOfferOption,
+                                            )}
+                                            isSearchable={false}
+                                            openMenuOnClick={false}
+                                            openMenuOnFocus={false}
+                                            menuIsOpen={false}
+                                            options={
+                                                lockedOfferOption
+                                                    ? [lockedOfferOption]
+                                                    : []
+                                            }
+                                            value={lockedOfferOption}
+                                            placeholder="Не выбрана"
+                                            components={{
+                                                DropdownIndicator: () => null,
+                                            }}
+                                            onChange={(option) => {
+                                                if (!option) {
+                                                    patch({
+                                                        specialOfferId: '',
+                                                    })
+                                                }
+                                            }}
+                                        />
+                                        {!lockedOfferOption ? (
+                                            <button
+                                                type="button"
+                                                className="absolute inset-0 z-10 cursor-pointer rounded-xl"
+                                                aria-label="Перейти к списку акций"
+                                                onClick={() =>
+                                                    navigate('/offers')
+                                                }
+                                            />
+                                        ) : null}
+                                    </div>
+                                </FormItem>
+                                {specialOfferOptions &&
+                                specialOfferOptions.length > 0 ? (
+                                    <FormItem label="Акции">
+                                        <Select<Option, true>
+                                            {...selectMenuProps}
+                                            isMulti
+                                            compactMulti
+                                            closeMenuOnSelect={false}
+                                            isClearable
+                                            placeholder="Все акции"
+                                            options={specialOfferOptions}
+                                            value={optionsInSelectionOrder(
+                                                filters.specialOfferIds,
+                                                specialOfferOptions,
+                                            )}
+                                            onChange={(option) =>
+                                                patch({
+                                                    specialOfferIds:
+                                                        (
+                                                            option as
+                                                                | readonly Option[]
+                                                                | null
+                                                        )?.map(
+                                                            (item) =>
+                                                                item.value,
+                                                        ) || [],
+                                                })
+                                            }
+                                        />
+                                    </FormItem>
+                                ) : null}
                                 {desktopActionsInGrid ? (
                                     <div className="hidden xl:col-span-1 xl:flex xl:flex-nowrap xl:items-end xl:justify-end xl:gap-2 2xl:col-span-3">
                                         {actionButtons}

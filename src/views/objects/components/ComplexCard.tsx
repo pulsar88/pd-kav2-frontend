@@ -112,7 +112,7 @@ const ComplexCard = ({
                         <TbCalendar className="mt-0.5 shrink-0 text-gray-400 transition-colors group-hover:text-gray-500" />
                         <div>
                             <p className="text-xs text-gray-500 transition-colors group-hover:text-gray-400">
-                                Сдача
+                                Окончание строительства
                             </p>
                             <p className="font-semibold capitalize text-gray-900 transition-colors group-hover:text-gray-100 dark:text-gray-100">
                                 {completionDate}

@@ -5,6 +5,7 @@ export type FixationStatus =
     | 'moderation'
     | 'denied'
     | 'fixed'
+    | 'clinch'
     | 'registration'
     | 'success'
     | 'failed'

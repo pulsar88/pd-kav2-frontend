@@ -7,11 +7,21 @@ import { TbPlus } from 'react-icons/tb'
 import FixationsTable from './components/FixationsTable'
 import FixationsCreateWizardDialog from './components/FixationsCreateWizardDialog'
 import type { FixationCreateInitialSelection } from './createWizard.types'
+import type { FixationStatus } from './types'
+import { fixationStatusMap } from './utils'
+
+const VALID_STATUSES = new Set(Object.keys(fixationStatusMap))
 
 const Fixations = () => {
     const [searchParams, setSearchParams] = useSearchParams()
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [tableRefreshKey, setTableRefreshKey] = useState(0)
+
+    const statusFilter = useMemo(() => {
+        const raw = searchParams.get('status')?.toLowerCase()
+        if (!raw || !VALID_STATUSES.has(raw)) return undefined
+        return raw as FixationStatus
+    }, [searchParams])
 
     const initialSelection = useMemo<FixationCreateInitialSelection | null>(
         () => {
@@ -67,6 +77,16 @@ const Fixations = () => {
         }
     }
 
+    const handleStatusFilterChange = (status?: FixationStatus) => {
+        const next = new URLSearchParams(searchParams)
+        if (status) {
+            next.set('status', status)
+        } else {
+            next.delete('status')
+        }
+        setSearchParams(next, { replace: true })
+    }
+
     return (
         <Container>
             <AdaptiveCard>
@@ -86,7 +106,11 @@ const Fixations = () => {
                             Создать фиксацию
                         </Button>
                     </div>
-                    <FixationsTable refreshKey={tableRefreshKey} />
+                    <FixationsTable
+                        refreshKey={tableRefreshKey}
+                        statusFilter={statusFilter}
+                        onStatusFilterChange={handleStatusFilterChange}
+                    />
                 </div>
             </AdaptiveCard>
             <FixationsCreateWizardDialog

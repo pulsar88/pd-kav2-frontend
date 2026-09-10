@@ -41,6 +41,11 @@ export const fixationStatusMap: Record<
         className:
             'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
     },
+    clinch: {
+        label: 'Спорная фиксация',
+        className:
+            'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300',
+    },
     registration: {
         label: 'Оформление',
         className:

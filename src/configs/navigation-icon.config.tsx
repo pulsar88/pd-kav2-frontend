@@ -11,9 +11,10 @@ import {
     PiShieldCheckDuotone,
     PiCalculatorDuotone,
     PiScalesDuotone,
+    PiPercentDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
-import { TbUserCheck } from 'react-icons/tb'
+import { TbMailForward, TbUserCheck } from 'react-icons/tb'
 
 export type NavigationIcons = Record<string, JSX.Element>
 
@@ -29,7 +30,9 @@ const navigationIcon: NavigationIcons = {
     help: <PiQuestionDuotone />,
     news: <PiNewspaperDuotone />,
     events: <PiCalendarDuotone />,
+    offers: <PiPercentDuotone />,
     agencyRequests: <TbUserCheck />,
+    agencyInvitations: <TbMailForward />,
     supervisor: <PiShieldCheckDuotone />,
 }
 

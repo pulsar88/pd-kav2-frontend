@@ -37,6 +37,16 @@ export type CheckboardProperty = {
     euro: boolean
     free_destination: boolean
     price: number
+    discount_price?: number
+    special_offers?: Array<{
+        id: number
+        name: string
+        active?: number
+        color?: string
+        text_color?: string
+        badge_text?: string | null
+        badge_icon?: string | null
+    }>
     account_id: number
     checkboard_offset: number | null
     type: CheckboardPropertyType

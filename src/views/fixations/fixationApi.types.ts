@@ -4,6 +4,8 @@ export type FixationApiStatus =
     | 'MODERATION'
     | 'denied'
     | 'fixed'
+    | 'clinch'
+    | 'CLINCH'
     | 'registration'
     | 'success'
     | 'failed'

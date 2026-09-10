@@ -156,5 +156,20 @@ export const mapObjectsSearchFiltersToApiParams = (
         params['realty_project_id[]'] = filters.realtyProjectIds.map(Number)
     }
 
+    if (filters.fromInvestor === '1' || filters.fromInvestor === '0') {
+        params.from_investor = Number(filters.fromInvestor)
+    }
+
+    const offerIds = [
+        ...(filters.specialOfferIds ?? []),
+        ...(filters.specialOfferId ? [filters.specialOfferId] : []),
+    ]
+        .map(Number)
+        .filter((id) => Number.isFinite(id))
+
+    if (offerIds.length > 0) {
+        params['special_offer_id[]'] = offerIds
+    }
+
     return params
 }

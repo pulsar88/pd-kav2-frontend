@@ -15,6 +15,7 @@ import {
     getSectionColumns,
     getSectionFloors,
 } from '../../checkboardUtils'
+import { propertyHasSpecialOffer } from '../../specialOfferUtils'
 import DualHorizontalScroll from './DualHorizontalScroll'
 import CheckboardSharedPropertyTooltip from './CheckboardSharedPropertyTooltip'
 import {
@@ -163,10 +164,21 @@ const PlusBlock = ({
                             const isSelectable =
                                 !isPropertySelectable ||
                                 isPropertySelectable(property)
-                            const hasPrice = property.price > 0
+                            const discountPrice =
+                                property.discount_price != null &&
+                                property.discount_price > 0
+                                    ? property.discount_price
+                                    : undefined
+                            const hasDiscount = discountPrice != null
+                            const hasOffers = propertyHasSpecialOffer(property)
+                            const hasPrice =
+                                hasDiscount || property.price > 0
+                            const displayPrice = hasDiscount
+                                ? discountPrice
+                                : property.price
                             const pricePerSqm =
                                 hasPrice && property.area > 0
-                                    ? Math.round(property.price / property.area)
+                                    ? Math.round(displayPrice / property.area)
                                     : 0
 
                             return (
@@ -226,7 +238,26 @@ const PlusBlock = ({
                                             №{property.number}
                                         </span>
                                     </div>
-                                    {property.type.has_rooms ? (
+                                    {hasOffers ? (
+                                        <span
+                                            className="mb-1 inline-flex max-w-full truncate rounded px-1.5 py-0.5 text-[10px] font-bold leading-tight"
+                                            style={{
+                                                backgroundColor:
+                                                    property.special_offers![0]
+                                                        .color ||
+                                                    'rgba(0,0,0,0.25)',
+                                                color:
+                                                    property.special_offers![0]
+                                                        .text_color ||
+                                                    '#ffffff',
+                                            }}
+                                        >
+                                            {property.special_offers![0]
+                                                .badge_text ||
+                                                property.special_offers![0]
+                                                    .name}
+                                        </span>
+                                    ) : property.type.has_rooms ? (
                                         <p className="mb-1.5 text-[12px] font-medium opacity-90">
                                             {property.type.name}
                                         </p>
@@ -237,11 +268,18 @@ const PlusBlock = ({
                                     )}
                                     <p className="mt-auto text-[18px] font-bold leading-tight">
                                         {hasPrice
-                                            ? formatCheckboardPrice(
-                                                  property.price,
-                                              )
+                                            ? formatCheckboardPrice(displayPrice)
                                             : '—'}
                                     </p>
+                                    {hasDiscount &&
+                                    property.price > 0 &&
+                                    property.price !== discountPrice ? (
+                                        <p className="text-[11px] opacity-75 line-through">
+                                            {formatCheckboardPrice(
+                                                property.price,
+                                            )}
+                                        </p>
+                                    ) : null}
                                     <p className="mt-0.5 text-[14px] opacity-85">
                                         {property.area > 0
                                             ? `${property.area} м²`

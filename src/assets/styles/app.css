@@ -27,3 +27,97 @@
     outline-offset: 2px;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
 }
+
+/* TipTap tables — explicit borders (prose resets table borders) */
+.ProseMirror table.rich-text-table,
+.prose table.rich-text-table,
+.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin: 1rem 0;
+    overflow: hidden;
+    border: 1px solid #d6d3d1;
+}
+
+.dark .ProseMirror table.rich-text-table,
+.dark .prose table.rich-text-table,
+.dark .prose table {
+    border-color: #57534e;
+}
+
+.ProseMirror table.rich-text-table td,
+.ProseMirror table.rich-text-table th,
+.prose table.rich-text-table td,
+.prose table.rich-text-table th,
+.prose table td,
+.prose table th {
+    position: relative;
+    min-width: 80px;
+    border: 1px solid #d6d3d1 !important;
+    padding: 0.5rem 0.75rem;
+    vertical-align: top;
+}
+
+.dark .ProseMirror table.rich-text-table td,
+.dark .ProseMirror table.rich-text-table th,
+.dark .prose table.rich-text-table td,
+.dark .prose table.rich-text-table th,
+.dark .prose table td,
+.dark .prose table th {
+    border-color: #57534e !important;
+}
+
+.ProseMirror table.rich-text-table th,
+.prose table.rich-text-table th,
+.prose table th {
+    background-color: #f5f5f4;
+    font-weight: 600;
+    text-align: left;
+}
+
+.dark .ProseMirror table.rich-text-table th,
+.dark .prose table.rich-text-table th,
+.dark .prose table th {
+    background-color: #292524;
+}
+
+.ProseMirror table.ProseMirror-selectednode {
+    outline: 2px solid var(--primary, #4f46e5);
+    outline-offset: 2px;
+}
+
+/* TipTap lists: keep markers with aligned text */
+.ProseMirror li[style*='text-align: center'],
+.ProseMirror li[style*='text-align: right'],
+.ProseMirror li[style*='text-align: justify'],
+.prose li[style*='text-align: center'],
+.prose li[style*='text-align: right'],
+.prose li[style*='text-align: justify'] {
+    list-style-position: inside;
+}
+
+.ProseMirror li[style*='text-align: center'] > p,
+.ProseMirror li[style*='text-align: right'] > p,
+.ProseMirror li[style*='text-align: justify'] > p,
+.prose li[style*='text-align: center'] > p,
+.prose li[style*='text-align: right'] > p,
+.prose li[style*='text-align: justify'] > p {
+    display: inline;
+}
+
+/*
+ * Tailwind Typography sets an explicit color on strong/em/code,
+ * which overrides TipTap textStyle colors when marks nest like
+ * <span style="color">…</span><strong>…</strong> or the reverse.
+ */
+.ProseMirror strong,
+.ProseMirror b,
+.ProseMirror em,
+.ProseMirror i,
+.prose strong,
+.prose b,
+.prose em,
+.prose i {
+    color: inherit;
+}

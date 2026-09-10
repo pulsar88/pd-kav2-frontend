@@ -71,7 +71,8 @@ export const formatNotificationChannelTitle = (
 export const getUserLogTypeId = (log: UserLog | UserLogRaw) =>
     typeof log.type === 'number' ? log.type : Number(log.type.value)
 
-export const getUserLogTypeName = (log: UserLog) => log.type.name
+export const getUserLogTypeName = (log: UserLog) =>
+    log.type?.name || 'Уведомление'
 
 export const normalizeUserLog = (
     log: UserLogRaw,

@@ -11,7 +11,6 @@ import Button from '@/components/ui/Button'
 import Notification from '@/components/ui/Notification'
 import Pagination from '@/components/ui/Pagination'
 import Spinner from '@/components/ui/Spinner'
-import Select from '@/components/ui/Select'
 import toast from '@/components/ui/toast'
 import { TbArrowNarrowLeft, TbPlus } from 'react-icons/tb'
 import { useNavigate } from 'react-router'
@@ -21,16 +20,6 @@ import useAuthority from '@/utils/hooks/useAuthority'
 import { DEFAULT_HELP_CENTER_PAGE_SIZE } from '../helpCenterApiQuery'
 import { usePublicationKind } from '../publicationKind'
 import type { GetSupportHubArticlesResponse } from '../types'
-
-type Option = {
-    value: number
-    label: string
-}
-
-const pageSizeOptions: Option[] = [20, 50, 100].map((value) => ({
-    value,
-    label: `${value} / стр.`,
-}))
 
 type ArticleListProps = {
     query?: string
@@ -42,7 +31,7 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
     const userAuthority = useSessionUser((state) => state.user.authority) ?? []
     const canManageContent = useAuthority(userAuthority, [CONTENT_MANAGER])
     const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(DEFAULT_HELP_CENTER_PAGE_SIZE)
+    const pageSize = DEFAULT_HELP_CENTER_PAGE_SIZE
     const [data, setData] = useState<GetSupportHubArticlesResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -51,7 +40,7 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
 
     useEffect(() => {
         setPageIndex(1)
-    }, [query, pageSize, kind.kind])
+    }, [query, kind.kind])
 
     useEffect(() => {
         let cancelled = false
@@ -228,38 +217,14 @@ const ArticleList = ({ query = '' }: ArticleListProps) => {
                             />
                         ))}
                     </div>
-                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="overflow-x-auto">
-                            <Pagination
-                                currentPage={pageIndex}
-                                pageSize={pageSize}
-                                total={totalCount}
-                                pagerCount={5}
-                                onChange={setPageIndex}
-                            />
-                        </div>
-                        <div
-                            className="shrink-0 self-end sm:self-auto"
-                            style={{ minWidth: 130 }}
-                        >
-                            <Select
-                                instanceId={`${kind.kind}-page-size`}
-                                size="sm"
-                                menuPlacement="top"
-                                isSearchable={false}
-                                value={pageSizeOptions.filter(
-                                    (option) => option.value === pageSize,
-                                )}
-                                options={pageSizeOptions}
-                                onChange={(option) => {
-                                    const size = (option as Option | null)
-                                        ?.value
-                                    if (typeof size === 'number') {
-                                        setPageSize(size)
-                                    }
-                                }}
-                            />
-                        </div>
+                    <div className="mt-6">
+                        <Pagination
+                            currentPage={pageIndex}
+                            pageSize={pageSize}
+                            total={totalCount}
+                            pagerCount={5}
+                            onChange={setPageIndex}
+                        />
                     </div>
                 </>
             ) : null}

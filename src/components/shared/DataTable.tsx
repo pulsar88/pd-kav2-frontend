@@ -8,7 +8,6 @@ import {
 import classNames from 'classnames'
 import Table from '@/components/ui/Table'
 import Pagination from '@/components/ui/Pagination'
-import Select from '@/components/ui/Select'
 import Checkbox from '@/components/ui/Checkbox'
 import TableRowSkeleton from './loaders/TableRowSkeleton'
 import Loading from './Loading'
@@ -38,14 +37,11 @@ type DataTableProps<T> = {
     data?: T[]
     loading?: boolean
     noData?: boolean
-    instanceId?: string
     onCheckBoxChange?: (checked: boolean, row: T) => void
     onIndeterminateCheckBoxChange?: (checked: boolean, rows: Row<T>[]) => void
     onPaginationChange?: (page: number) => void
-    onSelectChange?: (num: number) => void
     onSort?: (sort: OnSortParam) => void
     onRowClick?: (row: T) => void
-    pageSizes?: number[]
     selectable?: boolean
     skeletonAvatarColumns?: number[]
     skeletonAvatarProps?: SkeletonProps
@@ -120,10 +116,8 @@ function DataTable<T>(props: DataTableProps<T>) {
         onCheckBoxChange,
         onIndeterminateCheckBoxChange,
         onPaginationChange,
-        onSelectChange,
         onSort,
         onRowClick,
-        pageSizes = [20, 50, 100],
         selectable = false,
         skeletonAvatarProps,
         pagingData = {
@@ -133,7 +127,6 @@ function DataTable<T>(props: DataTableProps<T>) {
         },
         checkboxChecked,
         indeterminateCheckboxChecked,
-        instanceId = 'data-table',
         ref,
         ...rest
     } = props
@@ -141,15 +134,6 @@ function DataTable<T>(props: DataTableProps<T>) {
     const { pageSize, pageIndex, total } = pagingData
 
     const [sorting, setSorting] = useState<ColumnSort[] | null>(null)
-
-    const pageSizeOption = useMemo(
-        () =>
-            pageSizes.map((number) => ({
-                value: number,
-                label: `${number} / стр.`,
-            })),
-        [pageSizes],
-    )
 
     useEffect(() => {
         if (Array.isArray(sorting)) {
@@ -263,12 +247,6 @@ function DataTable<T>(props: DataTableProps<T>) {
         if (!loading) {
             resetSelected()
             onPaginationChange?.(page)
-        }
-    }
-
-    const handleSelectChange = (value?: number) => {
-        if (!loading) {
-            onSelectChange?.(Number(value))
         }
     }
 
@@ -389,26 +367,13 @@ function DataTable<T>(props: DataTableProps<T>) {
                     </TBody>
                 )}
             </Table>
-            <div className="flex items-center justify-between mt-4">
+            <div className="mt-4">
                 <Pagination
                     pageSize={pageSize}
                     currentPage={pageIndex}
                     total={total}
                     onChange={handlePaginationChange}
                 />
-                <div style={{ minWidth: 130 }}>
-                    <Select
-                        instanceId={instanceId}
-                        size="sm"
-                        menuPlacement="top"
-                        isSearchable={false}
-                        value={pageSizeOption.filter(
-                            (option) => option.value === pageSize,
-                        )}
-                        options={pageSizeOption}
-                        onChange={(option) => handleSelectChange(option?.value)}
-                    />
-                </div>
             </div>
         </Loading>
     )

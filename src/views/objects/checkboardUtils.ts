@@ -57,6 +57,24 @@ export const buildPremiseFromCheckboardProperty = (
             propertyDetails?.price ??
             (property.price > 0 ? property.price : undefined),
         pricePerSqm: propertyDetails?.pricePerSqm,
+        discountPrice:
+            propertyDetails?.discountPrice ??
+            (property.discount_price != null && property.discount_price > 0
+                ? property.discount_price
+                : undefined),
+        specialOffers:
+            propertyDetails?.specialOffers ??
+            (property.special_offers?.length
+                ? property.special_offers.map((offer) => ({
+                      id: offer.id,
+                      name: offer.name,
+                      active: offer.active,
+                      color: offer.color,
+                      text_color: offer.text_color,
+                      badge_text: offer.badge_text ?? null,
+                      badge_icon: offer.badge_icon ?? null,
+                  }))
+                : undefined),
         layoutImage: propertyDetails?.layoutImage,
         layout: propertyDetails?.layout,
         complexId: propertyDetails?.complexId ?? complexId,
@@ -315,7 +333,8 @@ export const getPropertyAt = (
     column: SectionColumn,
 ) => {
     if (Array.isArray(section.properties)) return undefined
-    const list = section.properties[String(floor)] || []
+    const raw = section.properties[String(floor)]
+    const list = Array.isArray(raw) ? raw : raw ? [raw] : []
 
     if (column.kind === 'stack') {
         return list.find((property) => property.stack_id === column.stackId)
@@ -415,23 +434,38 @@ export const matchesObjectsSearchFilters = (
     const areaTo = toFilterNumber(filters.areaTo)
     const floorFrom = toFilterNumber(filters.floorFrom)
     const floorTo = toFilterNumber(filters.floorTo)
+    const effectivePrice =
+        property.discount_price != null && property.discount_price > 0
+            ? property.discount_price
+            : property.price
 
     if (!matchesPremiseTypeFilter(property.type.code, selectedTypes)) {
         return false
     }
 
-    if (
-        !matchesRealtyRoomFilters(property, filters.rooms || [])
-    ) {
+    if (!matchesRealtyRoomFilters(property, filters.rooms || [])) {
         return false
     }
 
-    if (priceFrom !== undefined && property.price < priceFrom) return false
-    if (priceTo !== undefined && property.price > priceTo) return false
+    if (priceFrom !== undefined && effectivePrice < priceFrom) return false
+    if (priceTo !== undefined && effectivePrice > priceTo) return false
     if (areaFrom !== undefined && property.area < areaFrom) return false
     if (areaTo !== undefined && property.area > areaTo) return false
     if (floorFrom !== undefined && property.floor < floorFrom) return false
     if (floorTo !== undefined && property.floor > floorTo) return false
+
+    const offerFilterIds = [
+        ...(filters.specialOfferIds ?? []),
+        ...(filters.specialOfferId ? [filters.specialOfferId] : []),
+    ]
+    if (offerFilterIds.length > 0) {
+        const propertyOfferIds = new Set(
+            (property.special_offers ?? []).map((offer) => String(offer.id)),
+        )
+        if (!offerFilterIds.some((id) => propertyOfferIds.has(id))) {
+            return false
+        }
+    }
 
     return true
 }
