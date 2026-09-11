@@ -16,6 +16,7 @@ import {
     getSectionColumns,
     getSectionFloors,
 } from '../../checkboardUtils'
+import { propertyHasSpecialOffer } from '../../specialOfferUtils'
 import DualHorizontalScroll from './DualHorizontalScroll'
 import CheckboardSharedPropertyTooltip from './CheckboardSharedPropertyTooltip'
 import {
@@ -207,6 +208,28 @@ const ClassicBlock = ({
                                     }}
                                 >
                                     {getCellLabel(property, labelMode)}
+                                    {propertyHasSpecialOffer(property) ? (
+                                        <span
+                                            className="absolute -right-0.5 -top-0.5 max-w-[calc(100%+4px)] truncate rounded px-1 py-px text-[8px] font-bold leading-tight shadow-sm"
+                                            style={{
+                                                backgroundColor:
+                                                    property.special_offers![0]
+                                                        .color || '#f59e0b',
+                                                color:
+                                                    property.special_offers![0]
+                                                        .text_color ||
+                                                    '#111827',
+                                            }}
+                                            title={
+                                                property.special_offers![0]
+                                                    .badge_text ||
+                                                property.special_offers![0]
+                                                    .name
+                                            }
+                                        >
+                                            %
+                                        </span>
+                                    ) : null}
                                 </button>
                             )
                         })}

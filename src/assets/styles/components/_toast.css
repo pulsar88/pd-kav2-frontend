@@ -1,6 +1,7 @@
 @layer components {
   .toast {
     @apply fixed z-[9999] pointer-events-none;
+    flex-direction: column;
   }
 
   .toast-wrapper {
@@ -18,7 +19,10 @@
       width: auto !important;
       max-width: calc(100vw - 32px);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      gap: 8px;
       transform: none !important;
       pointer-events: none !important;
     }

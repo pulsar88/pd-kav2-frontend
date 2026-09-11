@@ -8,7 +8,6 @@ import { useAuth } from '@/auth'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import Checkbox from '@/components/ui/Checkbox'
 import Pagination from '@/components/ui/Pagination'
-import Select from '@/components/ui/Select'
 import DebouceInput from '@/components/shared/DebouceInput'
 import ImageGallery from '@/components/shared/ImageGallery'
 import PremiseResultItem from '@/views/objects/components/PremiseResultItem'
@@ -33,17 +32,12 @@ import {
     type PremiseSortState,
 } from '@/views/objects/utils'
 
-type Option = { value: string | number; label: string }
-
 type FavoritePremisesListProps = {
     selectedIds: string[]
     onSelectedIdsChange: (ids: string[]) => void
 }
 
-const pageSizeOptions = [20, 50, 100].map((number) => ({
-    value: number,
-    label: `${number} / стр.`,
-}))
+const PAGE_SIZE = 20
 
 const emptySearchFilters = createEmptyObjectsSearchFilters()
 
@@ -59,7 +53,7 @@ const FavoritePremisesList = ({
     const setFavoriteIds = useFavoritesStore((state) => state.setFavoriteIds)
     const [sortKey, setSortKey] = useState<PremiseSortState>(null)
     const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(20)
+    const pageSize = PAGE_SIZE
     const [search, setSearch] = useState('')
     const [previewIndex, setPreviewIndex] = useState(-1)
     const [previewSlides, setPreviewSlides] = useState<Array<{ src: string }>>(
@@ -274,7 +268,7 @@ const FavoritePremisesList = ({
 
     useEffect(() => {
         setPageIndex(1)
-    }, [search, sortKey, pageSize])
+    }, [search, sortKey])
 
     const pageSelectedCount = pageData.filter((premise) =>
         selectedIds.includes(premise.id),
@@ -467,39 +461,14 @@ const FavoritePremisesList = ({
                             )
                         })}
                     </div>
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="overflow-x-auto">
-                            <Pagination
-                                currentPage={pageIndex}
-                                pageSize={pageSize}
-                                total={totalCount}
-                                pagerCount={5}
-                                onChange={setPageIndex}
-                            />
-                        </div>
-                        <div
-                            className="shrink-0 self-end sm:self-auto"
-                            style={{ minWidth: 130 }}
-                        >
-                            <Select
-                                instanceId="favorites-page-size"
-                                size="sm"
-                                menuPlacement="top"
-                                isSearchable={false}
-                                value={pageSizeOptions.filter(
-                                    (option) => option.value === pageSize,
-                                )}
-                                options={pageSizeOptions}
-                                onChange={(option) => {
-                                    const size = (option as Option | null)
-                                        ?.value
-                                    if (typeof size === 'number') {
-                                        setPageSize(size)
-                                        setPageIndex(1)
-                                    }
-                                }}
-                            />
-                        </div>
+                    <div className="mt-4">
+                        <Pagination
+                            currentPage={pageIndex}
+                            pageSize={pageSize}
+                            total={totalCount}
+                            pagerCount={5}
+                            onChange={setPageIndex}
+                        />
                     </div>
                 </>
             )}

@@ -63,6 +63,9 @@ const endpointConfig = {
     newsArticles: '/v2/news/articles',
     newsEvents: '/v2/news/events',
     newsItem: (newsId: string | number) => `/v2/news/${newsId}`,
+    specialOffers: '/v2/special_offers',
+    specialOffer: (offerId: string | number) =>
+        `/v2/special_offers/${offerId}`,
     agencies: '/v2/agencies',
     agencyRequests: '/v2/user/agency/requests',
     agencyRequest: (requestId: string | number) =>
@@ -73,6 +76,13 @@ const endpointConfig = {
         `/v2/user/agency/requests/${requestId}/reject`,
     agencyRequestCancel: (requestId: string | number) =>
         `/v2/user/agency/requests/${requestId}/cancel`,
+    invitations: '/v2/invitations',
+    invitation: (invitation: string | number) =>
+        `/v2/invitations/${invitation}`,
+    invitationCheck: (invitation: string | number) =>
+        `/v2/invitations/check/${invitation}`,
+    invitationLink: (invitation: string | number) =>
+        `/v2/invitations/link/${invitation}`,
 }
 
 export default endpointConfig

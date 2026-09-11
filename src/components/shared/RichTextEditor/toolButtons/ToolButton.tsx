@@ -13,13 +13,15 @@ const ToolButton = (props: ToolButtonProps) => {
     const button = (
         <button
             className={classNames(
-                'tool-button text-xl heading-text hover:text-primary flex items-center p-1.5 rounded-lg',
-                active && 'text-primary',
+                'tool-button text-xl heading-text hover:text-primary flex items-center p-1.5 rounded-lg transition-colors',
+                active &&
+                    'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary',
                 disabled && 'opacity-20 cursor-not-allowed',
                 className,
             )}
             type="button"
             disabled={disabled}
+            aria-pressed={active ? true : undefined}
             {...rest}
         >
             {children}

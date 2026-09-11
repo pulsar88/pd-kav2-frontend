@@ -14,11 +14,20 @@ const fontSizes = [
 const ToolButtonFontSize = ({ editor }: BaseToolButtonProps) => {
     const currentSize =
         (editor.getAttributes('textStyle').fontSize as string | undefined) || ''
+    const currentLabel =
+        fontSizes.find((size) => size.value === currentSize)?.label || null
 
     return (
         <Dropdown
             renderTitle={
-                <ToolButton title="Размер шрифта">
+                <ToolButton
+                    title={
+                        currentLabel
+                            ? `Размер шрифта: ${currentLabel}`
+                            : 'Размер шрифта'
+                    }
+                    active={Boolean(currentSize)}
+                >
                     <LuALargeSmall />
                 </ToolButton>
             }
@@ -26,9 +35,7 @@ const ToolButtonFontSize = ({ editor }: BaseToolButtonProps) => {
             <Dropdown.Item
                 eventKey="font-default"
                 active={!currentSize}
-                onClick={() =>
-                    editor.chain().focus().unsetFontSize().run()
-                }
+                onClick={() => editor.chain().focus().unsetFontSize().run()}
             >
                 По умолчанию
             </Dropdown.Item>

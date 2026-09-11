@@ -103,7 +103,7 @@ type ClientSelectOption = SelectOption & {
     client: FixationClient
 }
 
-const CLIENTS_PAGE_SIZES = [20, 50, 100]
+const CLIENTS_PAGE_SIZE = 20
 
 /**
  * Расширенные шаги wizard (помещение, предпочтения, родственники, комментарий).
@@ -485,7 +485,7 @@ const FixationsCreateWizardDialog = ({
     const [clients, setClients] = useState<FixationClient[]>([])
     const [clientsTotal, setClientsTotal] = useState(0)
     const [clientsPageIndex, setClientsPageIndex] = useState(1)
-    const [clientsPageSize, setClientsPageSize] = useState(20)
+    const clientsPageSize = CLIENTS_PAGE_SIZE
     const [hasClientsLoaded, setHasClientsLoaded] = useState(false)
     const [complexes, setComplexes] = useState<FixationComplex[]>([])
     const [managers, setManagers] = useState<FixationManager[]>([])
@@ -561,7 +561,6 @@ const FixationsCreateWizardDialog = ({
         setClientSearchQuery('')
         setClientsTotal(0)
         setClientsPageIndex(1)
-        setClientsPageSize(20)
         setHasClientsLoaded(false)
         setComplexes([])
         setManagers([])
@@ -658,17 +657,7 @@ const FixationsCreateWizardDialog = ({
         step,
         clientSearchQuery,
         clientsPageIndex,
-        clientsPageSize,
     ])
-
-    const clientsPageSizeOptions = useMemo(
-        () =>
-            CLIENTS_PAGE_SIZES.map((number) => ({
-                value: number,
-                label: `${number} / стр.`,
-            })),
-        [],
-    )
 
     const orderedClients = useMemo(() => {
         if (!selectedClient) return clients
@@ -1887,39 +1876,14 @@ const FixationsCreateWizardDialog = ({
                                         </Table>
                                     </div>
 
-                                    <div className="flex shrink-0 flex-col gap-2.5 border-t border-gray-200 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:border-gray-700">
-                                        <div className="overflow-x-auto">
+                                    <div className="flex shrink-0 border-t border-gray-200 p-2.5 sm:px-4 sm:py-3 dark:border-gray-700">
+                                        <div>
                                             <Pagination
                                                 pageSize={clientsPageSize}
                                                 currentPage={clientsPageIndex}
                                                 total={clientsTotal}
                                                 pagerCount={5}
                                                 onChange={setClientsPageIndex}
-                                            />
-                                        </div>
-                                        <div className="w-[130px] shrink-0 self-end sm:self-auto">
-                                            <Select
-                                                size="sm"
-                                                menuPlacement="top"
-                                                isSearchable={false}
-                                                value={clientsPageSizeOptions.filter(
-                                                    (option) =>
-                                                        option.value ===
-                                                        clientsPageSize,
-                                                )}
-                                                options={
-                                                    clientsPageSizeOptions
-                                                }
-                                                onChange={(option) => {
-                                                    const size =
-                                                        (
-                                                            option as {
-                                                                value: number
-                                                            } | null
-                                                        )?.value || 20
-                                                    setClientsPageSize(size)
-                                                    setClientsPageIndex(1)
-                                                }}
                                             />
                                         </div>
                                     </div>

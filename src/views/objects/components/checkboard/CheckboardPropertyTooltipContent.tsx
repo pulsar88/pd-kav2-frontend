@@ -4,6 +4,11 @@ import {
     formatTypeShortLabel,
     getPricePerSqm,
 } from '../../checkboardUtils'
+import {
+    propertyHasSpecialOffer,
+    toFiniteNumber,
+} from '../../specialOfferUtils'
+import SpecialOfferBadges from '../SpecialOfferBadges'
 
 type CheckboardPropertyTooltipContentProps = {
     property: CheckboardProperty
@@ -20,9 +25,14 @@ const getRoomsBadgeLabel = (property: CheckboardProperty) => {
 const CheckboardPropertyTooltipContent = ({
     property,
 }: CheckboardPropertyTooltipContentProps) => {
-    const pricePerSqm = getPricePerSqm(property.price, property.area)
-    const hasPrice = property.price > 0
+    const discountPrice = toFiniteNumber(property.discount_price)
+    const hasDiscount = discountPrice != null && discountPrice > 0
+    const effectivePrice = hasDiscount ? discountPrice! : property.price
+    const pricePerSqm = getPricePerSqm(effectivePrice, property.area)
+    const hasPrice = effectivePrice > 0
     const hasArea = property.area > 0
+    const hasOffers = propertyHasSpecialOffer(property)
+    const offers = hasOffers ? property.special_offers : undefined
 
     return (
         <div className="min-w-[240px] space-y-2 text-left">
@@ -44,9 +54,26 @@ const CheckboardPropertyTooltipContent = ({
                 </span>
             </div>
 
-            <p className="text-lg font-bold leading-tight text-white">
-                {hasPrice ? formatCheckboardPrice(property.price) : '—'}
-            </p>
+            {offers?.length ? (
+                <SpecialOfferBadges offers={offers} max={3} />
+            ) : null}
+
+            {hasDiscount ? (
+                <div className="space-y-0.5">
+                    <p className="text-lg font-bold leading-tight text-emerald-300">
+                        {formatCheckboardPrice(discountPrice!)}
+                    </p>
+                    {property.price > 0 && property.price !== discountPrice ? (
+                        <p className="text-xs text-gray-400 line-through">
+                            {formatCheckboardPrice(property.price)}
+                        </p>
+                    ) : null}
+                </div>
+            ) : (
+                <p className="text-lg font-bold leading-tight text-white">
+                    {hasPrice ? formatCheckboardPrice(property.price) : '—'}
+                </p>
+            )}
 
             <p className="text-xs text-gray-300">
                 {hasArea ? `${property.area} м²` : '—'}

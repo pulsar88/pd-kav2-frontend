@@ -141,6 +141,28 @@ export const protectedRoutes: Routes = [
         },
     },
     {
+        key: 'offers',
+        path: '/offers/:id',
+        component: lazy(
+            () => import('@/views/special-offers/SpecialOfferDetail'),
+        ),
+        authority: agentCabinetAuthority,
+        meta: {
+            pageContainerType: 'gutterless',
+            pageBackgroundType: 'plain',
+        },
+    },
+    {
+        key: 'offers',
+        path: '/offers',
+        component: lazy(() => import('@/views/special-offers')),
+        authority: agentCabinetAuthority,
+        meta: {
+            pageContainerType: 'gutterless',
+            pageBackgroundType: 'plain',
+        },
+    },
+    {
         key: 'news',
         path: '/news/create',
         component: lazy(() => import('@/views/help-center/CreateArticle')),
@@ -225,6 +247,18 @@ export const protectedRoutes: Routes = [
         path: '/agency/requests',
         component: lazy(() => import('@/views/agency/AgencyRequests')),
         authority: [AGENCY_SUPERVISOR, SUPERVISOR, ADMIN],
+    },
+    {
+        key: 'agencyInvitations',
+        path: '/agency/invitations',
+        component: lazy(() => import('@/views/agency/AgencyInvitations')),
+        authority: [AGENCY_SUPERVISOR],
+    },
+    {
+        key: 'invitationJoin',
+        path: '/invitations/:token',
+        component: lazy(() => import('@/views/invitations')),
+        authority: agentCabinetAuthority,
     },
     {
         key: 'supervisorFixations',

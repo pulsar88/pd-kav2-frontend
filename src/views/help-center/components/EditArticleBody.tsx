@@ -17,9 +17,12 @@ import ToolButtonAlignCenter from '@/components/shared/RichTextEditor/toolButton
 import ToolButtonAlignRight from '@/components/shared/RichTextEditor/toolButtons/ToolButtonAlignRight'
 import ToolButtonImage from '@/components/shared/RichTextEditor/toolButtons/ToolButtonImage'
 import ToolButtonDeleteImage from '@/components/shared/RichTextEditor/toolButtons/ToolButtonDeleteImage'
+import ToolButtonTable from '@/components/shared/RichTextEditor/toolButtons/ToolButtonTable'
 import FontSize from '@/components/shared/RichTextEditor/extensions/FontSize'
 import BlockSpacing from '@/components/shared/RichTextEditor/extensions/BlockSpacing'
 import CustomImage from '@/components/shared/RichTextEditor/extensions/Image'
+import { tableExtensions } from '@/components/shared/RichTextEditor/extensions/tableExtensions'
+import { richTextTableClass } from '@/components/shared/RichTextEditor/tableStyles'
 import {
     focusEditorAtPointer,
     proseMirrorSurfaceClass,
@@ -55,10 +58,10 @@ const getEditorTypographyClass = (fillHeight?: boolean) =>
         fillHeight
             ? 'min-h-full h-full cursor-text outline-none'
             : proseMirrorSurfaceClass
-    } ${headingColorClass} ${imageEditorClass}`
+    } ${headingColorClass} ${imageEditorClass} ${richTextTableClass}`
 
 const editorContentClass =
-    `prose max-w-full dark:prose-invert prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100 ${imageEditorClass}`
+    `prose max-w-full dark:prose-invert prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100 ${imageEditorClass} ${richTextTableClass}`
 
 const EditArticleBody = ({
     content,
@@ -150,11 +153,12 @@ const EditArticleBody = ({
             FontSize,
             BlockSpacing,
             TextAlign.configure({
-                types: ['heading', 'paragraph', 'image'],
+                types: ['heading', 'paragraph', 'listItem', 'image'],
             }),
             CustomImage.configure({
                 allowBase64: true,
             }),
+            ...tableExtensions,
         ],
         editorProps: {
             attributes: {
@@ -294,6 +298,7 @@ const EditArticleBody = ({
                 <ToolButtonOrderedList editor={editor} />
                 <ToolButtonCodeBlock editor={editor} />
                 <ToolButtonHorizontalRule editor={editor} />
+                <ToolButtonTable editor={editor} />
                 <ToolButtonImage
                     editor={editor}
                     disabled={isUploading}

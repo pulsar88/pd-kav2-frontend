@@ -14,6 +14,7 @@ import {
 } from '@/services/FixationsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
+    TbAlertTriangle,
     TbArrowLeft,
     TbBriefcase,
     TbClock,
@@ -119,10 +120,26 @@ const FixationExpiryDate = ({ value }: { value: string }) => (
     </span>
 )
 
+const FIXATION_CLINCH_EVENT_CODE =
+    'app.gigalog.res_gen.fixation_clinch_event_res_gen'
+
 const getGigalogStyle = (log: FixationGigalogItem) => {
     const code = log.code?.toLowerCase() || ''
     const msg = log.message.toLowerCase()
 
+    if (
+        code === FIXATION_CLINCH_EVENT_CODE ||
+        code.includes('fixation_clinch_event')
+    ) {
+        return {
+            icon: TbAlertTriangle,
+            label: 'Важно',
+            cardClassName:
+                'bg-rose-50/80 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-800/40',
+            barClassName: 'bg-rose-500',
+            metaClassName: 'text-rose-600 dark:text-rose-400',
+        }
+    }
     if (code.includes('restored') || msg.includes('восстановлен')) {
         return {
             icon: TbRefresh,

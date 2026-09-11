@@ -12,7 +12,7 @@ import {
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { TbCalendarPlus, TbCalendarTime, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
-import type { Fixation, GetFixationsResponse } from '../types'
+import type { Fixation, FixationStatus, GetFixationsResponse } from '../types'
 import {
     fixationStatusMap,
     formatFixationDate,
@@ -32,12 +32,18 @@ import FixationsTableTools from './FixationsTableTools'
 
 type FixationsTableProps = {
     refreshKey?: number
+    statusFilter?: FixationStatus
+    onStatusFilterChange?: (status?: FixationStatus) => void
 }
 
-const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
+const FixationsTable = ({
+    refreshKey = 0,
+    statusFilter,
+    onStatusFilterChange,
+}: FixationsTableProps) => {
     const navigate = useNavigate()
     const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(20)
+    const pageSize = 20
     const [search, setSearch] = useState('')
     const [columnVisibility, setColumnVisibility] =
         useState<FixationColumnVisibility>(() => loadFixationColumnVisibility())
@@ -51,6 +57,10 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
     const [refreshCount, setRefreshCount] = useState(0)
 
     useEffect(() => {
+        setPageIndex(1)
+    }, [statusFilter])
+
+    useEffect(() => {
         let cancelled = false
         setIsLoading(true)
 
@@ -58,6 +68,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
             page: pageIndex,
             page_size: pageSize,
             search: search || undefined,
+            status: statusFilter,
         })
             .then((response) => {
                 if (!cancelled) setData(response)
@@ -72,7 +83,7 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         return () => {
             cancelled = true
         }
-    }, [pageIndex, pageSize, refreshCount, refreshKey, search])
+    }, [pageIndex, pageSize, refreshCount, refreshKey, search, statusFilter])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
@@ -312,7 +323,11 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
         <div className="flex flex-col gap-4">
             <FixationsTableTools
                 columnVisibility={columnVisibility}
+                statusFilter={statusFilter}
                 onSearchChange={handleSearchChange}
+                onStatusFilterChange={(status) =>
+                    onStatusFilterChange?.(status)
+                }
                 onColumnVisibilityChange={handleColumnVisibilityChange}
             />
             <DataTable
@@ -326,10 +341,6 @@ const FixationsTable = ({ refreshKey = 0 }: FixationsTableProps) => {
                     pageSize,
                 }}
                 onPaginationChange={setPageIndex}
-                onSelectChange={(size) => {
-                    setPageSize(size)
-                    setPageIndex(1)
-                }}
                 onRowClick={(row) => navigate(`/fixations/${row.id}`)}
             />
             <FixationExtendRequestDialog

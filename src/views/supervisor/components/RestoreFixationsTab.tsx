@@ -83,7 +83,7 @@ const saveColumnVisibility = (visibility: RestoreColumnVisibility) => {
 
 const RestoreFixationsTab = () => {
     const [pageIndex, setPageIndex] = useState(1)
-    const [pageSize, setPageSize] = useState(20)
+    const pageSize = 20
     const [columnVisibility, setColumnVisibility] =
         useState<RestoreColumnVisibility>(() => loadColumnVisibility())
     const [data, setData] = useState<GetFixationsResponse | undefined>(undefined)
@@ -432,10 +432,6 @@ const RestoreFixationsTab = () => {
                     pageSize,
                 }}
                 onPaginationChange={setPageIndex}
-                onSelectChange={(size) => {
-                    setPageSize(size)
-                    setPageIndex(1)
-                }}
             />
 
             {/* Диалог восстановления */}

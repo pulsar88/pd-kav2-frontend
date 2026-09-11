@@ -4,6 +4,7 @@ import { isRealtyPropertyTypeCode } from './realtyPropertyQuery'
 export type ObjectsCatalogTab = 'complexes' | 'premises'
 
 const CATALOG_TAB_PARAM = 'tab'
+const SPECIAL_OFFER_ID_PARAM = 'special_offer_id'
 
 const numberKeys: Array<keyof ObjectsSearchFilters> = [
     'priceFrom',
@@ -18,6 +19,7 @@ const arrayKeys: Array<keyof ObjectsSearchFilters> = [
     'type',
     'rooms',
     'realtyProjectIds',
+    'specialOfferIds',
 ]
 
 export const createEmptyObjectsSearchFilters = (
@@ -33,6 +35,9 @@ export const createEmptyObjectsSearchFilters = (
     areaTo: '',
     floorFrom: '',
     floorTo: '',
+    fromInvestor: '',
+    specialOfferId: '',
+    specialOfferIds: [],
 })
 
 export const withoutComplexFilters = (
@@ -52,6 +57,19 @@ export const parseObjectsSearchFilters = (
 
     Object.keys(filters).forEach((key) => {
         const typedKey = key as keyof ObjectsSearchFilters
+
+        if (typedKey === 'specialOfferId') {
+            return
+        }
+
+        if (typedKey === 'fromInvestor') {
+            const rawValue = params.get('fromInvestor')
+            if (rawValue === '1' || rawValue === '0') {
+                filters.fromInvestor = rawValue
+            }
+            return
+        }
+
         const rawValue = params.get(key)
 
         if (!rawValue) return
@@ -77,6 +95,10 @@ export const parseObjectsSearchFilters = (
                 filters.realtyProjectIds = values
             }
 
+            if (typedKey === 'specialOfferIds') {
+                filters.specialOfferIds = values
+            }
+
             return
         }
 
@@ -90,6 +112,11 @@ export const parseObjectsSearchFilters = (
 
         ;(filters[typedKey] as string) = rawValue
     })
+
+    const specialOfferId = params.get(SPECIAL_OFFER_ID_PARAM)
+    if (specialOfferId) {
+        filters.specialOfferId = specialOfferId
+    }
 
     const legacyComplexId = params.get('complexId')
     if (
@@ -111,7 +138,14 @@ export const serializeObjectsSearchFilters = (
     const nextFilters = { ...filters, ...overrides }
 
     Object.entries(nextFilters).forEach(([key, value]) => {
+        if (key === 'specialOfferId') return
         if (value === '' || value === undefined || value === null) return
+        if (typeof value === 'boolean') {
+            if (value) {
+                params.set(key, '1')
+            }
+            return
+        }
         if (Array.isArray(value)) {
             if (value.length === 0) return
             params.set(key, value.join(','))
@@ -119,6 +153,10 @@ export const serializeObjectsSearchFilters = (
         }
         params.set(key, String(value))
     })
+
+    if (nextFilters.specialOfferId) {
+        params.set(SPECIAL_OFFER_ID_PARAM, nextFilters.specialOfferId)
+    }
 
     return params
 }

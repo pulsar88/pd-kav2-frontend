@@ -18,12 +18,18 @@ import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { disconnectEcho } from '@/services/broadcast/echo'
 import { clearFavoritesStore } from '@/store/favoritesStore'
 import { clearComparisonStore } from '@/store/comparisonStore'
+import {
+    isServerOutageStatus,
+    useServerStatusStore,
+} from '@/store/serverStatusStore'
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
 import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
 import { preparePushPromptAfterAuth } from '@/utils/webPush'
-import Notification from '@/components/ui/Notification'
-import toast from '@/components/ui/toast'
+import {
+    clearInvitationTokenFromStorage,
+    getInvitationTokenFromStorage,
+} from '@/utils/invitationTokenStorage'
 import type {
     SignInCredential,
     SignUpCredential,
@@ -76,11 +82,23 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const navigatorRef = useRef<IsolatedNavigatorRef>(null)
 
-    const redirect = (authority?: string[]) => {
+    const redirect = (authority?: string[], nextUser?: User | null) => {
         const search = window.location.search
         const params = new URLSearchParams(search)
         const redirectUrl = params.get(REDIRECT_URL_KEY)
-        const roles = authority ?? user.authority ?? []
+        const roles = authority ?? nextUser?.authority ?? user.authority ?? []
+        const invitationToken = getInvitationTokenFromStorage()
+        const hasAgency = Boolean(nextUser?.agency ?? user.agency)
+
+        if (invitationToken) {
+            if (!hasAgency) {
+                navigatorRef.current?.navigate(
+                    `/invitations/${encodeURIComponent(invitationToken)}`,
+                )
+                return
+            }
+            clearInvitationTokenFromStorage()
+        }
 
         navigatorRef.current?.navigate(
             redirectUrl
@@ -166,14 +184,11 @@ function AuthProvider({ children }: AuthProviderProps) {
                 setSessionSignedIn(true)
                 await loadCurrentUser()
 
-                toast.push(
-                    <Notification type="warning" title="Сервер временно недоступен">
-                        {status
-                            ? `Не удалось проверить сессию (ошибка ${status}). Вы остаётесь в системе — попробуйте обновить страницу позже.`
-                            : 'Не удалось проверить сессию из‑за сетевой ошибки. Вы остаётесь в системе — попробуйте обновить страницу позже.'}
-                    </Notification>,
-                    { placement: 'top-center' },
-                )
+                if (isServerOutageStatus(status)) {
+                    useServerStatusStore.getState().reportServerOutage(status)
+                } else if (!status) {
+                    useServerStatusStore.getState().reportServerOutage()
+                }
             }
         }
 
@@ -188,7 +203,10 @@ function AuthProvider({ children }: AuthProviderProps) {
     const finishAuth = async (accessToken: string, nextUser?: User) => {
         handleSignIn({ accessToken }, nextUser)
         const currentUser = await loadCurrentUser()
-        redirect(currentUser?.authority ?? nextUser?.authority)
+        redirect(
+            currentUser?.authority ?? nextUser?.authority,
+            currentUser ?? nextUser,
+        )
 
         void preparePushPromptAfterAuth()
             .then(({ shouldPrompt }) => {

@@ -141,10 +141,13 @@ export const getPremisePricePerSqm = (
 export type PremisePreviewSlide = {
     src: string
     title?: string
+    width?: number
+    height?: number
+    floorPath?: string
 }
 
 export const getPremisePreviewSlides = (
-    premise: Pick<Premise, 'layoutImage' | 'floorPlanImage'>,
+    premise: Pick<Premise, 'layoutImage' | 'floorPlanImage' | 'floorPath'>,
 ): PremisePreviewSlide[] => {
     const slides: PremisePreviewSlide[] = []
 
@@ -156,7 +159,11 @@ export const getPremisePreviewSlides = (
         premise.floorPlanImage &&
         premise.floorPlanImage !== premise.layoutImage
     ) {
-        slides.push({ src: premise.floorPlanImage, title: 'План этажа' })
+        slides.push({
+            src: premise.floorPlanImage,
+            title: 'План этажа',
+            floorPath: premise.floorPath,
+        })
     }
 
     return slides
