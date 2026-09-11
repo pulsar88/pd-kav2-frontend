@@ -77,14 +77,14 @@ type RealtyObjectBriefApi = {
 
 type RealtyFloorPlanApi = {
     id?: number
-    src?: string
-    url?: string
+    object_id?: number
+    image?: RealtyPropertyImageApi | string | null
 }
 
 type RealtyFloorApi = {
     id?: number
     number?: number
-    floor_plan?: RealtyFloorPlanApi | string | null
+    plan?: RealtyFloorPlanApi | null
 }
 
 type RealtyPropertyStatusApi = {
@@ -121,7 +121,7 @@ type RealtyPropertyApi = {
 }
 
 export const REALTY_PROPERTY_WITH =
-    'preset.image,object,realtyFloor.floorPlan,project,object.image,status'
+    'preset.image,object,realtyFloor.plan.image,project,object.image,status'
 
 const REALTY_OBJECT_WITH = 'image,project'
 
@@ -176,17 +176,17 @@ const resolvePresetImageUrl = (
 const resolveFloorPlanImageUrl = (
     floor?: RealtyFloorApi | null,
 ): string | undefined => {
-    const plan = floor?.floor_plan
+    const image = floor?.plan?.image
 
-    if (!plan) {
+    if (!image) {
         return undefined
     }
 
-    if (typeof plan === 'string') {
-        return plan
+    if (typeof image === 'string') {
+        return image
     }
 
-    return plan.src || plan.url
+    return image.src || image.url
 }
 
 const resolvePremiseLayoutName = (item: RealtyPropertyApi) =>
