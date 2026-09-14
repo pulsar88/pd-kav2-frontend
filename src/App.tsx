@@ -3,6 +3,7 @@ import Theme from '@/components/template/Theme'
 import Layout from '@/components/layouts'
 import { AuthProvider } from '@/auth'
 import CookieBanner from '@/components/shared/CookieBanner'
+import PwaInstallBanner from '@/components/shared/PwaInstallBanner'
 import UserLogsBroadcastListener from '@/components/template/Notification/UserLogsBroadcastListener'
 import ServerUnavailableGate from '@/components/template/ServerUnavailableGate'
 import Views from '@/views'
@@ -17,6 +18,7 @@ function App() {
                         <Views />
                     </Layout>
                     <CookieBanner />
+                    <PwaInstallBanner />
                     <ServerUnavailableGate />
                 </AuthProvider>
             </BrowserRouter>
