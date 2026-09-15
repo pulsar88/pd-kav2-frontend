@@ -11,7 +11,7 @@ const resolveApiStatus = (item: FixationApiItem): FixationStatus => {
     const status = item.status
 
     if (status?.value) {
-        return status.value
+        return status.value.toLowerCase() as FixationStatus
     }
 
     if (status?.code) {
@@ -198,6 +198,10 @@ export const mapFixationApiItemToFixation = (
             phone: formatFixationPhone(item.agent?.phone),
             agency: item.agency?.name?.trim() || '—',
         },
+        targetAgentName: item.agent_name?.trim() || undefined,
+        targetAgentPhone: item.agent_phone
+            ? formatFixationPhone(item.agent_phone)
+            : undefined,
         crm: mapCrmStatus(item.crm_status),
         history: [],
         has_extend_request: hasExtend,

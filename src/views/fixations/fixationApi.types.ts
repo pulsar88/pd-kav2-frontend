@@ -129,6 +129,8 @@ export type FixationApiItem = {
     object?: FixationApiObject
     crm_status?: FixationApiCrmStatus
     has_extend_request?: boolean
+    agent_name?: string | null
+    agent_phone?: string | null
 }
 
 export type FixationsApiMeta = {

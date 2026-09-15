@@ -162,86 +162,87 @@ export const protectedRoutes: Routes = [
             pageBackgroundType: 'plain',
         },
     },
-    {
-        key: 'news',
-        path: '/news/create',
-        component: lazy(() => import('@/views/help-center/CreateArticle')),
-        authority: [CONTENT_MANAGER],
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'news',
-        path: '/news/:slug/edit',
-        component: lazy(() => import('@/views/help-center/EditArticle')),
-        authority: [CONTENT_MANAGER],
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'news',
-        path: '/news/:slug',
-        component: lazy(() => import('@/views/help-center/Article')),
-        authority: contentManagerAllowedAuthority,
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'news',
-        path: '/news',
-        component: lazy(() => import('@/views/news')),
-        authority: contentManagerAllowedAuthority,
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'events',
-        path: '/news/events/create',
-        component: lazy(() => import('@/views/help-center/CreateArticle')),
-        authority: [CONTENT_MANAGER],
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'events',
-        path: '/news/events/:slug/edit',
-        component: lazy(() => import('@/views/help-center/EditArticle')),
-        authority: [CONTENT_MANAGER],
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'events',
-        path: '/news/events/:slug',
-        component: lazy(() => import('@/views/help-center/Article')),
-        authority: contentManagerAllowedAuthority,
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'events',
-        path: '/news/events',
-        component: lazy(() => import('@/views/events')),
-        authority: contentManagerAllowedAuthority,
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
+    // Временно скрыто для всех: новости и события
+    // {
+    //     key: 'news',
+    //     path: '/news/create',
+    //     component: lazy(() => import('@/views/help-center/CreateArticle')),
+    //     authority: [CONTENT_MANAGER],
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'news',
+    //     path: '/news/:slug/edit',
+    //     component: lazy(() => import('@/views/help-center/EditArticle')),
+    //     authority: [CONTENT_MANAGER],
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'news',
+    //     path: '/news/:slug',
+    //     component: lazy(() => import('@/views/help-center/Article')),
+    //     authority: contentManagerAllowedAuthority,
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'news',
+    //     path: '/news',
+    //     component: lazy(() => import('@/views/news')),
+    //     authority: contentManagerAllowedAuthority,
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'events',
+    //     path: '/news/events/create',
+    //     component: lazy(() => import('@/views/help-center/CreateArticle')),
+    //     authority: [CONTENT_MANAGER],
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'events',
+    //     path: '/news/events/:slug/edit',
+    //     component: lazy(() => import('@/views/help-center/EditArticle')),
+    //     authority: [CONTENT_MANAGER],
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'events',
+    //     path: '/news/events/:slug',
+    //     component: lazy(() => import('@/views/help-center/Article')),
+    //     authority: contentManagerAllowedAuthority,
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
+    // {
+    //     key: 'events',
+    //     path: '/news/events',
+    //     component: lazy(() => import('@/views/events')),
+    //     authority: contentManagerAllowedAuthority,
+    //     meta: {
+    //         pageContainerType: 'gutterless',
+    //         pageBackgroundType: 'plain',
+    //     },
+    // },
     {
         key: 'agencyRequests',
         path: '/agency/requests',

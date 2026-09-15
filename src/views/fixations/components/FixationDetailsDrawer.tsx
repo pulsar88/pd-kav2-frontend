@@ -128,21 +128,36 @@ const FixationDetailsDrawer = ({
 
                         <Section title="Контакты агента">
                             <InfoRow
-                                label="Email"
-                                value={fixation.agent.email}
-                            />
-                            <InfoRow
-                                label="Имя"
+                                label="Создал"
                                 value={fixation.agent.fullName}
                             />
                             <InfoRow
-                                label="Телефон"
+                                label="Телефон создателя"
                                 value={fixation.agent.phone}
+                            />
+                            <InfoRow
+                                label="Email"
+                                value={fixation.agent.email}
                             />
                             <InfoRow
                                 label="Агентство"
                                 value={fixation.agent.agency}
                             />
+                            {fixation.targetAgentName ||
+                            fixation.targetAgentPhone ? (
+                                <>
+                                    <InfoRow
+                                        label="На кого"
+                                        value={fixation.targetAgentName || '—'}
+                                    />
+                                    <InfoRow
+                                        label="Телефон агента"
+                                        value={
+                                            fixation.targetAgentPhone || '—'
+                                        }
+                                    />
+                                </>
+                            ) : null}
                         </Section>
 
                         <Section title="Контакты клиента">

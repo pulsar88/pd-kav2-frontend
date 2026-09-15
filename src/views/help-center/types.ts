@@ -58,4 +58,5 @@ export type UpdateSupportHubArticlePayload = {
     code?: string
     type: number
     isDraft?: boolean
+    notify?: boolean
 }

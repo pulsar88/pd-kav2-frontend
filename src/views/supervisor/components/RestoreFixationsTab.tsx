@@ -285,7 +285,7 @@ const RestoreFixationsTab = () => {
             },
             {
                 id: 'createdAt',
-                header: 'Создана',
+                header: 'Дата создания',
                 size: 120,
                 minSize: 110,
                 cell: (props) => (

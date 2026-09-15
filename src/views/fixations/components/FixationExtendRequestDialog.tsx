@@ -4,7 +4,7 @@ import Dialog from '@/components/ui/Dialog'
 import Input from '@/components/ui/Input'
 import { Form, FormItem } from '@/components/ui/Form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, type Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import type { Fixation } from '../types'
 
@@ -56,7 +56,7 @@ const FixationExtendRequestDialog = ({
         formState: { errors, isValid },
     } = useForm<ExtendFormSchema>({
         defaultValues,
-        resolver: zodResolver(extendSchema),
+        resolver: zodResolver(extendSchema) as Resolver<ExtendFormSchema>,
         mode: 'onChange',
     })
 

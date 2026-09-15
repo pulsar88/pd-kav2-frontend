@@ -38,6 +38,8 @@ export type ExtendColumnId =
     | 'object'
     | 'agent'
     | 'extendDays'
+    | 'fixationCreatedAt'
+    | 'fixedTill'
     | 'createdAt'
 
 export type ExtendColumnVisibility = Record<ExtendColumnId, boolean>
@@ -50,6 +52,8 @@ export const EXTEND_COLUMN_OPTIONS: Array<{
     { id: 'object', label: 'ЖК' },
     { id: 'agent', label: 'Агент' },
     { id: 'extendDays', label: 'Продление' },
+    { id: 'fixationCreatedAt', label: 'Дата создания' },
+    { id: 'fixedTill', label: 'Дата окончания' },
     { id: 'createdAt', label: 'Дата запроса' },
 ]
 
@@ -58,6 +62,8 @@ export const DEFAULT_EXTEND_COLUMN_VISIBILITY: ExtendColumnVisibility = {
     object: true,
     agent: true,
     extendDays: true,
+    fixationCreatedAt: true,
+    fixedTill: true,
     createdAt: true,
 }
 
@@ -411,6 +417,36 @@ const ExtendRequestsTab = () => {
                 },
             },
             {
+                id: 'fixationCreatedAt',
+                header: 'Дата создания',
+                size: 140,
+                minSize: 130,
+                cell: (props) => {
+                    const dateStr = props.row.original.fixation?.created_at
+
+                    return (
+                        <span className="whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                            {dateStr ? formatFixationDate(dateStr) : '—'}
+                        </span>
+                    )
+                },
+            },
+            {
+                id: 'fixedTill',
+                header: 'Дата окончания',
+                size: 140,
+                minSize: 130,
+                cell: (props) => {
+                    const dateStr = props.row.original.fixation?.fixed_till
+
+                    return (
+                        <span className="whitespace-nowrap text-xs text-gray-600 dark:text-gray-400">
+                            {dateStr ? formatFixationDate(dateStr) : '—'}
+                        </span>
+                    )
+                },
+            },
+            {
                 id: 'createdAt',
                 header: 'Дата запроса',
                 size: 140,
@@ -423,8 +459,7 @@ const ExtendRequestsTab = () => {
                         bgClass: 'bg-gray-100 dark:bg-gray-700',
                         textClass: 'text-gray-600 dark:text-gray-300',
                     }
-                    const dateStr =
-                        item.created_at || item.fixation?.created_at
+                    const dateStr = item.created_at
 
                     return (
                         <div className="flex flex-col gap-1 items-start whitespace-nowrap">

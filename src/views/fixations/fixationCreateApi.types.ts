@@ -51,6 +51,8 @@ export type CreateFixationApiBody = {
             country_code: string
         }[]
     }
+    agent_name?: string
+    agent_phone?: string
     // TODO(api): раскомментировать, когда POST /v2/fixations начнёт принимать поля
     // property_id?: number
     comment?: string

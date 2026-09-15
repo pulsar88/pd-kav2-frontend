@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import classNames from '@/utils/classNames'
 import Button from '@/components/ui/Button'
@@ -20,7 +20,11 @@ import {
     formatRuPhone,
     RU_PHONE_REGEX,
 } from '@/views/fixations/utils'
+import { LEGAL_DOCS } from '@/constants/legalDocs.constant'
 import type { CommonProps } from '@/@types/common'
+
+/** Временно скрыто: регистрация руководителя агентства */
+const AGENCY_REGISTRATION_ENABLED = false;
 
 type AuthStep =
     | 'phone'
@@ -39,8 +43,9 @@ interface SignInFormProps extends CommonProps {
 
 type PhoneSchema = {
     phone: string
-    personalDataConsent: boolean
-    termsAccepted: boolean
+    opdConsent: boolean
+    privacyPoliciesAccepted: boolean
+    marketingConsent: boolean
 }
 
 type PasswordSchema = {
@@ -83,6 +88,24 @@ const registerRoleOptions: Array<{
     },
 ]
 
+const DocLink = ({
+    href,
+    children,
+}: {
+    href: string
+    children: ReactNode
+}) => (
+    <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-primary underline-offset-2 hover:underline"
+        onClick={(event) => event.stopPropagation()}
+    >
+        {children}
+    </a>
+)
+
 const showAuthSuccessToast = () => {
     toast.push(
         <Notification type="success">Вход выполнен успешно</Notification>,
@@ -102,14 +125,13 @@ const phoneSchema = z.object({
         .regex(RU_PHONE_REGEX, {
             message: 'Введите номер в формате +7 9XX XXX XX XX',
         }),
-    personalDataConsent: z
-        .boolean()
-        .refine((value) => value, {
-            message: 'Необходимо согласие на обработку персональных данных',
-        }),
-    termsAccepted: z.boolean().refine((value) => value, {
-        message: 'Необходимо принять пользовательское соглашение',
+    opdConsent: z.boolean().refine((value) => value, {
+        message: 'Необходимо согласие на ОПД',
     }),
+    privacyPoliciesAccepted: z.boolean().refine((value) => value, {
+        message: 'Необходимо подтвердить ознакомление с политиками',
+    }),
+    marketingConsent: z.boolean(),
 })
 
 const passwordSchema = z.object({
@@ -244,8 +266,9 @@ const SignInForm = (props: SignInFormProps) => {
     const phoneForm = useForm<PhoneSchema>({
         defaultValues: {
             phone: '',
-            personalDataConsent: false,
-            termsAccepted: false,
+            opdConsent: false,
+            privacyPoliciesAccepted: false,
+            marketingConsent: false,
         },
         resolver: zodResolver(phoneSchema),
         mode: 'onChange',
@@ -335,6 +358,10 @@ const SignInForm = (props: SignInFormProps) => {
         setStep('register-password')
     }
 
+    const startAgentRegistration = () => {
+        selectRegisterRole('agent')
+    }
+
     const goBack = () => {
         setMessage?.('')
         otpForm.reset({ code: '' })
@@ -356,7 +383,13 @@ const SignInForm = (props: SignInFormProps) => {
             return
         }
         if (step === 'register-password') {
-            setStep('register-role')
+            if (AGENCY_REGISTRATION_ENABLED) {
+                setStep('register-role')
+                return
+            }
+            setHighlightConsents(false)
+            resetRegisterFlow()
+            setStep('phone')
             return
         }
         if (step === 'register-otp') {
@@ -385,7 +418,11 @@ const SignInForm = (props: SignInFormProps) => {
             setStep('login-password')
         } else {
             resetRegisterFlow()
-            setStep('register-role')
+            if (AGENCY_REGISTRATION_ENABLED) {
+                setStep('register-role')
+            } else {
+                startAgentRegistration()
+            }
         }
     }
 
@@ -610,49 +647,11 @@ const SignInForm = (props: SignInFormProps) => {
                     <FormItem
                         errorMode="none"
                         invalid={
-                            highlightConsents &&
-                            !phoneForm.watch('personalDataConsent')
+                            highlightConsents && !phoneForm.watch('opdConsent')
                         }
                     >
                         <Controller
-                            name="personalDataConsent"
-                            control={phoneForm.control}
-                            render={({ field }) => (
-                                <Checkbox
-                                    checked={field.value}
-                                    checkboxClass={
-                                        highlightConsents && !field.value
-                                            ? 'text-error ring-error border-error'
-                                            : undefined
-                                    }
-                                    onChange={(checked) => {
-                                        const next = Boolean(checked)
-                                        field.onChange(next)
-                                        if (
-                                            next &&
-                                            phoneForm.getValues('termsAccepted')
-                                        ) {
-                                            setHighlightConsents(false)
-                                        }
-                                    }}
-                                >
-                                    Даю согласие на обработку своих
-                                    персональных данных
-                                </Checkbox>
-                            )}
-                        />
-                    </FormItem>
-
-                    <FormItem
-                        className="!mb-6"
-                        errorMode="none"
-                        invalid={
-                            highlightConsents &&
-                            !phoneForm.watch('termsAccepted')
-                        }
-                    >
-                        <Controller
-                            name="termsAccepted"
+                            name="opdConsent"
                             control={phoneForm.control}
                             render={({ field }) => (
                                 <Checkbox
@@ -668,14 +667,82 @@ const SignInForm = (props: SignInFormProps) => {
                                         if (
                                             next &&
                                             phoneForm.getValues(
-                                                'personalDataConsent',
+                                                'privacyPoliciesAccepted',
                                             )
                                         ) {
                                             setHighlightConsents(false)
                                         }
                                     }}
                                 >
-                                    Я принимаю пользовательское соглашение
+                                    Даю согласие на ОПД в соответствии с{' '}
+                                    <DocLink href={LEGAL_DOCS.soglasieOpdAgenta}>
+                                        согласием на ОПД Агента
+                                    </DocLink>
+                                    .
+                                </Checkbox>
+                            )}
+                        />
+                    </FormItem>
+
+                    <FormItem
+                        errorMode="none"
+                        invalid={
+                            highlightConsents &&
+                            !phoneForm.watch('privacyPoliciesAccepted')
+                        }
+                    >
+                        <Controller
+                            name="privacyPoliciesAccepted"
+                            control={phoneForm.control}
+                            render={({ field }) => (
+                                <Checkbox
+                                    checked={field.value}
+                                    checkboxClass={
+                                        highlightConsents && !field.value
+                                            ? 'text-error ring-error border-error'
+                                            : undefined
+                                    }
+                                    onChange={(checked) => {
+                                        const next = Boolean(checked)
+                                        field.onChange(next)
+                                        if (
+                                            next &&
+                                            phoneForm.getValues('opdConsent')
+                                        ) {
+                                            setHighlightConsents(false)
+                                        }
+                                    }}
+                                >
+                                    Ознакомлен (а) с{' '}
+                                    <DocLink href={LEGAL_DOCS.politikaKpd}>
+                                        Политикой КПД
+                                    </DocLink>{' '}
+                                    и{' '}
+                                    <DocLink href={LEGAL_DOCS.politikaOpd}>
+                                        Политикой в отношении ОПД
+                                    </DocLink>
+                                    .
+                                </Checkbox>
+                            )}
+                        />
+                    </FormItem>
+
+                    <FormItem className="!mb-6" errorMode="none">
+                        <Controller
+                            name="marketingConsent"
+                            control={phoneForm.control}
+                            render={({ field }) => (
+                                <Checkbox
+                                    checked={field.value}
+                                    onChange={(checked) =>
+                                        field.onChange(Boolean(checked))
+                                    }
+                                >
+                                    Даю{' '}
+                                    <DocLink href={LEGAL_DOCS.soglasieReklama}>
+                                        согласие на получение рекламных
+                                        сообщений
+                                    </DocLink>
                                 </Checkbox>
                             )}
                         />
@@ -867,7 +934,7 @@ const SignInForm = (props: SignInFormProps) => {
                 </Form>
             ) : null}
 
-            {step === 'register-role' ? (
+            {AGENCY_REGISTRATION_ENABLED && step === 'register-role' ? (
                 <div className="flex flex-col gap-3">
                     {registerRoleOptions.map((option) => {
                         const Icon = option.icon
@@ -924,25 +991,27 @@ const SignInForm = (props: SignInFormProps) => {
                         handleRegisterPassword,
                     )}
                 >
-                    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-800/60">
-                        <div className="min-w-0">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Тип регистрации
-                            </p>
-                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                {isAgency
-                                    ? 'Руководитель агентства'
-                                    : 'Агент'}
-                            </p>
+                    {AGENCY_REGISTRATION_ENABLED ? (
+                        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-gray-700 dark:bg-gray-800/60">
+                            <div className="min-w-0">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Тип регистрации
+                                </p>
+                                <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    {isAgency
+                                        ? 'Руководитель агентства'
+                                        : 'Агент'}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                className="shrink-0 text-sm font-semibold text-primary hover:underline"
+                                onClick={() => setStep('register-role')}
+                            >
+                                Изменить
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            className="shrink-0 text-sm font-semibold text-primary hover:underline"
-                            onClick={() => setStep('register-role')}
-                        >
-                            Изменить
-                        </button>
-                    </div>
+                    ) : null}
 
                     <FormItem
                         asterisk

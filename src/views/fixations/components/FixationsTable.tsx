@@ -10,6 +10,7 @@ import {
     apiCreateFixationExtendRequest,
 } from '@/services/FixationsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { useSessionUser } from '@/store/authStore'
 import { TbCalendarPlus, TbCalendarTime, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
 import type { Fixation, FixationStatus, GetFixationsResponse } from '../types'
@@ -20,6 +21,7 @@ import {
     getFixationExpiryAccentClass,
 } from '../utils'
 import {
+    getFixationColumnsScope,
     loadFixationColumnVisibility,
     saveFixationColumnVisibility,
     type FixationColumnId,
@@ -42,6 +44,11 @@ const FixationsTable = ({
     onStatusFilterChange,
 }: FixationsTableProps) => {
     const navigate = useNavigate()
+    const user = useSessionUser((state) => state.user)
+    const columnsScope = useMemo(
+        () => getFixationColumnsScope(user.authority ?? []),
+        [user.authority],
+    )
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
     const [search, setSearch] = useState('')
@@ -194,6 +201,40 @@ const FixationsTable = ({
                 ),
             },
             {
+                id: 'agent',
+                header: 'Агент',
+                enableSorting: false,
+                size: 200,
+                minSize: 160,
+                cell: (props) => {
+                    const agent = props.row.original.agent
+                    return (
+                        <div className="min-w-0 whitespace-nowrap">
+                            <div className="font-medium text-gray-900 dark:text-gray-100">
+                                {agent?.fullName || '—'}
+                            </div>
+                            {agent?.phone && agent.phone !== '—' ? (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {agent.phone}
+                                </div>
+                            ) : null}
+                        </div>
+                    )
+                },
+            },
+            {
+                id: 'agency',
+                header: 'Агентство',
+                enableSorting: false,
+                size: 180,
+                minSize: 140,
+                cell: (props) => (
+                    <span className="font-medium">
+                        {props.row.original.agent?.agency || '—'}
+                    </span>
+                ),
+            },
+            {
                 id: 'status',
                 header: 'Статус',
                 accessorKey: 'status',
@@ -313,9 +354,12 @@ const FixationsTable = ({
 
         return allColumns.filter((column) => {
             if (column.id === 'actions') return true
+            if (column.id === 'agent' && !columnsScope.canSeeAgent) return false
+            if (column.id === 'agency' && !columnsScope.canSeeAgency)
+                return false
             return columnVisibility[column.id as FixationColumnId]
         })
-    }, [columnVisibility])
+    }, [columnVisibility, columnsScope.canSeeAgency, columnsScope.canSeeAgent])
 
     const pageData = list
 
@@ -323,6 +367,7 @@ const FixationsTable = ({
         <div className="flex flex-col gap-4">
             <FixationsTableTools
                 columnVisibility={columnVisibility}
+                columnOptionsAuthority={user.authority ?? []}
                 statusFilter={statusFilter}
                 onSearchChange={handleSearchChange}
                 onStatusFilterChange={(status) =>

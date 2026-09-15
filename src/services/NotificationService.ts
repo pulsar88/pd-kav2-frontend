@@ -2,7 +2,10 @@ import ApiService from './ApiService'
 import endpointConfig from '@/configs/endpoint.config'
 import { unwrapApiData, type ApiDataEnvelope } from './auth/authUtils'
 import { emitUserLogsReaded } from '@/services/broadcast/userLogsBroadcastBus'
-import { parseNotificationDictionaries, normalizeUserLogs } from '@/utils/notificationDictionary'
+import {
+    parseNotificationDictionaries,
+    normalizeUserLogs,
+} from '@/utils/notificationDictionary'
 import type {
     GetUserLogsParams,
     MarkUserLogsReadPayload,
@@ -16,7 +19,15 @@ import type {
 export async function apiGetUserLogs(
     params?: GetUserLogsParams,
 ): Promise<UserLogsResponse> {
-    const { notificationTypes, is_unread, page, types, ...rest } = params ?? {}
+    const {
+        notificationTypes,
+        is_unread,
+        set_read,
+        page,
+        per_page,
+        types,
+        ...rest
+    } = params ?? {}
 
     const queryParams: Record<string, string | number> = { ...rest }
 
@@ -24,8 +35,16 @@ export async function apiGetUserLogs(
         queryParams.page = page
     }
 
+    if (per_page !== undefined) {
+        queryParams.per_page = per_page
+    }
+
     if (is_unread !== undefined) {
         queryParams.is_unread = is_unread ? 1 : 0
+    }
+
+    if (set_read !== undefined) {
+        queryParams.set_read = set_read ? 1 : 0
     }
 
     if (types?.length) {

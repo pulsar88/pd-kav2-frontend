@@ -6,7 +6,7 @@ import DebouceInput from '@/components/shared/DebouceInput'
 import { TbColumns, TbSearch } from 'react-icons/tb'
 import type { ChangeEvent } from 'react'
 import {
-    FIXATION_COLUMN_OPTIONS,
+    getFixationColumnOptionsForAuthority,
     type FixationColumnId,
     type FixationColumnVisibility,
 } from '../columnVisibility'
@@ -26,6 +26,7 @@ const STATUS_OPTIONS: StatusOption[] = FIXATION_STATUS_ORDER.map((status) => ({
 
 type FixationsTableToolsProps = {
     columnVisibility: FixationColumnVisibility
+    columnOptionsAuthority?: string[]
     statusFilter?: FixationStatus
     onSearchChange: (value: string) => void
     onStatusFilterChange: (status?: FixationStatus) => void
@@ -37,12 +38,15 @@ type FixationsTableToolsProps = {
 
 const FixationsTableTools = ({
     columnVisibility,
+    columnOptionsAuthority = [],
     statusFilter,
     onSearchChange,
     onStatusFilterChange,
     onColumnVisibilityChange,
 }: FixationsTableToolsProps) => {
-    const visibleCount = FIXATION_COLUMN_OPTIONS.filter(
+    const columnOptions =
+        getFixationColumnOptionsForAuthority(columnOptionsAuthority)
+    const visibleCount = columnOptions.filter(
         (column) => columnVisibility[column.id],
     ).length
 
@@ -89,7 +93,7 @@ const FixationsTableTools = ({
                         Отображаемые столбцы
                     </div>
                 </Dropdown.Item>
-                {FIXATION_COLUMN_OPTIONS.map((column) => {
+                {columnOptions.map((column) => {
                     const checked = columnVisibility[column.id]
                     const disableUncheck = checked && visibleCount <= 1
 

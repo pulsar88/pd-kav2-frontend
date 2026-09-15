@@ -154,6 +154,7 @@ export type AgencyBrief = {
     id: number
     fix_days: number
     name: string
+    is_aggregator?: number
 }
 
 export type CurrentUserResponse = {

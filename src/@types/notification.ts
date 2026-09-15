@@ -85,7 +85,10 @@ export type NotificationDictionaries = {
 
 export type GetUserLogsParams = {
     page?: number
+    per_page?: number
     is_unread?: boolean
+    /** Если true — бэкенд отметит непрочитанные из выборки как прочитанные */
+    set_read?: boolean
     types?: number[]
     notificationTypes?: NotificationTypeDictionaryItem[]
 }
