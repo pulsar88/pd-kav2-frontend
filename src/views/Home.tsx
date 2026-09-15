@@ -32,7 +32,7 @@ import {
     FIXATION_STATUS_COLORS,
     FIXATION_STATUS_ORDER,
 } from '@/views/fixations/dashboard.constants'
-import { defaultFixationsDashboardMonth } from '@/views/fixations/FixationsDashboardMockData'
+import { defaultFixationsDashboardMonth } from '@/views/fixations/fixationsDashboardMockData'
 import {
     fixationStatusMap,
 } from '@/views/fixations/utils'
