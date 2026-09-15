@@ -2,6 +2,7 @@ import Container from '@/components/shared/Container'
 import ProfileForm from './components/ProfileForm'
 import ChangePassword from './components/ChangePassword'
 import NotificationPreferences from './components/NotificationPreferences'
+import PwaInstallCard from './components/PwaInstallCard'
 import PrimaryColor from './components/PrimaryColor'
 
 const Profile = () => {
@@ -18,6 +19,7 @@ const Profile = () => {
                 <ProfileForm />
                 <ChangePassword />
                 <NotificationPreferences />
+                <PwaInstallCard />
                 <PrimaryColor />
             </div>
         </Container>
