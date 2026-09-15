@@ -32,6 +32,7 @@ export async function apiGetAgencies(
             page,
             per_page: perPage,
             ...(search ? { search } : {}),
+            ...(params.with ? { with: params.with } : {}),
         },
     })
 
@@ -56,6 +57,27 @@ export async function apiGetAgencies(
     }
 
     return { data, meta }
+}
+
+export async function apiGetAgency(
+    agencyId: string | number,
+    params: Pick<GetAgenciesParams, 'with'> = {},
+): Promise<AgencyItem | null> {
+    const response = await ApiService.fetchDataWithAxios<
+        AgencyItem | { data?: AgencyItem | null }
+    >({
+        url: endpointConfig.agency(agencyId),
+        method: 'get',
+        params: {
+            ...(params.with ? { with: params.with } : {}),
+        },
+    })
+
+    if (response && typeof response === 'object' && 'data' in response) {
+        return response.data ?? null
+    }
+
+    return (response as AgencyItem) ?? null
 }
 
 /**

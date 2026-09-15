@@ -4,7 +4,10 @@ import DatePickerRange from './DatePickerRange'
 import DateTimepicker from './DateTimepicker'
 
 export type { DatePickerProps } from './DatePicker'
-export type { DatePickerRangeProps } from './DatePickerRange'
+export type {
+    DatePickerRangeProps,
+    DatePickerRangeValue,
+} from './DatePickerRange'
 export type { DateTimepickerProps } from './DateTimepicker'
 
 type CompoundedComponent = ForwardRefExoticComponent<

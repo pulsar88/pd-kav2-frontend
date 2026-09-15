@@ -18,6 +18,7 @@ import ToolButtonAlignRight from '@/components/shared/RichTextEditor/toolButtons
 import ToolButtonImage from '@/components/shared/RichTextEditor/toolButtons/ToolButtonImage'
 import ToolButtonDeleteImage from '@/components/shared/RichTextEditor/toolButtons/ToolButtonDeleteImage'
 import ToolButtonTable from '@/components/shared/RichTextEditor/toolButtons/ToolButtonTable'
+import ToolButtonLink from '@/components/shared/RichTextEditor/toolButtons/ToolButtonLink'
 import FontSize from '@/components/shared/RichTextEditor/extensions/FontSize'
 import BlockSpacing from '@/components/shared/RichTextEditor/extensions/BlockSpacing'
 import CustomImage from '@/components/shared/RichTextEditor/extensions/Image'
@@ -33,11 +34,13 @@ import StarterKit from '@tiptap/starter-kit'
 import TextAlign from '@tiptap/extension-text-align'
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
+import Link from '@tiptap/extension-link'
 import Spinner from '@/components/ui/Spinner'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { apiUploadNewsMedia } from '@/services/HelpCenterService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import classNames from '@/utils/classNames'
 
 type EditArticleBodyProps = {
     content?: string
@@ -54,9 +57,9 @@ const imageEditorClass =
     '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:cursor-pointer [&_img]:transition-all [&_img:hover]:ring-2 [&_img:hover]:ring-primary/40 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary [&_img.ProseMirror-selectednode]:ring-offset-2 dark:[&_img.ProseMirror-selectednode]:ring-offset-gray-900 [&_img.ProseMirror-selectednode]:shadow-lg'
 
 const getEditorTypographyClass = (fillHeight?: boolean) =>
-    `m-2 focus:outline-hidden ${
+    `m-2 focus:outline-hidden article-editor-show-blocks ${
         fillHeight
-            ? 'min-h-full h-full cursor-text outline-none'
+            ? 'cursor-text outline-none'
             : proseMirrorSurfaceClass
     } ${headingColorClass} ${imageEditorClass} ${richTextTableClass}`
 
@@ -154,6 +157,16 @@ const EditArticleBody = ({
             BlockSpacing,
             TextAlign.configure({
                 types: ['heading', 'paragraph', 'listItem', 'image'],
+            }),
+            Link.configure({
+                openOnClick: false,
+                autolink: true,
+                linkOnPaste: true,
+                HTMLAttributes: {
+                    class: 'text-primary underline underline-offset-2',
+                    rel: 'noopener noreferrer nofollow',
+                    target: '_blank',
+                },
             }),
             CustomImage.configure({
                 allowBase64: true,
@@ -253,11 +266,10 @@ const EditArticleBody = ({
 
     return (
         <div
-            className={
-                fillHeight
-                    ? 'flex flex-1 flex-col rounded-xl border border-gray-200 dark:border-gray-700'
-                    : 'rounded-xl border border-gray-200 dark:border-gray-700'
-            }
+            className={classNames(
+                'rounded-xl border border-gray-200 dark:border-gray-700',
+                fillHeight && 'flex min-h-0 flex-1 flex-col overflow-hidden',
+            )}
             onDragOver={(event) => {
                 if (event.dataTransfer?.types?.includes('Files')) {
                     event.preventDefault()
@@ -281,11 +293,12 @@ const EditArticleBody = ({
                 }
             }}
         >
-            <div className="flex shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-gray-200 p-2 dark:border-gray-700">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
                 <ToolButtonBold editor={editor} />
                 <ToolButtonItalic editor={editor} />
                 <ToolButtonStrike editor={editor} />
                 <ToolButtonCode editor={editor} />
+                <ToolButtonLink editor={editor} />
                 <ToolButtonTextColor editor={editor} />
                 <ToolButtonBlockquote editor={editor} />
                 <ToolButtonHeading editor={editor} />
@@ -320,7 +333,11 @@ const EditArticleBody = ({
                 ) : null}
             </div>
             <div
-                className={fillHeight ? 'flex-1 px-2' : 'overflow-auto px-2'}
+                className={
+                    fillHeight
+                        ? 'min-h-0 flex-1 overflow-y-auto px-2'
+                        : 'overflow-auto px-2'
+                }
                 onMouseDown={(event) => {
                     if (event.button !== 0) return
                     if (!shouldManualFocusRichTextEditor(editor, event.target)) {
@@ -334,7 +351,7 @@ const EditArticleBody = ({
                 <EditorContent
                     className={
                         fillHeight
-                            ? `${editorContentClass} h-full [&_.ProseMirror]:min-h-full`
+                            ? `${editorContentClass} [&_.ProseMirror]:min-h-[240px]`
                             : `${editorContentClass} [&_.ProseMirror]:min-h-[320px]`
                     }
                     editor={editor}

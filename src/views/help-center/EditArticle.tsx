@@ -3,6 +3,8 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import Loading from '@/components/shared/Loading'
 import Card from '@/components/ui/Card'
+import Dialog from '@/components/ui/Dialog'
+import Button from '@/components/ui/Button'
 import EditArticleHeader from './components/EditArticleHeader'
 import EditArticleBody from './components/EditArticleBody'
 import ArticleEditorHints from './components/ArticleEditorHints'
@@ -37,6 +39,9 @@ const EditArticle = () => {
     const [content, setContent] = useState('')
     const [articleCode, setArticleCode] = useState<string>()
     const [isSaving, setIsSaving] = useState(false)
+    const [savingAsDraft, setSavingAsDraft] = useState(false)
+    const [isNotifyDialogOpen, setIsNotifyDialogOpen] = useState(false)
+    const [pendingNotify, setPendingNotify] = useState<boolean | null>(null)
     const [data, setData] = useState<GetSupportHubArticleResponse | null>(null)
     const [isLoading, setIsLoading] = useState(Boolean(resolvedId))
 
@@ -99,16 +104,13 @@ const EditArticle = () => {
         return url
     }
 
-    const handleSave = async () => {
-        // PUT по реальному числовому id из полученной записи
-        if (!data?.id) return
-
+    const validateBeforeSave = () => {
         if (!title.trim()) {
             toast.push(
                 <Notification type="warning">{kind.titleRequired}</Notification>,
                 { placement: 'top-end' },
             )
-            return
+            return false
         }
 
         if (!previewText.trim()) {
@@ -118,10 +120,21 @@ const EditArticle = () => {
                 </Notification>,
                 { placement: 'top-end' },
             )
-            return
+            return false
         }
 
+        return true
+    }
+
+    const handleSave = async (asDraft: boolean, notify: boolean) => {
+        // PUT по реальному числовому id из полученной записи
+        if (!data?.id) return
+        if (!validateBeforeSave()) return
+
+        setIsNotifyDialogOpen(false)
         setIsSaving(true)
+        setSavingAsDraft(asDraft)
+        setPendingNotify(asDraft ? null : notify)
         try {
             // Удаляем с бэкенда картинки, которые были удалены из верстки
             const finalImages = new Set(extractImageSourcesFromHtml(content))
@@ -158,11 +171,14 @@ const EditArticle = () => {
                     content,
                     code: articleCode,
                     type: kind.type,
-                    isDraft: false,
+                    isDraft: asDraft,
+                    notify,
                 },
             })
             toast.push(
-                <Notification type="success">{kind.updateSuccess}</Notification>,
+                <Notification type="success">
+                    {asDraft ? 'Сохранено как черновик' : kind.updateSuccess}
+                </Notification>,
                 { placement: 'top-end' },
             )
             const targetSlug = buildItemSlug(data.id, articleCode)
@@ -176,21 +192,36 @@ const EditArticle = () => {
             )
         } finally {
             setIsSaving(false)
+            setPendingNotify(null)
         }
+    }
+
+    const handleSaveDraft = () => {
+        void handleSave(true, false)
+    }
+
+    const handlePublishClick = () => {
+        if (!data?.id) return
+        if (!validateBeforeSave()) return
+        setIsNotifyDialogOpen(true)
     }
 
     return (
         <div
             className={classNames(
-                'flex h-full min-h-[calc(100dvh-10rem)] flex-col py-6',
+                'flex h-[calc(100dvh-10rem)] flex-col overflow-hidden py-6',
                 PAGE_CONTAINER_GUTTER_X,
             )}
         >
             <Card
-                className="flex min-h-0 w-full flex-1 flex-col"
-                bodyClass="flex min-h-0 flex-1 flex-col gap-4"
+                className="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
+                bodyClass="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
             >
-                <Loading loading={isLoading} className="flex flex-1 flex-col gap-4">
+                <Loading
+                    type="cover"
+                    loading={isLoading}
+                    className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+                >
                     {data ? (
                         <>
                             <div className="shrink-0 space-y-4">
@@ -215,11 +246,52 @@ const EditArticle = () => {
                 </Loading>
             </Card>
             <ArticleFormActions
-                saveLabel="Сохранить"
                 isSaving={isSaving}
+                savingAsDraft={savingAsDraft}
                 onBack={() => navigate(itemPath)}
-                onSave={() => void handleSave()}
+                onSaveDraft={handleSaveDraft}
+                onPublish={handlePublishClick}
             />
+            <Dialog
+                isOpen={isNotifyDialogOpen}
+                width={480}
+                onClose={() => setIsNotifyDialogOpen(false)}
+                onRequestClose={() => setIsNotifyDialogOpen(false)}
+            >
+                <h5 className="mb-2">Уведомить пользователей?</h5>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Отправить уведомление всем пользователям проекта о публикации{' '}
+                    {kind.itemNameGenitive}?
+                </p>
+                <p className="mt-3 text-sm font-medium text-amber-700 dark:text-amber-300">
+                    Пользователей может быть много — уведомление получат все.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                        variant="plain"
+                        disabled={isSaving}
+                        onClick={() => setIsNotifyDialogOpen(false)}
+                    >
+                        Отмена
+                    </Button>
+                    <Button
+                        variant="default"
+                        disabled={isSaving}
+                        loading={isSaving && pendingNotify === false}
+                        onClick={() => void handleSave(false, false)}
+                    >
+                        Без уведомления
+                    </Button>
+                    <Button
+                        variant="solid"
+                        disabled={isSaving}
+                        loading={isSaving && pendingNotify === true}
+                        onClick={() => void handleSave(false, true)}
+                    >
+                        Уведомить всех
+                    </Button>
+                </div>
+            </Dialog>
         </div>
     )
 }

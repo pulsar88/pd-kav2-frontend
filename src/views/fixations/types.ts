@@ -88,6 +88,9 @@ export type Fixation = {
     meetingDate?: string
     relatives?: FixationRelative[]
     agent: FixationAgent
+    /** Агент агрегатора, на кого оформлена фиксация */
+    targetAgentName?: string
+    targetAgentPhone?: string
     crm: FixationCrm
     history: FixationHistoryItem[]
     has_extend_request?: boolean

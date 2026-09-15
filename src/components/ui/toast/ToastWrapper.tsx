@@ -14,7 +14,7 @@ import { getPlacementTransition } from './transition'
 import { PLACEMENT } from '../utils/constants'
 import { createRoot } from 'react-dom/client'
 import { NotificationPlacement } from '../@types/placement'
-import type { DetailedReactHTMLElement, ReactNode, Ref } from 'react'
+import type { DetailedReactHTMLElement, CSSProperties, ReactNode, Ref } from 'react'
 
 type NodeProps = DetailedReactHTMLElement<any, HTMLDivElement>
 
@@ -160,7 +160,7 @@ const ToastWrapper = (props: ToastWrapperProps) => {
 
     return (
         <div
-            style={placementTransition.default}
+            style={placementTransition.default as CSSProperties}
             {...rest}
             ref={(thisRef) => {
                 rootRef.current = thisRef

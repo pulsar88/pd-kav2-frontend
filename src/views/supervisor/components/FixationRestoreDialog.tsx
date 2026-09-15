@@ -5,7 +5,7 @@ import Input from '@/components/ui/Input'
 import Select from '@/components/ui/Select'
 import { Form, FormItem } from '@/components/ui/Form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, type Resolver } from 'react-hook-form'
 import { z } from 'zod'
 import type { Fixation } from '@/views/fixations/types'
 import { getFixationStatusDisplay } from '@/views/fixations/utils'
@@ -70,7 +70,7 @@ const FixationRestoreDialog = ({
         formState: { errors, isValid },
     } = useForm<RestoreFormSchema>({
         defaultValues,
-        resolver: zodResolver(restoreSchema),
+        resolver: zodResolver(restoreSchema) as Resolver<RestoreFormSchema>,
         mode: 'onChange',
     })
 

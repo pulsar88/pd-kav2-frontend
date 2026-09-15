@@ -61,6 +61,14 @@ export const mapCreateFixationPayloadToApiBody = (
         body.client_id = payload.clientId
     }
 
+    if (payload.agentName?.trim()) {
+        body.agent_name = payload.agentName.trim()
+    }
+
+    if (payload.agentPhone?.trim()) {
+        body.agent_phone = serializeRuPhoneForApi(payload.agentPhone)
+    }
+
     // TODO(api): раскомментировать, когда POST /v2/fixations начнёт принимать поля
     // if (payload.propertyId != null) {
     //     body.property_id = payload.propertyId

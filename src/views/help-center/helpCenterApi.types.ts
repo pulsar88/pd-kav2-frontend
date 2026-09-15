@@ -47,6 +47,7 @@ export type UpdateNewsApiBody = {
     content: string
     type: string
     is_draft?: boolean | number
+    notify?: boolean
 }
 
 export type NewsMediaApiResponse = {

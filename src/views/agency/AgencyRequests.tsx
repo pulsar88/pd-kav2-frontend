@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Container from '@/components/shared/Container'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -7,6 +7,7 @@ import Table from '@/components/ui/Table'
 import Tag from '@/components/ui/Tag'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
+import Select from '@/components/ui/Select'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import {
@@ -14,20 +15,21 @@ import {
     apiApproveAgencyRequest,
     apiRejectAgencyRequest,
 } from '@/services/AgencyService'
-import type { JoinAgencyRequest } from '@/@types/agency'
+import type { AgencyRequestStatus, JoinAgencyRequest } from '@/@types/agency'
 import { formatRuPhone } from '@/views/fixations/utils'
 import {
+    TbBuilding,
     TbCheck,
     TbX,
     TbUser,
     TbClock,
     TbUsers,
     TbRefresh,
+    TbPhone,
 } from 'react-icons/tb'
 
 const { Tr, Th, Td, THead, TBody } = Table
 
-// Бейджи статусов
 const statusConfig: Record<
     string,
     { label: string; bgClass: string; textClass: string }
@@ -54,7 +56,18 @@ const statusConfig: Record<
     },
 }
 
-// Форматирование даты в формат "HH:mm DD.MM.YYYY" (например, "09:50 24.08.2026")
+type StatusOption = {
+    value: AgencyRequestStatus
+    label: string
+}
+
+const STATUS_FILTER_OPTIONS: StatusOption[] = [
+    { value: 'pending', label: statusConfig.pending.label },
+    { value: 'approved', label: statusConfig.approved.label },
+    { value: 'rejected', label: statusConfig.rejected.label },
+    { value: 'cancelled', label: statusConfig.cancelled.label },
+]
+
 const formatDate = (dateStr?: string) => {
     if (!dateStr) return '—'
     const d = new Date(dateStr)
@@ -69,8 +82,14 @@ const formatDate = (dateStr?: string) => {
     return `${hh}:${mm} ${day}.${month}.${yyyy}`
 }
 
+const resolveSupervisor = (item: JoinAgencyRequest) =>
+    item.supervisor || item.agency?.supervisor || null
+
 const AgencyRequests = () => {
     const [requests, setRequests] = useState<JoinAgencyRequest[]>([])
+    const [statusFilter, setStatusFilter] = useState<
+        AgencyRequestStatus | undefined
+    >(undefined)
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [selectedRequest, setSelectedRequest] =
@@ -83,7 +102,8 @@ const AgencyRequests = () => {
         setIsLoading(true)
         try {
             const response = await apiGetAgencyRequests({
-                with: 'agent,agent.profilePicture',
+                with: 'agent,agent.profilePicture,agency,agency.supervisor',
+                ...(statusFilter ? { status: statusFilter } : {}),
             })
             setRequests(response.data || [])
         } catch (err: unknown) {
@@ -97,13 +117,19 @@ const AgencyRequests = () => {
         } finally {
             setIsLoading(false)
         }
-    }, [])
+    }, [statusFilter])
 
     useEffect(() => {
         void loadRequests()
     }, [loadRequests])
 
-    // Подтверждение одобрения / отклонения
+    const selectedStatus = useMemo(
+        () =>
+            STATUS_FILTER_OPTIONS.find((item) => item.value === statusFilter) ??
+            null,
+        [statusFilter],
+    )
+
     const handleConfirmAction = async () => {
         if (!selectedRequest || !dialogType) return
 
@@ -141,193 +167,236 @@ const AgencyRequests = () => {
 
     return (
         <Container>
-            {/* Заголовок страницы */}
-            <div className="mb-6">
-                <h3 className="mb-1">Заявки в агентство</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Список заявок агентов на присоединение к агентству
-                </p>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                    <h3 className="mb-1">Заявки в агентство</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Список заявок агентов на присоединение к агентству
+                    </p>
+                </div>
+                <div className="w-full sm:w-56">
+                    <Select<StatusOption, false>
+                        isClearable
+                        isSearchable={false}
+                        placeholder="Все статусы"
+                        options={STATUS_FILTER_OPTIONS}
+                        value={selectedStatus}
+                        onChange={(option) =>
+                            setStatusFilter(option?.value)
+                        }
+                    />
+                </div>
             </div>
 
             <AdaptiveCard>
                 <Loading loading={isLoading}>
-                    <Table className="w-full min-w-[850px]">
-                        <THead>
-                            <Tr>
-                                {/* Агент (26%) */}
-                                <Th className="w-[26%]">Агент</Th>
-
-                                {/* Телефон (18%) */}
-                                <Th className="w-[18%]">Телефон</Th>
-
-                                {/* Подана (16%) */}
-                                <Th className="w-[16%]">Подана</Th>
-
-                                {/* Обновлена (16%) */}
-                                <Th className="w-[16%]">Обновлена</Th>
-
-                                {/* Статус (11%) */}
-                                <Th className="w-[11%]">Статус</Th>
-
-                                {/* Действия (13%) */}
-                                <Th className="w-[13%] text-right">Действия</Th>
-                            </Tr>
-                        </THead>
-                        <TBody>
-                            {requests.length > 0 ? (
-                                requests.map((item) => {
-                                    const status = statusConfig[
-                                        item.status
-                                    ] || {
-                                        label: item.status,
-                                        bgClass: 'bg-gray-100 dark:bg-gray-700',
-                                        textClass:
-                                            'text-gray-600 dark:text-gray-300',
-                                    }
-
-                                    const avatarSrc =
-                                        item.agent?.profile_picture?.src
-
-                                    return (
-                                        <Tr key={item.id}>
-                                            {/* Агент (растягивается) */}
-                                            <Td>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar
-                                                        shape="circle"
-                                                        size={40}
-                                                        src={avatarSrc || ''}
-                                                        className="shrink-0 bg-primary/10 text-primary font-semibold border border-gray-100 dark:border-gray-700"
-                                                        icon={<TbUser />}
-                                                    />
-                                                    <div className="min-w-0">
-                                                        <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                                            {item.agent?.name ||
-                                                                '—'}
-                                                        </div>
-                                                        {item.agent?.email && (
-                                                            <div className="text-xs text-gray-400 truncate">
-                                                                {
-                                                                    item.agent
-                                                                        .email
-                                                                }
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </Td>
-
-                                            {/* Телефон */}
-                                            <Td className="whitespace-nowrap">
-                                                <span className="font-medium text-gray-800 dark:text-gray-200">
-                                                    {item.agent?.phone
-                                                        ? formatRuPhone(
-                                                              item.agent.phone,
-                                                          )
-                                                        : '—'}
-                                                </span>
-                                            </Td>
-
-                                            {/* Подана */}
-                                            <Td className="whitespace-nowrap">
-                                                <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                                                    <TbClock className="text-base shrink-0" />
-                                                    <span>
-                                                        {formatDate(
-                                                            item.created_at,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </Td>
-
-                                            {/* Обновлена */}
-                                            <Td className="whitespace-nowrap">
-                                                <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                                    <TbRefresh className="text-base shrink-0 opacity-70" />
-                                                    <span>
-                                                        {formatDate(
-                                                            item.updated_at,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </Td>
-
-                                            {/* Статус */}
-                                            <Td className="whitespace-nowrap">
-                                                <Tag
-                                                    className={`font-semibold border-0 ${status.bgClass} ${status.textClass}`}
-                                                >
-                                                    {status.label}
-                                                </Tag>
-                                            </Td>
-
-                                            {/* Действия */}
-                                            <Td className="text-right whitespace-nowrap">
-                                                {item.status === 'pending' ? (
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="solid"
-                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                            icon={<TbCheck />}
-                                                            onClick={() => {
-                                                                setSelectedRequest(
-                                                                    item,
-                                                                )
-                                                                setDialogType(
-                                                                    'approve',
-                                                                )
-                                                            }}
-                                                        >
-                                                            Принять
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="plain"
-                                                            className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
-                                                            icon={<TbX />}
-                                                            onClick={() => {
-                                                                setSelectedRequest(
-                                                                    item,
-                                                                )
-                                                                setDialogType(
-                                                                    'reject',
-                                                                )
-                                                            }}
-                                                        >
-                                                            Отклонить
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-gray-400">
-                                                        —
-                                                    </span>
-                                                )}
-                                            </Td>
-                                        </Tr>
-                                    )
-                                })
-                            ) : (
+                    <div className="overflow-x-auto">
+                        <Table className="w-full min-w-[1100px]">
+                            <THead>
                                 <Tr>
-                                    <Td
-                                        colSpan={6}
-                                        className="text-center py-12"
-                                    >
-                                        <div className="flex flex-col items-center justify-center text-gray-400">
-                                            <TbUsers className="text-4xl mb-2" />
-                                            <p className="text-sm">
-                                                Заявок пока нет
-                                            </p>
-                                        </div>
-                                    </Td>
+                                    <Th>Агент</Th>
+                                    <Th>Телефон</Th>
+                                    <Th>Агентство</Th>
+                                    <Th>Руководитель</Th>
+                                    <Th>Подана</Th>
+                                    <Th>Обновлена</Th>
+                                    <Th>Статус</Th>
+                                    <Th className="text-right">Действия</Th>
                                 </Tr>
-                            )}
-                        </TBody>
-                    </Table>
+                            </THead>
+                            <TBody>
+                                {requests.length > 0 ? (
+                                    requests.map((item) => {
+                                        const status = statusConfig[
+                                            item.status
+                                        ] || {
+                                            label: item.status,
+                                            bgClass:
+                                                'bg-gray-100 dark:bg-gray-700',
+                                            textClass:
+                                                'text-gray-600 dark:text-gray-300',
+                                        }
+
+                                        const avatarSrc =
+                                            item.agent?.profile_picture?.src
+                                        const supervisor =
+                                            resolveSupervisor(item)
+
+                                        return (
+                                            <Tr key={item.id}>
+                                                <Td>
+                                                    <div className="flex items-center gap-3">
+                                                        <Avatar
+                                                            shape="circle"
+                                                            size={40}
+                                                            src={
+                                                                avatarSrc || ''
+                                                            }
+                                                            className="shrink-0 bg-primary/10 text-primary font-semibold border border-gray-100 dark:border-gray-700"
+                                                            icon={<TbUser />}
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                                {item.agent
+                                                                    ?.name ||
+                                                                    '—'}
+                                                            </div>
+                                                            {item.agent
+                                                                ?.email ? (
+                                                                <div className="text-xs text-gray-400 truncate">
+                                                                    {
+                                                                        item
+                                                                            .agent
+                                                                            .email
+                                                                    }
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                </Td>
+
+                                                <Td className="whitespace-nowrap">
+                                                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                                                        {item.agent?.phone
+                                                            ? formatRuPhone(
+                                                                  item.agent
+                                                                      .phone,
+                                                              )
+                                                            : '—'}
+                                                    </span>
+                                                </Td>
+
+                                                <Td>
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <TbBuilding className="shrink-0 text-gray-400" />
+                                                        <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                            {item.agency
+                                                                ?.name || '—'}
+                                                        </span>
+                                                    </div>
+                                                </Td>
+
+                                                <Td>
+                                                    <div className="min-w-0 whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100">
+                                                            <TbUser className="shrink-0 text-gray-400" />
+                                                            <span>
+                                                                {supervisor?.name ||
+                                                                    '—'}
+                                                            </span>
+                                                        </div>
+                                                        {supervisor?.phone ? (
+                                                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                <TbPhone className="shrink-0 text-gray-400" />
+                                                                <span>
+                                                                    {formatRuPhone(
+                                                                        supervisor.phone,
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                </Td>
+
+                                                <Td className="whitespace-nowrap">
+                                                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                                                        <TbClock className="text-base shrink-0" />
+                                                        <span>
+                                                            {formatDate(
+                                                                item.created_at,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </Td>
+
+                                                <Td className="whitespace-nowrap">
+                                                    <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                                                        <TbRefresh className="text-base shrink-0 opacity-70" />
+                                                        <span>
+                                                            {formatDate(
+                                                                item.updated_at,
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                </Td>
+
+                                                <Td className="whitespace-nowrap">
+                                                    <Tag
+                                                        className={`font-semibold border-0 ${status.bgClass} ${status.textClass}`}
+                                                    >
+                                                        {status.label}
+                                                    </Tag>
+                                                </Td>
+
+                                                <Td className="text-right whitespace-nowrap">
+                                                    {item.status ===
+                                                    'pending' ? (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="solid"
+                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                                icon={
+                                                                    <TbCheck />
+                                                                }
+                                                                onClick={() => {
+                                                                    setSelectedRequest(
+                                                                        item,
+                                                                    )
+                                                                    setDialogType(
+                                                                        'approve',
+                                                                    )
+                                                                }}
+                                                            >
+                                                                Принять
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="plain"
+                                                                className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                                                                icon={<TbX />}
+                                                                onClick={() => {
+                                                                    setSelectedRequest(
+                                                                        item,
+                                                                    )
+                                                                    setDialogType(
+                                                                        'reject',
+                                                                    )
+                                                                }}
+                                                            >
+                                                                Отклонить
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">
+                                                            —
+                                                        </span>
+                                                    )}
+                                                </Td>
+                                            </Tr>
+                                        )
+                                    })
+                                ) : (
+                                    <Tr>
+                                        <Td
+                                            colSpan={8}
+                                            className="text-center py-12"
+                                        >
+                                            <div className="flex flex-col items-center justify-center text-gray-400">
+                                                <TbUsers className="text-4xl mb-2" />
+                                                <p className="text-sm">
+                                                    Заявок пока нет
+                                                </p>
+                                            </div>
+                                        </Td>
+                                    </Tr>
+                                )}
+                            </TBody>
+                        </Table>
+                    </div>
                 </Loading>
             </AdaptiveCard>
 
-            {/* Модальное окно подтверждения */}
             <ConfirmDialog
                 isOpen={Boolean(selectedRequest && dialogType)}
                 type={dialogType === 'approve' ? 'info' : 'danger'}

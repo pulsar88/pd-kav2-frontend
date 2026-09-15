@@ -1,8 +1,20 @@
 import dayjs from 'dayjs'
 import ApiService from './ApiService'
 import endpointConfig from '@/configs/endpoint.config'
-import { getFixationsDashboardStats } from '@/views/fixations/fixationsDashboardMockData'
-import type { FixationsDashboardStats } from '@/views/fixations/dashboard.constants'
+import {
+    createEmptyFixationsStatusCounts,
+    type FixationsDashboardStats,
+    type FixationsStatusCounts,
+} from '@/views/fixations/dashboard.constants'
+import {
+    formatStatsApiDate,
+    getDefaultFixationsStatsDateRange,
+    mapFixationsStatsStatusesToCounts,
+    mapFixationsStatsToTransitionTimeline,
+    mapFixationsStatsToTransitions,
+    parseStatsApiDate,
+    type FixationsStatsStatusApiItem,
+} from '@/views/fixations/fixationStatsMapper'
 import type {
     CreateFixationClientPayload,
     CreateFixationWizardPayload,
@@ -25,7 +37,10 @@ import type {
     FixationCreateClientsApiResponse,
     FixationCreateManagersApiResponse,
 } from '@/views/fixations/fixationCreateApi.types'
-import { mapFixationApiItemToFixation, unwrapFixationApiResponse } from '@/views/fixations/fixationApiMapper'
+import {
+    mapFixationApiItemToFixation,
+    unwrapFixationApiResponse,
+} from '@/views/fixations/fixationApiMapper'
 import {
     buildFixationDetailsParams,
     buildFixationsListParams,
@@ -38,16 +53,14 @@ import type {
 } from '@/views/fixations/fixationApi.types'
 import type { Fixation, GetFixationsResponse } from '@/views/fixations/types'
 import { serializeRuPhoneForApi } from '@/views/fixations/utils'
-import { toAxiosParams } from '@/views/objects/realtyPropertyQuery'
+import {
+    toAxiosParams,
+    type ApiFilterParams,
+} from '@/views/objects/realtyPropertyQuery'
 
 const DEFAULT_CLIENTS_PAGE_SIZE = 20
 const DEFAULT_MANAGERS_PAGE_SIZE = 20
 const DEFAULT_HOUSES_PER_PAGE = 20
-
-const delay = (ms = 200) =>
-    new Promise((resolve) => {
-        setTimeout(resolve, ms)
-    })
 
 const toListMeta = (
     meta:
@@ -71,11 +84,169 @@ const toListMeta = (
     total: meta?.total ?? fallback.total,
 })
 
-export async function apiGetFixationsDashboardStats(
-    month: string,
-): Promise<FixationsDashboardStats> {
-    await delay()
-    return getFixationsDashboardStats(month)
+const toStatsAgentIdParams = (
+    agentId?: number | number[],
+): ApiFilterParams => {
+    if (agentId == null) {
+        return {}
+    }
+
+    const ids = (Array.isArray(agentId) ? agentId : [agentId]).filter(
+        (id) => Number.isFinite(id),
+    )
+
+    if (ids.length === 0) {
+        return {}
+    }
+
+    return { 'agent_id[]': ids }
+}
+
+export async function apiGetFixationsStats(params: {
+    date_from: string
+    date_to: string
+    agent_id?: number | number[]
+}): Promise<FixationGigalogItem[]> {
+    const perPage = 100
+    const maxPages = 50
+    let page = 1
+    let lastPage = 1
+    const items: FixationGigalogItem[] = []
+
+    do {
+        const response = await ApiService.fetchDataWithAxios<
+            FixationGigalogsApiResponse | FixationGigalogItem[]
+        >({
+            url: endpointConfig.fixationsStats,
+            method: 'get',
+            params: toAxiosParams({
+                date_from: params.date_from,
+                date_to: params.date_to,
+                page,
+                per_page: perPage,
+                ...toStatsAgentIdParams(params.agent_id),
+            }),
+        })
+
+        if (Array.isArray(response)) {
+            items.push(...response)
+            break
+        }
+
+        const pageItems = Array.isArray(response?.data) ? response.data : []
+        items.push(...pageItems)
+
+        lastPage = response?.meta?.last_page ?? 1
+        page += 1
+    } while (page <= lastPage && page <= maxPages)
+
+    return items
+}
+
+export async function apiGetFixationsStatsStatuses(params: {
+    date_from: string
+    date_to: string
+    agent_id?: number | number[]
+}): Promise<FixationsStatsStatusApiItem[]> {
+    const response = await ApiService.fetchDataWithAxios<
+        | {
+              data?: FixationsStatsStatusApiItem[]
+          }
+        | FixationsStatsStatusApiItem[]
+    >({
+        url: endpointConfig.fixationsStatsStatuses,
+        method: 'get',
+        params: toAxiosParams({
+            date_from: params.date_from,
+            date_to: params.date_to,
+            ...toStatsAgentIdParams(params.agent_id),
+        }),
+    })
+
+    if (Array.isArray(response)) {
+        return response
+    }
+
+    return Array.isArray(response?.data) ? response.data : []
+}
+
+export async function apiGetFixationsStatusCounts(params: {
+    date_from: string
+    date_to: string
+    agent_id?: number | number[]
+}): Promise<FixationsStatusCounts> {
+    const defaults = getDefaultFixationsStatsDateRange()
+    const fromDate = parseStatsApiDate(params.date_from) ?? defaults[0]
+    const toDate = parseStatsApiDate(params.date_to) ?? defaults[1]
+
+    try {
+        const items = await apiGetFixationsStatsStatuses({
+            date_from: formatStatsApiDate(fromDate),
+            date_to: formatStatsApiDate(toDate),
+            agent_id: params.agent_id,
+        })
+        return mapFixationsStatsStatusesToCounts(items)
+    } catch {
+        return createEmptyFixationsStatusCounts()
+    }
+}
+
+export async function apiGetFixationsTransitionStats(params: {
+    date_from: string
+    date_to: string
+    agent_id?: number | number[]
+}): Promise<
+    Pick<
+        FixationsDashboardStats,
+        'dateFrom' | 'dateTo' | 'transitions' | 'transitionTimeline'
+    >
+> {
+    const defaults = getDefaultFixationsStatsDateRange()
+    const fromDate = parseStatsApiDate(params.date_from) ?? defaults[0]
+    const toDate = parseStatsApiDate(params.date_to) ?? defaults[1]
+    const dateFrom = formatStatsApiDate(fromDate)
+    const dateTo = formatStatsApiDate(toDate)
+
+    try {
+        const events = await apiGetFixationsStats({
+            date_from: dateFrom,
+            date_to: dateTo,
+            agent_id: params.agent_id,
+        })
+        const transitions = mapFixationsStatsToTransitions(events)
+        const { timeline: transitionTimeline } =
+            mapFixationsStatsToTransitionTimeline(events, fromDate, toDate)
+
+        return {
+            dateFrom,
+            dateTo,
+            transitions,
+            transitionTimeline,
+        }
+    } catch {
+        return {
+            dateFrom,
+            dateTo,
+            transitions: [],
+            transitionTimeline: [],
+        }
+    }
+}
+
+export async function apiGetFixationsDashboardStats(params: {
+    date_from: string
+    date_to: string
+    agent_id?: number | number[]
+}): Promise<FixationsDashboardStats> {
+    const [statusCounts, transitions] = await Promise.all([
+        apiGetFixationsStatusCounts(params),
+        apiGetFixationsTransitionStats(params),
+    ])
+
+    return {
+        ...transitions,
+        statusCounts,
+    }
 }
 
 export async function apiGetFixations(
@@ -143,19 +314,17 @@ export async function apiGetFixationManagers(
     const pageSize = Math.max(1, params.page_size ?? DEFAULT_MANAGERS_PAGE_SIZE)
 
     const response =
-        await ApiService.fetchDataWithAxios<FixationCreateManagersApiResponse>(
-            {
-                url: endpointConfig.managers,
-                method: 'get',
-                params: toAxiosParams({
-                    page,
-                    page_size: pageSize,
-                    ...(params.object_id != null
-                        ? { object_id: params.object_id }
-                        : {}),
-                }),
-            },
-        )
+        await ApiService.fetchDataWithAxios<FixationCreateManagersApiResponse>({
+            url: endpointConfig.managers,
+            method: 'get',
+            params: toAxiosParams({
+                page,
+                page_size: pageSize,
+                ...(params.object_id != null
+                    ? { object_id: params.object_id }
+                    : {}),
+            }),
+        })
 
     const list = response.data.map(mapFixationCreateManagerApiToManager)
 
@@ -174,7 +343,10 @@ export type RealtyObjectListItem = {
     name: string
     facing?: string | null
     material?: string | null
-    building_state?: { value?: string; code?: string; name?: string } | string | null
+    building_state?:
+        | { value?: string; code?: string; name?: string }
+        | string
+        | null
     development_start?: string | null
     development_end?: string | null
     address?: string | null
@@ -192,7 +364,9 @@ export async function apiGetFixationHouses(
     const page = Math.max(1, params.page ?? 1)
     const perPage = Math.max(1, params.per_page ?? DEFAULT_HOUSES_PER_PAGE)
 
-    const response = await ApiService.fetchDataWithAxios<RealtyObjectsApiResponse | RealtyObjectListItem[]>({
+    const response = await ApiService.fetchDataWithAxios<
+        RealtyObjectsApiResponse | RealtyObjectListItem[]
+    >({
         url: endpointConfig.realtyObjects,
         method: 'get',
         params: toAxiosParams({
@@ -215,7 +389,8 @@ export async function apiGetFixationHouses(
         managers: [],
     }))
 
-    const meta = !Array.isArray(response) && response?.meta ? response.meta : undefined
+    const meta =
+        !Array.isArray(response) && response?.meta ? response.meta : undefined
 
     return {
         list,
@@ -229,8 +404,8 @@ export async function apiGetFixationHouses(
 
 export async function apiCreateFixation(
     data: CreateFixationWizardPayload,
-): Promise<{data: Fixation}> {
-    const response = await ApiService.fetchDataWithAxios<{data:Fixation}>({
+): Promise<{ data: Fixation }> {
+    const response = await ApiService.fetchDataWithAxios<{ data: Fixation }>({
         url: endpointConfig.fixations,
         method: 'post',
         data: mapCreateFixationPayloadToApiBody(data),
@@ -253,12 +428,11 @@ export async function apiSetRelatedClientsForFixation({
 }: {
     fixationId: string
     clients: { client_id: number; relation: number }[]
-}
-): Promise<void> {
+}): Promise<void> {
     await ApiService.fetchDataWithAxios({
         url: endpointConfig.fixationRelatedClients(fixationId),
         method: 'post',
-        data: {clients: clients},
+        data: { clients: clients },
     })
 }
 
@@ -460,12 +634,18 @@ export async function apiGetFixationExtendRequests(params?: {
 
     // Сортировка: новые запросы сверху, если нет серверной сортировки
     const sortedList = [...rawList].sort((a, b) => {
-        const timeA = (a.created_at || a.fixation?.created_at)
-            ? new Date(a.created_at || a.fixation?.created_at || 0).getTime()
-            : 0
-        const timeB = (b.created_at || b.fixation?.created_at)
-            ? new Date(b.created_at || b.fixation?.created_at || 0).getTime()
-            : 0
+        const timeA =
+            a.created_at || a.fixation?.created_at
+                ? new Date(
+                      a.created_at || a.fixation?.created_at || 0,
+                  ).getTime()
+                : 0
+        const timeB =
+            b.created_at || b.fixation?.created_at
+                ? new Date(
+                      b.created_at || b.fixation?.created_at || 0,
+                  ).getTime()
+                : 0
         return timeB - timeA
     })
 
@@ -614,14 +794,15 @@ export async function apiGetFixationGigalogs(
     const page = params.page ?? 1
     const perPage = params.per_page ?? 20
 
-    const response = await ApiService.fetchDataWithAxios<FixationGigalogsApiResponse>({
-        url: endpointConfig.fixationGigalogs(fixationId),
-        method: 'get',
-        params: {
-            page,
-            per_page: perPage,
-        },
-    })
+    const response =
+        await ApiService.fetchDataWithAxios<FixationGigalogsApiResponse>({
+            url: endpointConfig.fixationGigalogs(fixationId),
+            method: 'get',
+            params: {
+                page,
+                per_page: perPage,
+            },
+        })
 
     return response
 }

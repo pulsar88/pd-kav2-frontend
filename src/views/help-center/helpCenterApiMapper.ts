@@ -109,6 +109,7 @@ export const mapUpdateArticlePayloadToApiBody = (
         content: serializeArticleContentForApi(payload.content),
         type: String(payload.type),
         is_draft: payload.isDraft !== undefined ? payload.isDraft : false,
+        notify: payload.notify !== undefined ? payload.notify : false,
     }
 }
 

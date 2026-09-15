@@ -160,14 +160,17 @@ const CustomImage = Node.create<ImageOptions>({
             .replace(/\s+/g, ' ')
             .trim()
 
-        const finalAttributes = {
+        const finalAttributes: Record<string, unknown> = {
             ...HTMLAttributes,
             class: classes,
         }
 
         if (align) {
             const extraStyle = getAlignmentStyle(align)
-            const existingStyle = (HTMLAttributes.style as string) || ''
+            const existingStyle =
+                typeof HTMLAttributes.style === 'string'
+                    ? HTMLAttributes.style
+                    : ''
             finalAttributes.style = existingStyle
                 ? `${existingStyle.replace(/;\s*$/, '')}; ${extraStyle}`
                 : extraStyle

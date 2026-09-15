@@ -9,11 +9,11 @@ import { resolveEchoConnectionOptions } from './resolveEchoOptions'
 declare global {
     interface Window {
         Pusher: typeof Pusher
-        Echo?: Echo
+        Echo?: Echo<'pusher'>
     }
 }
 
-let echoInstance: Echo | null = null
+let echoInstance: Echo<'pusher'> | null = null
 
 const readAccessToken = () => {
     const storage = appConfig.accessTokenPersistStrategy

@@ -1,3 +1,9 @@
+import {
+    AGENCY_SUPERVISOR,
+    ADMIN,
+    SUPERVISOR,
+} from '@/constants/roles.constant'
+
 export const FIXATIONS_COLUMNS_STORAGE_KEY =
     'agent-cabinet:fixations-column-visibility'
 
@@ -5,6 +11,8 @@ export type FixationColumnId =
     | 'fullName'
     | 'phone'
     | 'projectName'
+    | 'agent'
+    | 'agency'
     | 'status'
     | 'createdAt'
     | 'expiresAt'
@@ -18,6 +26,8 @@ export const FIXATION_COLUMN_OPTIONS: Array<{
     { id: 'fullName', label: 'ФИО' },
     { id: 'phone', label: 'Номер' },
     { id: 'projectName', label: 'ЖК' },
+    { id: 'agent', label: 'Агент' },
+    { id: 'agency', label: 'Агентство' },
     { id: 'status', label: 'Статус' },
     { id: 'createdAt', label: 'Дата создания' },
     { id: 'expiresAt', label: 'Дата истечения' },
@@ -27,9 +37,35 @@ export const DEFAULT_FIXATION_COLUMN_VISIBILITY: FixationColumnVisibility = {
     fullName: true,
     phone: true,
     projectName: true,
+    agent: true,
+    agency: true,
     status: true,
     createdAt: true,
     expiresAt: true,
+}
+
+export const getFixationColumnsScope = (authority: string[] = []) => {
+    const isPlatformSupervisor =
+        authority.includes(SUPERVISOR) || authority.includes(ADMIN)
+    const isAgencySupervisor =
+        authority.includes(AGENCY_SUPERVISOR) && !isPlatformSupervisor
+
+    return {
+        canSeeAgent: isPlatformSupervisor || isAgencySupervisor,
+        canSeeAgency: isPlatformSupervisor,
+    }
+}
+
+export const getFixationColumnOptionsForAuthority = (
+    authority: string[] = [],
+) => {
+    const { canSeeAgent, canSeeAgency } = getFixationColumnsScope(authority)
+
+    return FIXATION_COLUMN_OPTIONS.filter((column) => {
+        if (column.id === 'agent') return canSeeAgent
+        if (column.id === 'agency') return canSeeAgency
+        return true
+    })
 }
 
 export const loadFixationColumnVisibility = (): FixationColumnVisibility => {

@@ -80,6 +80,8 @@ export type CreateFixationPayload = {
     managerId?: number
     clientId?: number
     client?: FixationClient
+    agentName?: string
+    agentPhone?: string
 }
 
 /**

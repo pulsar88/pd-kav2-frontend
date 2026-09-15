@@ -31,6 +31,8 @@ const endpointConfig = {
     realtyObjectChess: (complexId: string | number) =>
         `/v2/realty_objects/${complexId}/chess`,
     fixations: '/v2/fixations',
+    fixationsStats: '/v2/fixations/stats',
+    fixationsStatsStatuses: '/v2/fixations/stats/statuses',
     fixation: (fixationId: string | number) => `/v2/fixations/${fixationId}`,
     fixationRelatedClients: (fixationId: string | number) =>
         `/v2/fixations/${fixationId}/related_clients`,
@@ -64,9 +66,9 @@ const endpointConfig = {
     newsEvents: '/v2/news/events',
     newsItem: (newsId: string | number) => `/v2/news/${newsId}`,
     specialOffers: '/v2/special_offers',
-    specialOffer: (offerId: string | number) =>
-        `/v2/special_offers/${offerId}`,
+    specialOffer: (offerId: string | number) => `/v2/special_offers/${offerId}`,
     agencies: '/v2/agencies',
+    agency: (agencyId: string | number) => `/v2/agencies/${agencyId}`,
     agencyRequests: '/v2/user/agency/requests',
     agencyRequest: (requestId: string | number) =>
         `/v2/user/agency/requests/${requestId}`,

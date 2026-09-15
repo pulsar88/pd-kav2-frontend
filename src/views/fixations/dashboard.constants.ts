@@ -10,6 +10,7 @@ export const FIXATION_STATUS_ORDER: FixationStatus[] = [
     'failed',
     'denied',
     'deleted',
+    'expired',
 ]
 
 export const FIXATION_STATUS_COLORS: Record<FixationStatus, string> = {
@@ -27,66 +28,37 @@ export const FIXATION_STATUS_COLORS: Record<FixationStatus, string> = {
 
 export type FixationsStatusCounts = Record<FixationStatus, number>
 
-export type FixationsTimelinePoint = {
-    date: string
-    counts: FixationsStatusCounts
+export type FixationsStatusTransition = {
+    from: string
+    to: string
+    fromLabel: string
+    toLabel: string
+    count: number
 }
 
-export type FixationsDashboardMonth = {
-    value: string
-    label: string
+export type FixationsTransitionTimelinePoint = {
+    date: string
+    counts: Record<string, number>
 }
 
 export type FixationsDashboardStats = {
-    month: string
+    dateFrom: string
+    dateTo: string
     statusCounts: FixationsStatusCounts
-    timeline: FixationsTimelinePoint[]
-    availableMonths: FixationsDashboardMonth[]
+    transitions: FixationsStatusTransition[]
+    transitionTimeline: FixationsTransitionTimelinePoint[]
 }
-
-const MONTH_LABELS = [
-    'Январь',
-    'Февраль',
-    'Март',
-    'Апрель',
-    'Май',
-    'Июнь',
-    'Июль',
-    'Август',
-    'Сентябрь',
-    'Октябрь',
-    'Ноябрь',
-    'Декабрь',
-]
-
-export const formatFixationsDashboardMonthLabel = (value: string) => {
-    const [year, month] = value.split('-').map(Number)
-    return `${MONTH_LABELS[month - 1]} ${year}`
-}
-
-export const getCurrentFixationsDashboardMonth = () => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-export const defaultFixationsDashboardMonth =
-    getCurrentFixationsDashboardMonth()
 
 export const createEmptyFixationsStatusCounts = (): FixationsStatusCounts =>
     Object.fromEntries(
         FIXATION_STATUS_ORDER.map((status) => [status, 0]),
     ) as FixationsStatusCounts
 
-export const createEmptyFixationsDashboardStats = (
-    month: string = defaultFixationsDashboardMonth,
-): FixationsDashboardStats => ({
-    month,
-    statusCounts: createEmptyFixationsStatusCounts(),
-    timeline: [],
-    availableMonths: [
-        {
-            value: month,
-            label: formatFixationsDashboardMonthLabel(month),
-        },
-    ],
-})
+export const createEmptyFixationsDashboardStats =
+    (): FixationsDashboardStats => ({
+        dateFrom: '',
+        dateTo: '',
+        statusCounts: createEmptyFixationsStatusCounts(),
+        transitions: [],
+        transitionTimeline: [],
+    })

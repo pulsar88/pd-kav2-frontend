@@ -16,7 +16,8 @@ import Chart from '@/components/shared/Chart'
 import Container from '@/components/shared/Container'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
-import Select from '@/components/ui/Select'
+import DatePicker from '@/components/ui/DatePicker'
+import type { DatePickerRangeValue } from '@/components/ui/DatePicker'
 import Spinner from '@/components/ui/Spinner'
 import Tooltip from '@/components/ui/Tooltip'
 import classNames from '@/utils/classNames'
@@ -27,15 +28,20 @@ import {
     apiGetNotificationDictionaries,
     apiGetUserLogs,
 } from '@/services/NotificationService'
-import { apiGetFixationsDashboardStats } from '@/services/FixationsService'
+import {
+    apiGetFixationsStatusCounts,
+    apiGetFixationsTransitionStats,
+} from '@/services/FixationsService'
 import {
     FIXATION_STATUS_COLORS,
     FIXATION_STATUS_ORDER,
+    createEmptyFixationsStatusCounts,
 } from '@/views/fixations/dashboard.constants'
-import { defaultFixationsDashboardMonth } from '@/views/fixations/fixationsDashboardMockData'
 import {
-    fixationStatusMap,
-} from '@/views/fixations/utils'
+    formatStatsApiDate,
+    getDefaultFixationsStatsDateRange,
+} from '@/views/fixations/fixationStatsMapper'
+import { fixationStatusMap } from '@/views/fixations/utils'
 import type { FixationStatus } from '@/views/fixations/types'
 import {
     formatUserLogTime,
@@ -45,6 +51,9 @@ import {
 import { getUserLogTypeName } from '@/utils/notificationDictionary'
 import UserLogAvatar from '@/views/notifications/components/UserLogAvatar'
 import type { UserLog } from '@/@types/notification'
+import DashboardAnalyticsFilters, {
+    getDashboardAnalyticsScope,
+} from '@/views/Home/DashboardAnalyticsFilters'
 
 const Home = () => {
     const navigate = useNavigate()
@@ -52,17 +61,118 @@ const Home = () => {
     const user = useSessionUser((state) => state.user)
     const profile = useMemo(() => mapUserToProfileForm(user), [user])
     const isDesktop = Boolean(larger.lg)
-
-    const [selectedMonth, setSelectedMonth] = useState(
-        defaultFixationsDashboardMonth,
+    const analyticsScope = useMemo(
+        () => getDashboardAnalyticsScope(user.authority ?? []),
+        [user.authority],
     )
+
+    const [statusesDateRange, setStatusesDateRange] =
+        useState<DatePickerRangeValue>(() =>
+            getDefaultFixationsStatsDateRange(),
+        )
+    const [transitionsDateRange, setTransitionsDateRange] =
+        useState<DatePickerRangeValue>(() =>
+            getDefaultFixationsStatsDateRange(),
+        )
+    const [selectedAgencyId, setSelectedAgencyId] = useState<number | null>(
+        () =>
+            analyticsScope.isAgencySupervisor
+                ? (user.agency?.id ?? null)
+                : null,
+    )
+    const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null)
     const [notifications, setNotifications] = useState<UserLog[]>([])
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(true)
 
-    const { data, isLoading } = useSWR(
-        ['fixations-dashboard', selectedMonth],
-        () => apiGetFixationsDashboardStats(selectedMonth),
+    useEffect(() => {
+        if (
+            analyticsScope.isAgencySupervisor &&
+            user.agency?.id &&
+            selectedAgencyId == null
+        ) {
+            setSelectedAgencyId(user.agency.id)
+        }
+    }, [analyticsScope.isAgencySupervisor, selectedAgencyId, user.agency?.id])
+
+    const agentIdParam = useMemo(() => {
+        if (!analyticsScope.canSelectAgent) return undefined
+        return selectedAgentId ?? undefined
+    }, [analyticsScope.canSelectAgent, selectedAgentId])
+
+    const canLoadAnalytics =
+        !analyticsScope.canSelectAgent || selectedAgentId != null
+
+    const statusesRange = useMemo(() => {
+        if (!canLoadAnalytics) return null
+        const [from, to] = statusesDateRange
+        if (!(from instanceof Date) || !(to instanceof Date)) return null
+        return {
+            date_from: formatStatsApiDate(from),
+            date_to: formatStatsApiDate(to),
+            agent_id: agentIdParam,
+        }
+    }, [agentIdParam, canLoadAnalytics, statusesDateRange])
+
+    const transitionsRange = useMemo(() => {
+        if (!canLoadAnalytics) return null
+        const [from, to] = transitionsDateRange
+        if (!(from instanceof Date) || !(to instanceof Date)) return null
+        return {
+            date_from: formatStatsApiDate(from),
+            date_to: formatStatsApiDate(to),
+            agent_id: agentIdParam,
+        }
+    }, [agentIdParam, canLoadAnalytics, transitionsDateRange])
+
+    const {
+        data: statusCounts,
+        isLoading: isStatusesLoading,
+        isValidating: isStatusesValidating,
+    } = useSWR(
+        statusesRange
+            ? [
+                  'fixations-status-counts',
+                  statusesRange.date_from,
+                  statusesRange.date_to,
+                  statusesRange.agent_id ?? null,
+              ]
+            : null,
+        () => apiGetFixationsStatusCounts(statusesRange!),
+        {
+            keepPreviousData: true,
+        },
     )
+
+    const {
+        data: transitionsData,
+        isLoading: isTransitionsLoading,
+        isValidating: isTransitionsValidating,
+    } = useSWR(
+        transitionsRange
+            ? [
+                  'fixations-transitions',
+                  transitionsRange.date_from,
+                  transitionsRange.date_to,
+                  transitionsRange.agent_id ?? null,
+              ]
+            : null,
+        () => apiGetFixationsTransitionStats(transitionsRange!),
+        {
+            keepPreviousData: true,
+        },
+    )
+
+    const handleDateRangeChange =
+        (setter: (value: DatePickerRangeValue) => void) =>
+        (value: DatePickerRangeValue) => {
+            if (value?.[0] instanceof Date && value?.[1] instanceof Date) {
+                setter(value)
+                return
+            }
+            if (!value?.[0] && !value?.[1]) {
+                setter(getDefaultFixationsStatsDateRange())
+            }
+        }
 
     useEffect(() => {
         let cancelled = false
@@ -72,12 +182,14 @@ const Home = () => {
             .then((dictionaries) =>
                 apiGetUserLogs({
                     page: 1,
+                    per_page: 3,
+                    set_read: false,
                     notificationTypes: dictionaries.notification_types,
                 }),
             )
             .then((response) => {
                 if (!cancelled) {
-                    setNotifications(response.data.slice(0, 3))
+                    setNotifications(response.data)
                 }
             })
             .catch(() => {
@@ -92,31 +204,16 @@ const Home = () => {
         }
     }, [])
 
-    const monthOptions = useMemo(
-        () =>
-            (data?.availableMonths ?? []).map((item) => ({
-                value: item.value,
-                label: item.label,
-            })),
-        [data?.availableMonths],
-    )
-
-    const selectedMonthOption = useMemo(
-        () =>
-            monthOptions.find((item) => item.value === selectedMonth) ?? null,
-        [monthOptions, selectedMonth],
-    )
-
     const statusSummary = useMemo(() => {
-        if (!data) return []
+        const counts = statusCounts ?? createEmptyFixationsStatusCounts()
 
         return FIXATION_STATUS_ORDER.map((status: FixationStatus) => ({
             status,
             label: fixationStatusMap[status].label,
-            count: data.statusCounts[status] ?? 0,
+            count: counts[status] ?? 0,
             color: FIXATION_STATUS_COLORS[status],
         }))
-    }, [data])
+    }, [statusCounts])
 
     const donutSeries = useMemo(
         () => statusSummary.map((item) => item.count),
@@ -164,35 +261,52 @@ const Home = () => {
         [navigate, statusSummary],
     )
 
-    const timelineCategories = useMemo(() => {
-        if (!data) return []
-
-        return data.timeline.map((point) => {
-            const day = point.date.split('-')[2]
-            return String(Number(day))
-        })
-    }, [data])
-
-    const timelineSeries = useMemo(() => {
-        if (!data) return []
-
-        return FIXATION_STATUS_ORDER.map((status) => ({
-            name: fixationStatusMap[status].label,
-            data: data.timeline.map((point) => point.counts[status] ?? 0),
-        }))
-    }, [data])
-
-    const timelineColors = useMemo(
-        () =>
-            FIXATION_STATUS_ORDER.map(
-                (status) => FIXATION_STATUS_COLORS[status],
-            ),
-        [],
+    const transitions = useMemo(
+        () => transitionsData?.transitions ?? [],
+        [transitionsData?.transitions],
     )
 
-    const timelineOptions = useMemo<ApexOptions>(
+    const transitionTimeline = useMemo(
+        () => transitionsData?.transitionTimeline ?? [],
+        [transitionsData?.transitionTimeline],
+    )
+
+    const transitionCategories = useMemo(
+        () =>
+            transitionTimeline.map((point) => {
+                const [, month, day] = point.date.split('-')
+                return `${Number(day)}.${month}`
+            }),
+        [transitionTimeline],
+    )
+
+    const transitionSeries = useMemo(
+        () =>
+            transitions.map((item) => {
+                const key = `${item.from}→${item.to}`
+                return {
+                    name: `${item.fromLabel} → ${item.toLabel}`,
+                    data: transitionTimeline.map(
+                        (point) => point.counts[key] ?? 0,
+                    ),
+                }
+            }),
+        [transitionTimeline, transitions],
+    )
+
+    const transitionColors = useMemo(
+        () =>
+            transitions.map(
+                (item) =>
+                    FIXATION_STATUS_COLORS[item.to as FixationStatus] ??
+                    '#6b7280',
+            ),
+        [transitions],
+    )
+
+    const transitionOptions = useMemo<ApexOptions>(
         () => ({
-            colors: timelineColors,
+            colors: transitionColors,
             chart: {
                 type: 'line',
                 toolbar: {
@@ -208,7 +322,7 @@ const Home = () => {
                 curve: 'smooth',
                 width: 3,
                 lineCap: 'round',
-                colors: timelineColors,
+                colors: transitionColors,
             },
             legend: {
                 show: true,
@@ -218,7 +332,7 @@ const Home = () => {
             markers: {
                 size: 4,
                 strokeWidth: 0,
-                colors: timelineColors,
+                colors: transitionColors,
                 hover: {
                     size: 6,
                 },
@@ -232,15 +346,17 @@ const Home = () => {
             },
             xaxis: {
                 title: {
-                    text: 'День месяца',
+                    text: 'Дата',
                 },
                 labels: {
-                    rotate: 0,
+                    rotate: transitionCategories.length > 20 ? -45 : 0,
+                    hideOverlappingLabels: false,
                 },
+                tickPlacement: 'on',
             },
             yaxis: {
                 title: {
-                    text: 'Количество фиксаций',
+                    text: 'Количество переходов',
                 },
                 min: 0,
                 forceNiceScale: true,
@@ -253,10 +369,16 @@ const Home = () => {
                 },
             },
         }),
-        [timelineColors],
+        [transitionCategories.length, transitionColors],
     )
 
+    const transitionChartMinWidth = useMemo(() => {
+        const perDayPx = 56
+        return Math.max(480, transitionCategories.length * perDayPx)
+    }, [transitionCategories.length])
+
     const phoneDisplay = profile.phone || '—'
+    const hideAgencyAndLevel = analyticsScope.isSupervisor
 
     return (
         <Container>
@@ -288,9 +410,7 @@ const Home = () => {
                                     size="sm"
                                     icon={<TbSettings />}
                                     className="shrink-0"
-                                    onClick={() =>
-                                        navigate('/account/profile')
-                                    }
+                                    onClick={() => navigate('/account/profile')}
                                 >
                                     <span className="hidden sm:inline">
                                         Настройки
@@ -298,7 +418,12 @@ const Home = () => {
                                 </Button>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <div
+                                className={classNames(
+                                    'grid grid-cols-1 gap-2',
+                                    !hideAgencyAndLevel && 'sm:grid-cols-3',
+                                )}
+                            >
                                 <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
                                     <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         <TbPhone className="text-sm" />
@@ -308,36 +433,40 @@ const Home = () => {
                                         {phoneDisplay}
                                     </p>
                                 </div>
-                                <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
-                                    <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                        <TbBuilding className="text-sm" />
-                                        Агентство
-                                    </p>
-                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                        {profile.agency || '—'}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
-                                    <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                        <TbBriefcase className="text-sm" />
-                                        Уровень
-                                        <Tooltip title="Подробнее об уровнях в разделе помощи">
-                                            <Link
-                                                to="/help"
-                                                className="inline-flex rounded-full text-gray-400 transition-colors hover:text-primary"
-                                                aria-label="Справка об уровнях"
-                                                onClick={(event) =>
-                                                    event.stopPropagation()
-                                                }
-                                            >
-                                                <TbHelp className="text-sm" />
-                                            </Link>
-                                        </Tooltip>
-                                    </p>
-                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                        {profile.level || '—'}
-                                    </p>
-                                </div>
+                                {!hideAgencyAndLevel ? (
+                                    <>
+                                        <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
+                                            <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                <TbBuilding className="text-sm" />
+                                                Агентство
+                                            </p>
+                                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                {profile.agency || '—'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
+                                            <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                <TbBriefcase className="text-sm" />
+                                                Уровень
+                                                <Tooltip title="Подробнее об уровнях в разделе помощи">
+                                                    <Link
+                                                        to="/help"
+                                                        className="inline-flex rounded-full text-gray-400 transition-colors hover:text-primary"
+                                                        aria-label="Справка об уровнях"
+                                                        onClick={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                    >
+                                                        <TbHelp className="text-sm" />
+                                                    </Link>
+                                                </Tooltip>
+                                            </p>
+                                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                {profile.level || '—'}
+                                            </p>
+                                        </div>
+                                    </>
+                                ) : null}
                             </div>
                         </div>
                     </AdaptiveCard>
@@ -367,87 +496,95 @@ const Home = () => {
                                 </Button>
                             </div>
 
-                        {isNotificationsLoading ? (
-                            <div className="flex min-h-36 items-center justify-center">
-                                <Spinner size={28} />
-                            </div>
-                        ) : notifications.length === 0 ? (
-                            <div className="flex min-h-36 flex-col items-center justify-center text-center">
-                                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    Нет уведомлений
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Новые уведомления появятся здесь
-                                </p>
-                            </div>
-                        ) : (
-                            <ul className="divide-y divide-gray-100 dark:divide-gray-700/60">
-                                {notifications.map((log) => {
-                                    const action = log.action
-                                        ? resolveLogActionHref(log.action.url)
-                                        : null
-                                    const unread = !isUserLogRead(log)
+                            {isNotificationsLoading ? (
+                                <div className="flex min-h-36 items-center justify-center">
+                                    <Spinner size={28} />
+                                </div>
+                            ) : notifications.length === 0 ? (
+                                <div className="flex min-h-36 flex-col items-center justify-center text-center">
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                        Нет уведомлений
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Новые уведомления появятся здесь
+                                    </p>
+                                </div>
+                            ) : (
+                                <ul className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                                    {notifications.map((log) => {
+                                        const action = log.action
+                                            ? resolveLogActionHref(
+                                                  log.action.url,
+                                              )
+                                            : null
+                                        const unread = !isUserLogRead(log)
 
-                                    return (
-                                        <li key={log.id}>
-                                            <button
-                                                type="button"
-                                                className="flex w-full items-start gap-3 py-3 text-left transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-700/30"
-                                                onClick={() => {
-                                                    if (action?.href) {
-                                                        if (action.external) {
-                                                            window.open(
+                                        return (
+                                            <li key={log.id}>
+                                                <button
+                                                    type="button"
+                                                    className="flex w-full items-start gap-3 py-3 text-left transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-700/30"
+                                                    onClick={() => {
+                                                        if (action?.href) {
+                                                            if (
+                                                                action.external
+                                                            ) {
+                                                                window.open(
+                                                                    action.href,
+                                                                    '_blank',
+                                                                    'noopener,noreferrer',
+                                                                )
+                                                                return
+                                                            }
+                                                            navigate(
                                                                 action.href,
-                                                                '_blank',
-                                                                'noopener,noreferrer',
                                                             )
                                                             return
                                                         }
-                                                        navigate(action.href)
-                                                        return
-                                                    }
-                                                    navigate(
-                                                        '/account/notifications',
-                                                    )
-                                                }}
-                                            >
-                                                <UserLogAvatar type={log.type} />
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="mb-0.5 flex items-center justify-between gap-2">
-                                                        <span className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                            {getUserLogTypeName(
-                                                                log,
-                                                            )}
-                                                        </span>
-                                                        <span className="shrink-0 text-xs text-gray-400">
-                                                            {formatUserLogTime(
-                                                                log.created_at,
-                                                            )}
-                                                        </span>
-                                                    </div>
-                                                    <p
-                                                        className={classNames(
-                                                            'line-clamp-2 text-sm',
-                                                            unread
-                                                                ? 'font-medium text-gray-900 dark:text-gray-100'
-                                                                : 'text-gray-600 dark:text-gray-300',
-                                                        )}
-                                                    >
-                                                        {log.message}
-                                                    </p>
-                                                </div>
-                                                {unread ? (
-                                                    <span
-                                                        className="mt-2 h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-                                                        aria-hidden
+                                                        navigate(
+                                                            '/account/notifications',
+                                                        )
+                                                    }}
+                                                >
+                                                    <UserLogAvatar
+                                                        type={log.type}
                                                     />
-                                                ) : null}
-                                            </button>
-                                        </li>
-                                    )
-                                })}
-                            </ul>
-                        )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="mb-0.5 flex items-center justify-between gap-2">
+                                                            <span className="truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                                {getUserLogTypeName(
+                                                                    log,
+                                                                )}
+                                                            </span>
+                                                            <span className="shrink-0 text-xs text-gray-400">
+                                                                {formatUserLogTime(
+                                                                    log.created_at,
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <p
+                                                            className={classNames(
+                                                                'line-clamp-2 text-sm',
+                                                                unread
+                                                                    ? 'font-medium text-gray-900 dark:text-gray-100'
+                                                                    : 'text-gray-600 dark:text-gray-300',
+                                                            )}
+                                                        >
+                                                            {log.message}
+                                                        </p>
+                                                    </div>
+                                                    {unread ? (
+                                                        <span
+                                                            className="mt-2 h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+                                                            aria-hidden
+                                                        />
+                                                    ) : null}
+                                                </button>
+                                            </li>
+                                        )
+                                    })}
+                                </ul>
+                            )}
 
                             <Button
                                 size="sm"
@@ -464,118 +601,223 @@ const Home = () => {
                 </div>
 
                 <AdaptiveCard>
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                         <div>
                             <h3 className="mb-1">Статистика фиксаций</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Распределение и динамика по статусам за месяц
+                                Распределение по статусам и переходы между ними
                             </p>
                         </div>
-                        <div className="w-full sm:w-56">
-                            <label className="mb-1.5 block text-sm font-medium">
-                                Месяц
-                            </label>
-                            <Select
-                                isSearchable={false}
-                                options={monthOptions}
-                                value={selectedMonthOption}
-                                placeholder="Выберите месяц"
-                                onChange={(option) => {
-                                    if (option?.value) {
-                                        setSelectedMonth(String(option.value))
-                                    }
-                                }}
-                            />
-                        </div>
+                        <DashboardAnalyticsFilters
+                            selectedAgencyId={selectedAgencyId}
+                            selectedAgentId={selectedAgentId}
+                            onAgencyChange={setSelectedAgencyId}
+                            onAgentChange={setSelectedAgentId}
+                        />
                     </div>
                 </AdaptiveCard>
 
-                {isLoading && !data ? (
+                {!canLoadAnalytics ? (
                     <AdaptiveCard>
-                        <div className="flex min-h-72 items-center justify-center">
-                            <Spinner size={36} />
+                        <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                Выберите агента
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Аналитика доступна только по конкретному агенту
+                            </p>
                         </div>
                     </AdaptiveCard>
                 ) : (
                     <>
                         <AdaptiveCard>
-                            <div className="mb-4">
-                                <h4 className="mb-1">
-                                    Распределение по статусам
-                                </h4>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Нажмите на статус, чтобы открыть фиксации с
-                                    этим фильтром
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-2">
-                                <div className="flex flex-col gap-2">
-                                    {statusSummary.map((item) => (
-                                        <button
-                                            key={item.status}
-                                            type="button"
-                                            className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-gray-700 dark:hover:border-primary/40 dark:hover:bg-primary/10"
-                                            onClick={() =>
-                                                navigate(
-                                                    `/fixations?status=${item.status}`,
-                                                )
-                                            }
-                                        >
-                                            <span className="flex min-w-0 items-center gap-2.5">
-                                                <span
-                                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                                    style={{
-                                                        backgroundColor:
-                                                            item.color,
-                                                    }}
-                                                    aria-hidden
-                                                />
-                                                <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
-                                                    {item.label}
-                                                </span>
-                                            </span>
-                                            <span
-                                                className="shrink-0 text-sm font-semibold tabular-nums"
-                                                style={{ color: item.color }}
-                                            >
-                                                {item.count}
-                                            </span>
-                                        </button>
-                                    ))}
+                            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                                <div className="min-w-0">
+                                    <h4 className="mb-1">
+                                        Распределение по статусам
+                                    </h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Нажмите на статус, чтобы открыть
+                                        фиксации с этим фильтром
+                                    </p>
                                 </div>
-                                <div
-                                    className={classNames(
-                                        'mx-auto w-full',
-                                        isDesktop ? 'max-w-xl' : 'max-w-md',
-                                    )}
-                                >
-                                    <Chart
-                                        type="donut"
-                                        series={donutSeries}
-                                        height={isDesktop ? 420 : 300}
-                                        customOptions={donutOptions}
-                                        donutTitle="Всего"
-                                        donutText={String(totalFixations)}
+                                <div className="w-full sm:w-80">
+                                    <label className="mb-1.5 block text-sm font-medium">
+                                        Период
+                                    </label>
+                                    <DatePicker.DatePickerRange
+                                        value={statusesDateRange}
+                                        locale="ru"
+                                        inputFormat="DD.MM.YYYY"
+                                        placeholder="Выберите период"
+                                        separator="—"
+                                        maxDate={new Date()}
+                                        onChange={handleDateRangeChange(
+                                            setStatusesDateRange,
+                                        )}
                                     />
                                 </div>
                             </div>
+                            {isStatusesLoading && !statusCounts ? (
+                                <div className="flex min-h-72 items-center justify-center">
+                                    <Spinner size={36} />
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    {isStatusesValidating ? (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
+                                            <Spinner size={28} />
+                                        </div>
+                                    ) : null}
+                                    <div
+                                        className={classNames(
+                                            'grid grid-cols-1 items-center gap-6 lg:grid-cols-2',
+                                            isStatusesValidating &&
+                                                'pointer-events-none opacity-60',
+                                        )}
+                                    >
+                                        <div className="flex flex-col gap-2">
+                                            {statusSummary.map((item) => (
+                                                <button
+                                                    key={item.status}
+                                                    type="button"
+                                                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-gray-700 dark:hover:border-primary/40 dark:hover:bg-primary/10"
+                                                    onClick={() =>
+                                                        navigate(
+                                                            `/fixations?status=${item.status}`,
+                                                        )
+                                                    }
+                                                >
+                                                    <span className="flex min-w-0 items-center gap-2.5">
+                                                        <span
+                                                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    item.color,
+                                                            }}
+                                                            aria-hidden
+                                                        />
+                                                        <span className="truncate text-sm font-medium text-gray-800 dark:text-gray-100">
+                                                            {item.label}
+                                                        </span>
+                                                    </span>
+                                                    <span
+                                                        className="shrink-0 text-sm font-semibold tabular-nums"
+                                                        style={{
+                                                            color: item.color,
+                                                        }}
+                                                    >
+                                                        {item.count}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div
+                                            className={classNames(
+                                                'mx-auto w-full',
+                                                isDesktop
+                                                    ? 'max-w-xl'
+                                                    : 'max-w-md',
+                                            )}
+                                        >
+                                            <Chart
+                                                type="donut"
+                                                series={donutSeries}
+                                                height={isDesktop ? 420 : 300}
+                                                customOptions={donutOptions}
+                                                donutTitle="Всего"
+                                                donutText={String(
+                                                    totalFixations,
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </AdaptiveCard>
 
                         <AdaptiveCard>
-                            <div className="mb-4">
-                                <h4 className="mb-1">Динамика по дням</h4>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Сколько фиксаций в каждом статусе было на
-                                    определённый день
-                                </p>
+                            <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                                <div className="min-w-0">
+                                    <h4 className="mb-1">
+                                        Переходы между статусами
+                                    </h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                        Динамика переходов фиксаций из одного
+                                        статуса в другой по дням
+                                    </p>
+                                </div>
+                                <div className="w-full sm:w-80">
+                                    <label className="mb-1.5 block text-sm font-medium">
+                                        Период
+                                    </label>
+                                    <DatePicker.DatePickerRange
+                                        value={transitionsDateRange}
+                                        locale="ru"
+                                        inputFormat="DD.MM.YYYY"
+                                        placeholder="Выберите период"
+                                        separator="—"
+                                        maxDate={new Date()}
+                                        onChange={handleDateRangeChange(
+                                            setTransitionsDateRange,
+                                        )}
+                                    />
+                                </div>
                             </div>
-                            <Chart
-                                type="line"
-                                series={timelineSeries}
-                                xAxis={timelineCategories}
-                                height={360}
-                                customOptions={timelineOptions}
-                            />
+                            {isTransitionsLoading && !transitionsData ? (
+                                <div className="flex min-h-56 items-center justify-center">
+                                    <Spinner size={32} />
+                                </div>
+                            ) : transitions.length === 0 ? (
+                                <div className="relative flex min-h-56 flex-col items-center justify-center text-center">
+                                    {isTransitionsValidating ? (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
+                                            <Spinner size={28} />
+                                        </div>
+                                    ) : null}
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                        Нет переходов за период
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Изменения статусов появятся здесь после
+                                        событий в выбранном периоде
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    {isTransitionsValidating ? (
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
+                                            <Spinner size={28} />
+                                        </div>
+                                    ) : null}
+                                    <div
+                                        className={classNames(
+                                            isTransitionsValidating &&
+                                                'pointer-events-none opacity-60',
+                                        )}
+                                    >
+                                        <div className="overflow-x-auto">
+                                            <div
+                                                style={{
+                                                    minWidth: `${transitionChartMinWidth}px`,
+                                                }}
+                                            >
+                                                <Chart
+                                                    type="line"
+                                                    series={transitionSeries}
+                                                    xAxis={
+                                                        transitionCategories
+                                                    }
+                                                    height={360}
+                                                    customOptions={
+                                                        transitionOptions
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </AdaptiveCard>
                     </>
                 )}

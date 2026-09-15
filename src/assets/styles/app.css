@@ -28,16 +28,33 @@
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2) !important;
 }
 
-/* TipTap tables — explicit borders (prose resets table borders) */
+/* TipTap tables — keep readable columns; scroll horizontally when wide */
+.ProseMirror .tableWrapper,
+.prose .tableWrapper {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 1rem 0;
+    -webkit-overflow-scrolling: touch;
+}
+
 .ProseMirror table.rich-text-table,
 .prose table.rich-text-table,
 .prose table {
-    width: 100%;
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
     border-collapse: collapse;
-    table-layout: fixed;
+    table-layout: auto;
     margin: 1rem 0;
-    overflow: hidden;
     border: 1px solid #d6d3d1;
+}
+
+.ProseMirror .tableWrapper > table.rich-text-table,
+.prose .tableWrapper > table.rich-text-table,
+.prose .tableWrapper > table {
+    margin: 0;
 }
 
 .dark .ProseMirror table.rich-text-table,
@@ -53,10 +70,13 @@
 .prose table td,
 .prose table th {
     position: relative;
-    min-width: 80px;
+    min-width: 6rem;
     border: 1px solid #d6d3d1 !important;
     padding: 0.5rem 0.75rem;
     vertical-align: top;
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: normal;
 }
 
 .dark .ProseMirror table.rich-text-table td,
@@ -74,6 +94,7 @@
     background-color: #f5f5f4;
     font-weight: 600;
     text-align: left;
+    white-space: nowrap;
 }
 
 .dark .ProseMirror table.rich-text-table th,
@@ -120,4 +141,58 @@
 .prose em,
 .prose i {
     color: inherit;
+}
+
+/* Editor-only: show paragraph/block structure and empty lines */
+.ProseMirror.article-editor-show-blocks > p,
+.ProseMirror.article-editor-show-blocks > h1,
+.ProseMirror.article-editor-show-blocks > h2,
+.ProseMirror.article-editor-show-blocks > h3,
+.ProseMirror.article-editor-show-blocks > h4,
+.ProseMirror.article-editor-show-blocks > h5,
+.ProseMirror.article-editor-show-blocks > h6,
+.ProseMirror.article-editor-show-blocks > blockquote,
+.ProseMirror.article-editor-show-blocks > pre,
+.ProseMirror.article-editor-show-blocks > ul,
+.ProseMirror.article-editor-show-blocks > ol {
+    position: relative;
+    border-radius: 0.25rem;
+    outline: 1px dashed rgba(148, 163, 184, 0.55);
+    outline-offset: 2px;
+}
+
+.dark .ProseMirror.article-editor-show-blocks > p,
+.dark .ProseMirror.article-editor-show-blocks > h1,
+.dark .ProseMirror.article-editor-show-blocks > h2,
+.dark .ProseMirror.article-editor-show-blocks > h3,
+.dark .ProseMirror.article-editor-show-blocks > h4,
+.dark .ProseMirror.article-editor-show-blocks > h5,
+.dark .ProseMirror.article-editor-show-blocks > h6,
+.dark .ProseMirror.article-editor-show-blocks > blockquote,
+.dark .ProseMirror.article-editor-show-blocks > pre,
+.dark .ProseMirror.article-editor-show-blocks > ul,
+.dark .ProseMirror.article-editor-show-blocks > ol {
+    outline-color: rgba(100, 116, 139, 0.65);
+}
+
+.ProseMirror.article-editor-show-blocks > p {
+    min-height: 1.5em;
+}
+
+.ProseMirror.article-editor-show-blocks > p:empty::before,
+.ProseMirror.article-editor-show-blocks
+    > p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+    content: '¶ пустая строка';
+    pointer-events: none;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.dark .ProseMirror.article-editor-show-blocks > p:empty::before,
+.dark
+    .ProseMirror.article-editor-show-blocks
+    > p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+    color: #64748b;
 }

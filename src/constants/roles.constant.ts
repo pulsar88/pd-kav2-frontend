@@ -47,7 +47,7 @@ export const hasAgentCabinetAccess = (authority: string[] = []) =>
 export const isContentManagerOnly = (authority: string[] = []) =>
     authority.includes(CONTENT_MANAGER) && !hasAgentCabinetAccess(authority)
 
-export const CONTENT_MANAGER_ENTRY_PATH = '/news'
+export const CONTENT_MANAGER_ENTRY_PATH = '/help'
 
 export const getAuthenticatedEntryPath = (
     authority: string[] = [],

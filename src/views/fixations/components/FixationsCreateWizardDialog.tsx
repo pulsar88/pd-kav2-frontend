@@ -67,8 +67,10 @@ import type {
 import {
     formatFixationKinship,
     fixationKinshipOptions,
+    formatRuPhone,
     RU_PHONE_REGEX,
 } from '../utils'
+import { useSessionUser } from '@/store/authStore'
 
 const { THead, TBody, Tr, Th, Td } = Table
 
@@ -204,11 +206,22 @@ const formatPremiseInterestComment = (premise: FixationApartment) => {
 const buildFixationComment = (
     premise: FixationApartment | null,
     note: string,
+    aggregatorAgent?: { name: string; phone: string } | null,
 ) => {
     const parts: string[] = []
 
     if (premise) {
         parts.push(formatPremiseInterestComment(premise))
+    }
+
+    if (aggregatorAgent?.name || aggregatorAgent?.phone) {
+        const agentParts = [
+            aggregatorAgent.name.trim(),
+            aggregatorAgent.phone.trim(),
+        ].filter(Boolean)
+        if (agentParts.length > 0) {
+            parts.push(`Агент: ${agentParts.join(', ')}`)
+        }
     }
 
     const trimmedNote = note.trim()
@@ -522,6 +535,16 @@ const FixationsCreateWizardDialog = ({
     const [paymentFormat, setPaymentFormat] = useState('')
     const [budget, setBudget] = useState('')
     const [meetingDate, setMeetingDate] = useState('')
+    const [aggregatorAgentName, setAggregatorAgentName] = useState('')
+    const [aggregatorAgentPhone, setAggregatorAgentPhone] = useState('')
+    const [showAggregatorErrors, setShowAggregatorErrors] = useState(false)
+
+    const user = useSessionUser((state) => state.user)
+    const isAggregatorAgency = user.agency?.is_aggregator === 1
+    const canProceedFromAggregatorFields =
+        !isAggregatorAgency ||
+        (Boolean(aggregatorAgentName.trim()) &&
+            RU_PHONE_REGEX.test(aggregatorAgentPhone))
 
     const {
         control: clientControl,
@@ -1050,21 +1073,55 @@ const FixationsCreateWizardDialog = ({
         if (index === 0) return true
         if (index === 1) return Boolean(selectedClient)
         if (index === 2)
-            return Boolean(selectedClient && selectedComplex)
+            return Boolean(
+                selectedClient &&
+                    selectedComplex &&
+                    canProceedFromAggregatorFields,
+            )
         if (index === 3) {
-            return Boolean(selectedClient && selectedComplex)
+            return Boolean(
+                selectedClient &&
+                    selectedComplex &&
+                    canProceedFromAggregatorFields,
+            )
         }
         if (index === 4) {
             return Boolean(
                 selectedClient &&
                     selectedComplex &&
+                    canProceedFromAggregatorFields &&
                     canProceedFromRelatives,
             )
         }
         return false
     }
 
-    const canProceedFromComplex = Boolean(selectedComplex)
+    const handleFillAggregatorSelf = () => {
+        setAggregatorAgentName(user.userName?.trim() || '')
+        setAggregatorAgentPhone(user.phone ? formatRuPhone(user.phone) : '')
+        setShowAggregatorErrors(false)
+    }
+
+    const fixationCommentPreview = useMemo(
+        () =>
+            buildFixationComment(
+                selectedApartment,
+                note,
+                isAggregatorAgency
+                    ? {
+                          name: aggregatorAgentName,
+                          phone: aggregatorAgentPhone,
+                      }
+                    : null,
+            ),
+        [
+            aggregatorAgentName,
+            aggregatorAgentPhone,
+            isAggregatorAgency,
+            note,
+            selectedApartment,
+        ],
+    )
 
     const handleStepIndexChange = (index: number) => {
         if (!canGoToStep(index)) return
@@ -1354,7 +1411,7 @@ const FixationsCreateWizardDialog = ({
             budget.trim() ||
             meetingDate,
     )
-    const hasComment = Boolean(note.trim())
+    const hasComment = Boolean(fixationCommentPreview?.trim())
     const preferencesSummary = useMemo(() => {
         const parts: string[] = []
 
@@ -1419,6 +1476,11 @@ const FixationsCreateWizardDialog = ({
 
     const handleCreateFixation = async () => {
         if (!selectedClient || !selectedComplex) return
+        if (!canProceedFromAggregatorFields) {
+            setShowAggregatorErrors(true)
+            setStep('complex')
+            return
+        }
 
         try {
             setIsSubmitting(true)
@@ -1430,12 +1492,18 @@ const FixationsCreateWizardDialog = ({
                 ...(selectedClient.isNew
                     ? { client: selectedClient }
                     : { clientId: Number(selectedClient.id) }),
-                note: buildFixationComment(selectedApartment, note),
+                note: fixationCommentPreview,
                 desiredArea: desiredArea || undefined,
                 desiredRooms: desiredRooms || undefined,
                 paymentFormat: paymentFormat || undefined,
                 budget: budget.trim() || undefined,
                 meetingDate: meetingDate ? formatYMDToDMY(meetingDate) : undefined,
+                ...(isAggregatorAgency
+                    ? {
+                          agentName: aggregatorAgentName.trim(),
+                          agentPhone: aggregatorAgentPhone,
+                      }
+                    : {}),
             })
 
             const fixationId =
@@ -1932,6 +2000,71 @@ const FixationsCreateWizardDialog = ({
                                         } satisfies InfiniteSelectProps)}
                                     />
                                 </FormItem>
+                                {isAggregatorAgency ? (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                Агент (для кого фиксация)
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={handleFillAggregatorSelf}
+                                            >
+                                                Указать себя
+                                            </Button>
+                                        </div>
+                                        <FormItem
+                                            asterisk
+                                            label="Имя агента"
+                                            invalid={
+                                                showAggregatorErrors &&
+                                                !aggregatorAgentName.trim()
+                                            }
+                                            errorMessage={
+                                                showAggregatorErrors &&
+                                                !aggregatorAgentName.trim()
+                                                    ? 'Введите имя агента'
+                                                    : undefined
+                                            }
+                                        >
+                                            <Input
+                                                placeholder="Имя агента"
+                                                value={aggregatorAgentName}
+                                                onChange={(e) =>
+                                                    setAggregatorAgentName(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormItem>
+                                        <FormItem
+                                            asterisk
+                                            label="Телефон агента"
+                                            invalid={
+                                                showAggregatorErrors &&
+                                                !RU_PHONE_REGEX.test(
+                                                    aggregatorAgentPhone,
+                                                )
+                                            }
+                                            errorMessage={
+                                                showAggregatorErrors &&
+                                                !RU_PHONE_REGEX.test(
+                                                    aggregatorAgentPhone,
+                                                )
+                                                    ? 'Введите номер телефона'
+                                                    : undefined
+                                            }
+                                        >
+                                            <PhoneInput
+                                                value={aggregatorAgentPhone}
+                                                onChange={
+                                                    setAggregatorAgentPhone
+                                                }
+                                            />
+                                        </FormItem>
+                                    </div>
+                                ) : null}
                                 <FormItem label="Менеджер (необязательно)">
                                     <Select
                                         {...selectMenuProps}
@@ -2707,6 +2840,22 @@ const FixationsCreateWizardDialog = ({
                                     isFilled={Boolean(selectedClient)}
                                     onEdit={() => setStep('client')}
                                 />
+                                {isAggregatorAgency ? (
+                                    <SummaryCard
+                                        icon={<TbUser />}
+                                        label="Агент"
+                                        title={
+                                            aggregatorAgentName.trim() || '—'
+                                        }
+                                        subtitle={
+                                            aggregatorAgentPhone || undefined
+                                        }
+                                        isFilled={
+                                            canProceedFromAggregatorFields
+                                        }
+                                        onEdit={() => setStep('complex')}
+                                    />
+                                ) : null}
                                 <SummaryCard
                                     icon={<TbBuilding />}
                                     label="Дом"
@@ -2784,7 +2933,10 @@ const FixationsCreateWizardDialog = ({
                                         <SummaryCard
                                             icon={<TbMessage />}
                                             label="Комментарий"
-                                            title={note.trim() || 'Не указано'}
+                                            title={
+                                                fixationCommentPreview ||
+                                                'Не указано'
+                                            }
                                             isFilled={hasComment}
                                             scrollableContent
                                             onEdit={() => setStep('note')}
@@ -2824,8 +2976,15 @@ const FixationsCreateWizardDialog = ({
                                     <Button
                                         variant="solid"
                                         className="w-full sm:w-auto"
-                                        disabled={!canProceedFromComplex}
-                                        onClick={() => setStep('note')}
+                                        disabled={!selectedComplex}
+                                        onClick={() => {
+                                            if (!canProceedFromAggregatorFields) {
+                                                setShowAggregatorErrors(true)
+                                                return
+                                            }
+                                            setShowAggregatorErrors(false)
+                                            setStep('note')
+                                        }}
                                     >
                                         Далее
                                     </Button>

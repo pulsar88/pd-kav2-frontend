@@ -749,11 +749,11 @@ const FixationDetails = () => {
 
                                     <SectionCard title="Контакты агента">
                                         <InfoRow
-                                            label="ФИО"
+                                            label="Создал"
                                             value={data.agent.fullName}
                                         />
                                         <InfoRow
-                                            label="Номер"
+                                            label="Телефон создателя"
                                             value={data.agent.phone}
                                         />
                                         <InfoRow
@@ -764,6 +764,25 @@ const FixationDetails = () => {
                                             label="Агентство"
                                             value={data.agent.agency}
                                         />
+                                        {data.targetAgentName ||
+                                        data.targetAgentPhone ? (
+                                            <>
+                                                <InfoRow
+                                                    label="На кого"
+                                                    value={
+                                                        data.targetAgentName ||
+                                                        '—'
+                                                    }
+                                                />
+                                                <InfoRow
+                                                    label="Телефон агента"
+                                                    value={
+                                                        data.targetAgentPhone ||
+                                                        '—'
+                                                    }
+                                                />
+                                            </>
+                                        ) : null}
                                     </SectionCard>
                                 </div>
                             </div>
