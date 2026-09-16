@@ -67,12 +67,11 @@ const SpecialOfferCard = ({ offer }: SpecialOfferCardProps) => {
                 </h4>
 
                 {preview ? (
-                    <p className="mb-4 line-clamp-3 flex-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p className="mb-4 line-clamp-3 overflow-hidden text-sm leading-5 text-gray-600 dark:text-gray-300">
                         {preview}
                     </p>
-                ) : (
-                    <div className="flex-1" />
-                )}
+                ) : null}
+                <div className="min-h-0 flex-1" />
 
                 <div className="mt-auto flex flex-col gap-2">
                     <div className="flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400">

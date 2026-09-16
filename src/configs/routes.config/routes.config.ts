@@ -14,7 +14,7 @@ import {
 
 const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
-const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR]
+const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR, SUPERVISOR]
 const supervisorOnlyAuthority = [SUPERVISOR]
 
 export const publicRoutes: Routes = [...authRoute]
