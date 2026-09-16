@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import useSWR from 'swr'
 import {
     TbBell,
     TbBriefcase,
@@ -36,6 +35,7 @@ import {
     FIXATION_STATUS_COLORS,
     FIXATION_STATUS_ORDER,
     createEmptyFixationsStatusCounts,
+    type FixationsStatusCounts,
 } from '@/views/fixations/dashboard.constants'
 import {
     formatStatsApiDate,
@@ -54,6 +54,10 @@ import type { UserLog } from '@/@types/notification'
 import DashboardAnalyticsFilters, {
     getDashboardAnalyticsScope,
 } from '@/views/Home/DashboardAnalyticsFilters'
+
+type FixationsTransitionStats = Awaited<
+    ReturnType<typeof apiGetFixationsTransitionStats>
+>
 
 const Home = () => {
     const navigate = useNavigate()
@@ -83,6 +87,17 @@ const Home = () => {
     const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null)
     const [notifications, setNotifications] = useState<UserLog[]>([])
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(true)
+    const [statusCounts, setStatusCounts] =
+        useState<FixationsStatusCounts | null>(null)
+    const [isStatusesLoading, setIsStatusesLoading] = useState(false)
+    const [isStatusesRefreshing, setIsStatusesRefreshing] = useState(false)
+    const [transitionsData, setTransitionsData] =
+        useState<FixationsTransitionStats | null>(null)
+    const [isTransitionsLoading, setIsTransitionsLoading] = useState(false)
+    const [isTransitionsRefreshing, setIsTransitionsRefreshing] =
+        useState(false)
+    const statusCountsLoadedRef = useRef(false)
+    const transitionsLoadedRef = useRef(false)
 
     useEffect(() => {
         if (
@@ -124,43 +139,79 @@ const Home = () => {
         }
     }, [agentIdParam, canLoadAnalytics, transitionsDateRange])
 
-    const {
-        data: statusCounts,
-        isLoading: isStatusesLoading,
-        isValidating: isStatusesValidating,
-    } = useSWR(
-        statusesRange
-            ? [
-                  'fixations-status-counts',
-                  statusesRange.date_from,
-                  statusesRange.date_to,
-                  statusesRange.agent_id ?? null,
-              ]
-            : null,
-        () => apiGetFixationsStatusCounts(statusesRange!),
-        {
-            keepPreviousData: true,
-        },
-    )
+    useEffect(() => {
+        if (!statusesRange) {
+            statusCountsLoadedRef.current = false
+            setStatusCounts(null)
+            setIsStatusesLoading(false)
+            setIsStatusesRefreshing(false)
+            return
+        }
 
-    const {
-        data: transitionsData,
-        isLoading: isTransitionsLoading,
-        isValidating: isTransitionsValidating,
-    } = useSWR(
-        transitionsRange
-            ? [
-                  'fixations-transitions',
-                  transitionsRange.date_from,
-                  transitionsRange.date_to,
-                  transitionsRange.agent_id ?? null,
-              ]
-            : null,
-        () => apiGetFixationsTransitionStats(transitionsRange!),
-        {
-            keepPreviousData: true,
-        },
-    )
+        let cancelled = false
+        const isRefresh = statusCountsLoadedRef.current
+
+        if (isRefresh) {
+            setIsStatusesRefreshing(true)
+        } else {
+            setIsStatusesLoading(true)
+        }
+
+        void apiGetFixationsStatusCounts(statusesRange)
+            .then((data) => {
+                if (!cancelled) {
+                    statusCountsLoadedRef.current = true
+                    setStatusCounts(data)
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsStatusesLoading(false)
+                    setIsStatusesRefreshing(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [statusesRange])
+
+    useEffect(() => {
+        if (!transitionsRange) {
+            transitionsLoadedRef.current = false
+            setTransitionsData(null)
+            setIsTransitionsLoading(false)
+            setIsTransitionsRefreshing(false)
+            return
+        }
+
+        let cancelled = false
+        const isRefresh = transitionsLoadedRef.current
+
+        if (isRefresh) {
+            setIsTransitionsRefreshing(true)
+        } else {
+            setIsTransitionsLoading(true)
+        }
+
+        void apiGetFixationsTransitionStats(transitionsRange)
+            .then((data) => {
+                if (!cancelled) {
+                    transitionsLoadedRef.current = true
+                    setTransitionsData(data)
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsTransitionsLoading(false)
+                    setIsTransitionsRefreshing(false)
+                }
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [transitionsRange])
 
     const handleDateRangeChange =
         (setter: (value: DatePickerRangeValue) => void) =>
@@ -315,6 +366,7 @@ const Home = () => {
                 zoom: {
                     enabled: false,
                 },
+                parentHeightOffset: 0,
                 background: 'transparent',
             },
             stroke: {
@@ -372,10 +424,37 @@ const Home = () => {
         [transitionCategories.length, transitionColors],
     )
 
-    const transitionChartMinWidth = useMemo(() => {
+    const transitionChartDesiredWidth = useMemo(() => {
         const perDayPx = 56
         return Math.max(480, transitionCategories.length * perDayPx)
     }, [transitionCategories.length])
+
+    const transitionChartScrollRef = useRef<HTMLDivElement>(null)
+    const [transitionChartMinWidth, setTransitionChartMinWidth] = useState<
+        number | undefined
+    >(undefined)
+
+    useLayoutEffect(() => {
+        const el = transitionChartScrollRef.current
+        if (!el) {
+            setTransitionChartMinWidth(undefined)
+            return
+        }
+
+        const update = () => {
+            const available = el.clientWidth
+            setTransitionChartMinWidth(
+                transitionChartDesiredWidth > available
+                    ? transitionChartDesiredWidth
+                    : undefined,
+            )
+        }
+
+        update()
+        const observer = new ResizeObserver(update)
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [transitionChartDesiredWidth, transitions.length])
 
     const phoneDisplay = profile.phone || '—'
     const hideAgencyAndLevel = analyticsScope.isSupervisor
@@ -450,7 +529,7 @@ const Home = () => {
                                                 Уровень
                                                 <Tooltip title="Подробнее об уровнях в разделе помощи">
                                                     <Link
-                                                        to="/help"
+                                                        to="/help/56-urovni-agentov"
                                                         className="inline-flex rounded-full text-gray-400 transition-colors hover:text-primary"
                                                         aria-label="Справка об уровнях"
                                                         onClick={(event) =>
@@ -462,7 +541,8 @@ const Home = () => {
                                                 </Tooltip>
                                             </p>
                                             <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {profile.level || '—'}
+                                                {profile.accessLevel?.name ||
+                                                    '—'}
                                             </p>
                                         </div>
                                     </>
@@ -664,7 +744,7 @@ const Home = () => {
                                 </div>
                             ) : (
                                 <div className="relative">
-                                    {isStatusesValidating ? (
+                                    {isStatusesRefreshing ? (
                                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
                                             <Spinner size={28} />
                                         </div>
@@ -672,7 +752,7 @@ const Home = () => {
                                     <div
                                         className={classNames(
                                             'grid grid-cols-1 items-center gap-6 lg:grid-cols-2',
-                                            isStatusesValidating &&
+                                            isStatusesRefreshing &&
                                                 'pointer-events-none opacity-60',
                                         )}
                                     >
@@ -770,7 +850,7 @@ const Home = () => {
                                 </div>
                             ) : transitions.length === 0 ? (
                                 <div className="relative flex min-h-56 flex-col items-center justify-center text-center">
-                                    {isTransitionsValidating ? (
+                                    {isTransitionsRefreshing ? (
                                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
                                             <Spinner size={28} />
                                         </div>
@@ -785,22 +865,30 @@ const Home = () => {
                                 </div>
                             ) : (
                                 <div className="relative">
-                                    {isTransitionsValidating ? (
+                                    {isTransitionsRefreshing ? (
                                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
                                             <Spinner size={28} />
                                         </div>
                                     ) : null}
                                     <div
                                         className={classNames(
-                                            isTransitionsValidating &&
+                                            isTransitionsRefreshing &&
                                                 'pointer-events-none opacity-60',
                                         )}
                                     >
-                                        <div className="overflow-x-auto">
+                                        <div
+                                            ref={transitionChartScrollRef}
+                                            className="overflow-x-auto overflow-y-hidden"
+                                        >
                                             <div
-                                                style={{
-                                                    minWidth: `${transitionChartMinWidth}px`,
-                                                }}
+                                                className="overflow-hidden"
+                                                style={
+                                                    transitionChartMinWidth
+                                                        ? {
+                                                              minWidth: `${transitionChartMinWidth}px`,
+                                                          }
+                                                        : undefined
+                                                }
                                             >
                                                 <Chart
                                                     type="line"

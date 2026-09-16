@@ -1,3 +1,5 @@
+import type { AccessLevel } from '@/@types/auth'
+
 export type GetSettingsProfileResponse = {
     id: string
     fullName: string
@@ -7,5 +9,5 @@ export type GetSettingsProfileResponse = {
     countryCode: string
     agency: string
     role: string
-    level: string
+    accessLevel: AccessLevel | null
 }

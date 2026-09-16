@@ -13,6 +13,8 @@ import ToolButtonParagraph from './toolButtons/ToolButtonParagraph'
 import ToolButtonUndo from './toolButtons/ToolButtonUndo'
 import ToolButtonRedo from './toolButtons/ToolButtonRedo'
 import ToolButtonBulletList from './toolButtons/ToolButtonBulletList'
+import ToolButtonSinkList from './toolButtons/ToolButtonSinkList'
+import ToolButtonLiftList from './toolButtons/ToolButtonLiftList'
 import ToolButtonFontSize from './toolButtons/ToolButtonFontSize'
 import ToolButtonTextColor from './toolButtons/ToolButtonTextColor'
 import ToolButtonSpacing from './toolButtons/ToolButtonSpacing'
@@ -25,6 +27,7 @@ import ToolButtonTable from './toolButtons/ToolButtonTable'
 import FontSize from './extensions/FontSize'
 import BlockSpacing from './extensions/BlockSpacing'
 import CustomImage from './extensions/Image'
+import CustomListItem from './extensions/ListItem'
 import { tableExtensions } from './extensions/tableExtensions'
 import { richTextTableClass } from './tableStyles'
 import {
@@ -110,7 +113,7 @@ type RichTextEditorProps = {
 } & Omit<EditorContentProps, 'editor' | 'ref' | 'onChange'>
 
 const imageEditorClass =
-    '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:cursor-pointer [&_img]:transition-all [&_img:hover]:ring-2 [&_img:hover]:ring-primary/40 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary [&_img.ProseMirror-selectednode]:ring-offset-2 dark:[&_img.ProseMirror-selectednode]:ring-offset-gray-900 [&_img.ProseMirror-selectednode]:shadow-lg'
+    '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:border [&_img]:border-gray-200 dark:[&_img]:border-gray-600 [&_img]:cursor-pointer [&_img]:transition-all [&_img:hover]:ring-2 [&_img:hover]:ring-primary/40 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary [&_img.ProseMirror-selectednode]:ring-offset-2 dark:[&_img.ProseMirror-selectednode]:ring-offset-gray-900 [&_img.ProseMirror-selectednode]:shadow-lg'
 
 const RichTextEditor = (props: RichTextEditorProps) => {
     const {
@@ -171,12 +174,12 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                         editor
                             .chain()
                             .focus()
-                            .insertContentAt(currentPos, {
-                                type: 'image',
-                                attrs: { src: imageUrl, alt: file.name },
+                            .insertImageAt(currentPos, {
+                                src: imageUrl,
+                                alt: file.name,
                             })
                             .run()
-                        currentPos += 1
+                        currentPos += 2
                     } else {
                         editor
                             .chain()
@@ -206,7 +209,9 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                       orderedList: {
                           keepMarks: true,
                       },
+                      listItem: false,
                   }),
+                  CustomListItem,
                   TextStyle,
                   Color,
                   FontSize,
@@ -221,7 +226,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
               ],
               editorProps: {
                   attributes: {
-                      class: `m-2 focus:outline-hidden ${proseMirrorSurfaceClass} [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100 ${imageEditorClass} ${richTextTableClass}`,
+                      class: `m-1 focus:outline-hidden ${proseMirrorSurfaceClass} [&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100 ${imageEditorClass} ${richTextTableClass}`,
                   },
                   handleKeyDown: (view, event) => {
                       if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -320,7 +325,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
     return (
         <div
             className={classNames(
-                'rich-text-editor rounded-xl ring-1 ring-gray-200 dark:ring-gray-600 border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 pt-3',
+                'rich-text-editor min-w-0 rounded-xl ring-1 ring-gray-200 dark:ring-gray-600 border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 pt-3',
                 editor.isFocused && 'ring-primary border-primary',
                 invalid && 'bg-error-subtle',
                 editor.isFocused &&
@@ -350,7 +355,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                 }
             }}
         >
-            <div className="flex flex-wrap gap-x-1 gap-y-2 px-2">
+            <div className="sticky top-16 z-20 -mx-px flex w-full flex-wrap items-center justify-start gap-x-1 gap-y-2 border-b border-gray-200 bg-gray-100 px-2 pb-2 text-left shadow-sm dark:border-gray-600 dark:bg-gray-700">
                 {customToolBar ? (
                     customToolBar(editor, {
                         ToolButtonBold,
@@ -386,6 +391,8 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                         <ToolButtonAlignRight editor={editor} />
                         <ToolButtonBulletList editor={editor} />
                         <ToolButtonOrderedList editor={editor} />
+                        <ToolButtonSinkList editor={editor} />
+                        <ToolButtonLiftList editor={editor} />
                         <ToolButtonCodeBlock editor={editor} />
                         <ToolButtonHorizontalRule editor={editor} />
                         <ToolButtonTable editor={editor} />
@@ -411,7 +418,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
             </div>
 
             <div
-                className="overflow-auto px-2"
+                className="min-w-0 max-w-full px-1 pb-2"
                 onMouseDown={(event) => {
                     if (event.button !== 0) return
                     if (!shouldManualFocusRichTextEditor(editor, event.target)) {
@@ -425,7 +432,7 @@ const RichTextEditor = (props: RichTextEditorProps) => {
                 <EditorContent
                     ref={ref}
                     className={classNames(
-                        'max-h-[600px] prose prose-p:text-sm dark:prose-invert dark:prose-p:text-gray-400 max-w-full prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:min-h-[320px] [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100',
+                        'prose prose-p:text-sm dark:prose-invert dark:prose-p:text-gray-400 max-w-full min-w-0 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:min-h-[480px] [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100',
                         imageEditorClass,
                         richTextTableClass,
                         editorContentClass,

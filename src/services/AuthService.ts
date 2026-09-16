@@ -48,6 +48,7 @@ export const mapCurrentUserToUser = (
         data.profile_picture !== undefined
             ? resolveProfilePictureUrl(data.profile_picture)
             : previousAvatar || '',
+    accessLevel: data.access_level ?? null,
 })
 
 export async function apiRegisterSendCode(data: CheckPhoneCredential) {

@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import type { EditorState, Transaction } from '@tiptap/pm/state'
 
 export interface ImageOptions {
     inline: boolean
@@ -6,15 +8,18 @@ export interface ImageOptions {
     HTMLAttributes: Record<string, unknown>
 }
 
+type ImageAttrs = {
+    src: string
+    alt?: string
+    title?: string
+    textAlign?: 'left' | 'center' | 'right'
+}
+
 declare module '@tiptap/core' {
     interface Commands<ReturnType> {
         image: {
-            setImage: (options: {
-                src: string
-                alt?: string
-                title?: string
-                textAlign?: 'left' | 'center' | 'right'
-            }) => ReturnType
+            setImage: (options: ImageAttrs) => ReturnType
+            insertImageAt: (pos: number, options: ImageAttrs) => ReturnType
             setImageAlignment: (
                 alignment: 'left' | 'center' | 'right',
             ) => ReturnType
@@ -48,6 +53,71 @@ const getAlignmentStyle = (alignment?: string | null) => {
     }
 }
 
+const resolveInsertPos = (state: EditorState, pos?: number) => {
+    if (typeof pos === 'number') {
+        const $pos = state.doc.resolve(Math.min(pos, state.doc.content.size))
+        if ($pos.parent.isTextblock) {
+            return $pos.after()
+        }
+        return $pos.pos
+    }
+
+    const { selection } = state
+    if (selection instanceof NodeSelection) {
+        return selection.to
+    }
+
+    const { $from } = selection
+    if ($from.parent.isTextblock) {
+        return $from.after()
+    }
+
+    return selection.to
+}
+
+const insertImageTransaction = (
+    state: EditorState,
+    options: ImageAttrs,
+    pos?: number,
+): Transaction | null => {
+    const imageType = state.schema.nodes.image
+    const paragraphType = state.schema.nodes.paragraph
+    if (!imageType || !paragraphType) {
+        return null
+    }
+
+    const imageNode = imageType.create({
+        src: options.src,
+        alt: options.alt ?? null,
+        title: options.title ?? null,
+        textAlign: options.textAlign ?? null,
+    })
+    const paragraph = paragraphType.create()
+
+    const insertPos = resolveInsertPos(state, pos)
+    const clampedPos = Math.min(Math.max(insertPos, 0), state.doc.content.size)
+    const $insert = state.doc.resolve(clampedPos)
+    const index = $insert.index()
+
+    // Parent must allow an image at this slot (listItem, doc, blockquote, …).
+    if (!$insert.parent.canReplaceWith(index, index, imageType)) {
+        return null
+    }
+
+    let tr = state.tr.insert(clampedPos, imageNode)
+    const posAfterImage = clampedPos + imageNode.nodeSize
+    const $after = tr.doc.resolve(posAfterImage)
+    if ($after.parent.canReplaceWith($after.index(), $after.index(), paragraphType)) {
+        tr = tr.insert(posAfterImage, paragraph)
+        tr = tr.setSelection(
+            TextSelection.near(tr.doc.resolve(posAfterImage + 1)),
+        )
+    } else {
+        tr = tr.setSelection(TextSelection.near(tr.doc.resolve(posAfterImage)))
+    }
+    return tr.scrollIntoView()
+}
+
 const CustomImage = Node.create<ImageOptions>({
     name: 'image',
 
@@ -67,6 +137,7 @@ const CustomImage = Node.create<ImageOptions>({
         return this.options.inline ? 'inline' : 'block'
     },
 
+    atom: true,
     draggable: true,
     selectable: true,
 
@@ -149,7 +220,6 @@ const CustomImage = Node.create<ImageOptions>({
         const baseClass = 'rounded-xl max-w-full h-auto my-4 block shadow-xs'
         const existingClass = (HTMLAttributes.class as string) || ''
 
-        // Clean out previous conflicting alignment classes if present
         const cleanedExisting = existingClass
             .replace(/\b(mx-auto|ml-auto|mr-auto)\b/g, '')
             .trim()
@@ -186,11 +256,33 @@ const CustomImage = Node.create<ImageOptions>({
         return {
             setImage:
                 (options) =>
-                ({ commands }) => {
-                    return commands.insertContent({
-                        type: this.name,
-                        attrs: options,
-                    })
+                ({ state, dispatch, commands }) => {
+                    const tr = insertImageTransaction(state, options)
+                    if (!tr) {
+                        return commands.insertContent({
+                            type: this.name,
+                            attrs: options,
+                        })
+                    }
+                    if (dispatch) {
+                        dispatch(tr)
+                    }
+                    return true
+                },
+            insertImageAt:
+                (pos, options) =>
+                ({ state, dispatch, commands }) => {
+                    const tr = insertImageTransaction(state, options, pos)
+                    if (!tr) {
+                        return commands.insertContentAt(pos, {
+                            type: this.name,
+                            attrs: options,
+                        })
+                    }
+                    if (dispatch) {
+                        dispatch(tr)
+                    }
+                    return true
                 },
             setImageAlignment:
                 (alignment) =>

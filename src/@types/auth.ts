@@ -133,6 +133,7 @@ export type User = {
     authority?: string[]
     agency?: AgencyBrief | null
     agencyName?: string | null
+    accessLevel?: AccessLevel | null
 }
 
 export type ProfilePicture = {
@@ -157,6 +158,12 @@ export type AgencyBrief = {
     is_aggregator?: number
 }
 
+export type AccessLevel = {
+    value: number
+    code: string
+    name: string
+}
+
 export type CurrentUserResponse = {
     id: number
     name: string
@@ -166,6 +173,7 @@ export type CurrentUserResponse = {
     roles: string[]
     profile_picture: ProfilePicture | null
     agency?: AgencyBrief | null
+    access_level?: AccessLevel | null
 }
 
 export type UpdateUserPayload = {

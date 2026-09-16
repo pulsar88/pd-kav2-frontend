@@ -151,15 +151,17 @@ const SpecialOfferDetail = () => {
                                 {ReactHtmlParser(offer.description || '')}
                             </div>
 
-                            <div className="mt-8">
-                                <Button
-                                    variant="solid"
-                                    icon={<TbHome />}
-                                    onClick={handleOpenPremises}
-                                >
-                                    Смотреть помещения по акции
-                                </Button>
-                            </div>
+                            {offer.has_discount ? (
+                                <div className="mt-8">
+                                    <Button
+                                        variant="solid"
+                                        icon={<TbHome />}
+                                        onClick={handleOpenPremises}
+                                    >
+                                        Смотреть помещения по скидке
+                                    </Button>
+                                </div>
+                            ) : null}
                         </div>
                     ) : (
                         <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">

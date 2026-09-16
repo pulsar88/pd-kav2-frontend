@@ -81,7 +81,7 @@ const navigationConfig: NavigationTree[] = [
             },
             {
                 key: 'mortgageCalculator',
-                path: '/tools/mortgage-calculator',
+                path: '/mortgage-calculator',
                 title: 'Калькулятор',
                 translateKey: 'nav.mortgageCalculator',
                 icon: 'calculator',
@@ -169,6 +169,16 @@ const navigationConfig: NavigationTree[] = [
                 icon: 'help',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: contentManagerAllowedAuthority,
+                subMenu: [],
+            },
+            {
+                key: 'agentCommission',
+                path: '/help/23-agentskoe-voznagrazhdenie',
+                title: 'Агентское вознаграждение',
+                translateKey: 'nav.content.agentCommission',
+                icon: 'agentCommission',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: agentCabinetAuthority,
                 subMenu: [],
             },
             {

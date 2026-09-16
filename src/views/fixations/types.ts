@@ -95,6 +95,7 @@ export type Fixation = {
     history: FixationHistoryItem[]
     has_extend_request?: boolean
     hasExtendRequest?: boolean
+    extendRejectReason?: string
 }
 
 export type GetFixationsResponse = {

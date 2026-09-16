@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { TbCalendar, TbHome } from 'react-icons/tb'
+import { TbCalendar, TbEye, TbHome } from 'react-icons/tb'
 import { PiPercentDuotone } from 'react-icons/pi'
 import Button from '@/components/ui/Button'
 import { formatOfferPeriod, stripHtml } from '../utils'
@@ -15,6 +15,7 @@ const SpecialOfferCard = ({ offer }: SpecialOfferCardProps) => {
     const preview = stripHtml(offer.description || '')
     const badgeBg = offer.color || '#0ea5e9'
     const badgeFg = offer.text_color || '#ffffff'
+    const hasDiscount = Boolean(offer.has_discount)
 
     const openOffer = () => navigate(`/offers/${offer.id}`)
 
@@ -25,8 +26,17 @@ const SpecialOfferCard = ({ offer }: SpecialOfferCardProps) => {
         )
     }
 
+    const handleActionClick = (event: MouseEvent<HTMLButtonElement>) => {
+        if (hasDiscount) {
+            openPremises(event)
+            return
+        }
+        event.stopPropagation()
+        openOffer()
+    }
+
     return (
-        <div className="group flex h-full flex-col rounded-xl border border-transparent bg-gray-100 p-6 text-left transition-colors hover:border-primary/40 hover:bg-primary/10 dark:bg-gray-700/15">
+        <div className="group flex h-full flex-col rounded-xl border border-gray-200 bg-gray-100 p-6 text-left transition-[border-color,background-color] hover:border-[var(--primary)] hover:bg-primary/10 dark:border-gray-600 dark:hover:border-[var(--primary)] dark:bg-gray-700/15">
             <button
                 type="button"
                 className="flex min-h-0 flex-1 flex-col text-left outline-hidden"
@@ -103,10 +113,10 @@ const SpecialOfferCard = ({ offer }: SpecialOfferCardProps) => {
                     block
                     size="sm"
                     variant="solid"
-                    icon={<TbHome />}
-                    onClick={openPremises}
+                    icon={hasDiscount ? <TbHome /> : <TbEye />}
+                    onClick={handleActionClick}
                 >
-                    Смотреть помещения
+                    {hasDiscount ? 'Смотреть помещения' : 'Просмотр акции'}
                 </Button>
             </div>
         </div>

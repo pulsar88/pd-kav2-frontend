@@ -1,4 +1,6 @@
 import {
+    TbArrowsJoin,
+    TbArrowsSplit,
     TbColumnInsertLeft,
     TbColumnInsertRight,
     TbColumnRemove,
@@ -17,6 +19,8 @@ import type { BaseToolButtonProps } from './types'
 
 const ToolButtonTable = ({ editor }: BaseToolButtonProps) => {
     const inTable = editor.isActive('table')
+    const canMergeCells = inTable && editor.can().mergeCells()
+    const canSplitCell = inTable && editor.can().splitCell()
 
     return (
         <Dropdown
@@ -72,6 +76,27 @@ const ToolButtonTable = ({ editor }: BaseToolButtonProps) => {
                 <span className="flex items-center gap-2">
                     <TbSquare className="text-lg" />
                     Ячейка как шапка
+                </span>
+            </Dropdown.Item>
+            <Dropdown.Item variant="divider" />
+            <Dropdown.Item
+                eventKey="merge-cells"
+                disabled={!canMergeCells}
+                onClick={() => editor.chain().focus().mergeCells().run()}
+            >
+                <span className="flex items-center gap-2">
+                    <TbArrowsJoin className="text-lg" />
+                    Объединить ячейки
+                </span>
+            </Dropdown.Item>
+            <Dropdown.Item
+                eventKey="split-cell"
+                disabled={!canSplitCell}
+                onClick={() => editor.chain().focus().splitCell().run()}
+            >
+                <span className="flex items-center gap-2">
+                    <TbArrowsSplit className="text-lg" />
+                    Разделить ячейку
                 </span>
             </Dropdown.Item>
             <Dropdown.Item variant="divider" />

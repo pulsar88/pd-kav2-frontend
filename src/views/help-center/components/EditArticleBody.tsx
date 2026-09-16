@@ -19,9 +19,12 @@ import ToolButtonImage from '@/components/shared/RichTextEditor/toolButtons/Tool
 import ToolButtonDeleteImage from '@/components/shared/RichTextEditor/toolButtons/ToolButtonDeleteImage'
 import ToolButtonTable from '@/components/shared/RichTextEditor/toolButtons/ToolButtonTable'
 import ToolButtonLink from '@/components/shared/RichTextEditor/toolButtons/ToolButtonLink'
+import ToolButtonSinkList from '@/components/shared/RichTextEditor/toolButtons/ToolButtonSinkList'
+import ToolButtonLiftList from '@/components/shared/RichTextEditor/toolButtons/ToolButtonLiftList'
 import FontSize from '@/components/shared/RichTextEditor/extensions/FontSize'
 import BlockSpacing from '@/components/shared/RichTextEditor/extensions/BlockSpacing'
 import CustomImage from '@/components/shared/RichTextEditor/extensions/Image'
+import CustomListItem from '@/components/shared/RichTextEditor/extensions/ListItem'
 import { tableExtensions } from '@/components/shared/RichTextEditor/extensions/tableExtensions'
 import { richTextTableClass } from '@/components/shared/RichTextEditor/tableStyles'
 import {
@@ -40,8 +43,6 @@ import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import { apiUploadNewsMedia } from '@/services/HelpCenterService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
-import classNames from '@/utils/classNames'
-
 type EditArticleBodyProps = {
     content?: string
     onChange: (html: string) => void
@@ -54,10 +55,10 @@ const headingColorClass =
     '[&_h1]:text-gray-900 [&_h2]:text-gray-900 [&_h3]:text-gray-900 [&_h4]:text-gray-900 [&_h5]:text-gray-900 [&_h6]:text-gray-900 dark:[&_h1]:text-gray-100 dark:[&_h2]:text-gray-100 dark:[&_h3]:text-gray-100 dark:[&_h4]:text-gray-100 dark:[&_h5]:text-gray-100 dark:[&_h6]:text-gray-100'
 
 const imageEditorClass =
-    '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:cursor-pointer [&_img]:transition-all [&_img:hover]:ring-2 [&_img:hover]:ring-primary/40 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary [&_img.ProseMirror-selectednode]:ring-offset-2 dark:[&_img.ProseMirror-selectednode]:ring-offset-gray-900 [&_img.ProseMirror-selectednode]:shadow-lg'
+    '[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:border [&_img]:border-gray-200 dark:[&_img]:border-gray-600 [&_img]:cursor-pointer [&_img]:transition-all [&_img:hover]:ring-2 [&_img:hover]:ring-primary/40 [&_img.ProseMirror-selectednode]:ring-2 [&_img.ProseMirror-selectednode]:ring-primary [&_img.ProseMirror-selectednode]:ring-offset-2 dark:[&_img.ProseMirror-selectednode]:ring-offset-gray-900 [&_img.ProseMirror-selectednode]:shadow-lg'
 
 const getEditorTypographyClass = (fillHeight?: boolean) =>
-    `m-2 focus:outline-hidden article-editor-show-blocks ${
+    `m-1 focus:outline-hidden article-editor-show-blocks ${
         fillHeight
             ? 'cursor-text outline-none'
             : proseMirrorSurfaceClass
@@ -65,6 +66,11 @@ const getEditorTypographyClass = (fillHeight?: boolean) =>
 
 const editorContentClass =
     `prose max-w-full dark:prose-invert prose-headings:text-gray-900 dark:prose-headings:text-gray-100 [&_.ProseMirror]:cursor-text [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100 ${imageEditorClass} ${richTextTableClass}`
+
+const richTextToolbarStickyClass =
+    'sticky top-16 z-20 -mx-px -mt-px flex shrink-0 flex-wrap items-center justify-start gap-x-1 gap-y-2 rounded-t-xl border border-gray-200 bg-white p-2 text-left shadow-sm dark:border-gray-700 dark:bg-gray-800'
+
+const proseMirrorMinHeightClass = '[&_.ProseMirror]:min-h-[480px]'
 
 const EditArticleBody = ({
     content,
@@ -109,12 +115,12 @@ const EditArticleBody = ({
                         editor
                             .chain()
                             .focus()
-                            .insertContentAt(currentPos, {
-                                type: 'image',
-                                attrs: { src: imageUrl, alt: file.name },
+                            .insertImageAt(currentPos, {
+                                src: imageUrl,
+                                alt: file.name,
                             })
                             .run()
-                        currentPos += 1
+                        currentPos += 2
                     } else {
                         editor
                             .chain()
@@ -150,7 +156,9 @@ const EditArticleBody = ({
                 orderedList: {
                     keepMarks: true,
                 },
+                listItem: false,
             }),
+            CustomListItem,
             TextStyle,
             Color,
             FontSize,
@@ -266,10 +274,7 @@ const EditArticleBody = ({
 
     return (
         <div
-            className={classNames(
-                'rounded-xl border border-gray-200 dark:border-gray-700',
-                fillHeight && 'flex min-h-0 flex-1 flex-col overflow-hidden',
-            )}
+            className="min-w-0 rounded-xl border border-gray-200 dark:border-gray-700"
             onDragOver={(event) => {
                 if (event.dataTransfer?.types?.includes('Files')) {
                     event.preventDefault()
@@ -293,7 +298,7 @@ const EditArticleBody = ({
                 }
             }}
         >
-            <div className="flex shrink-0 flex-wrap items-center gap-x-1 gap-y-2 border-b border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800">
+            <div className={richTextToolbarStickyClass}>
                 <ToolButtonBold editor={editor} />
                 <ToolButtonItalic editor={editor} />
                 <ToolButtonStrike editor={editor} />
@@ -309,6 +314,8 @@ const EditArticleBody = ({
                 <ToolButtonAlignRight editor={editor} />
                 <ToolButtonBulletList editor={editor} />
                 <ToolButtonOrderedList editor={editor} />
+                <ToolButtonSinkList editor={editor} />
+                <ToolButtonLiftList editor={editor} />
                 <ToolButtonCodeBlock editor={editor} />
                 <ToolButtonHorizontalRule editor={editor} />
                 <ToolButtonTable editor={editor} />
@@ -333,11 +340,7 @@ const EditArticleBody = ({
                 ) : null}
             </div>
             <div
-                className={
-                    fillHeight
-                        ? 'min-h-0 flex-1 overflow-y-auto px-2'
-                        : 'overflow-auto px-2'
-                }
+                className="min-w-0 max-w-full px-1 pb-2"
                 onMouseDown={(event) => {
                     if (event.button !== 0) return
                     if (!shouldManualFocusRichTextEditor(editor, event.target)) {
@@ -349,11 +352,7 @@ const EditArticleBody = ({
                 }}
             >
                 <EditorContent
-                    className={
-                        fillHeight
-                            ? `${editorContentClass} [&_.ProseMirror]:min-h-[240px]`
-                            : `${editorContentClass} [&_.ProseMirror]:min-h-[320px]`
-                    }
+                    className={`${editorContentClass} ${proseMirrorMinHeightClass}`}
                     editor={editor}
                 />
             </div>

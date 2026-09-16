@@ -7,6 +7,10 @@ import type { BlockSpacingAttrs } from '../extensions/BlockSpacing'
 const presets: { label: string; value: BlockSpacingAttrs | null }[] = [
     { label: 'По умолчанию', value: null },
     {
+        label: 'Без отступов',
+        value: { marginTop: '0', marginBottom: '0' },
+    },
+    {
         label: 'Маленький',
         value: { marginTop: '0.5rem', marginBottom: '0.5rem' },
     },
@@ -20,10 +24,21 @@ const presets: { label: string; value: BlockSpacingAttrs | null }[] = [
     },
 ]
 
+const normalizeSpacingToken = (token: string) => {
+    const [rawKey, ...rawValueParts] = token.split(':')
+    const key = rawKey?.trim().toLowerCase()
+    let value = rawValueParts.join(':').trim().toLowerCase()
+    if (!key || !value) return ''
+    if (/^0(px|rem|em)?$/.test(value)) {
+        value = '0'
+    }
+    return `${key}: ${value}`
+}
+
 const normalizeSpacing = (value: string | null | undefined) =>
     (value || '')
         .split(';')
-        .map((part) => part.trim())
+        .map((part) => normalizeSpacingToken(part.trim()))
         .filter(Boolean)
         .sort()
         .join('; ')
@@ -31,9 +46,15 @@ const normalizeSpacing = (value: string | null | undefined) =>
 const spacingToStyle = (attrs: BlockSpacingAttrs | null) => {
     if (!attrs) return ''
     const parts: string[] = []
-    if (attrs.marginTop) parts.push(`margin-top: ${attrs.marginTop}`)
-    if (attrs.marginBottom) parts.push(`margin-bottom: ${attrs.marginBottom}`)
-    if (attrs.paddingLeft) parts.push(`padding-left: ${attrs.paddingLeft}`)
+    if (attrs.marginTop != null && attrs.marginTop !== '') {
+        parts.push(`margin-top: ${attrs.marginTop}`)
+    }
+    if (attrs.marginBottom != null && attrs.marginBottom !== '') {
+        parts.push(`margin-bottom: ${attrs.marginBottom}`)
+    }
+    if (attrs.paddingLeft != null && attrs.paddingLeft !== '') {
+        parts.push(`padding-left: ${attrs.paddingLeft}`)
+    }
     return normalizeSpacing(parts.join('; '))
 }
 

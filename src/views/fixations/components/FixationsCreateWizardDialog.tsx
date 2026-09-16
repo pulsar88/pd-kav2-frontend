@@ -16,6 +16,7 @@ import { components } from 'react-select'
 import type { GroupBase, MenuListProps } from 'react-select'
 import DatePicker from '@/components/ui/DatePicker'
 import { Form, FormItem } from '@/components/ui/Form'
+import Checkbox from '@/components/ui/Checkbox'
 import PhoneInput from '@/components/shared/PhoneInput'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
@@ -365,6 +366,9 @@ const paymentFormatOptions: SelectOption[] = [
     { value: '1000', label: 'Неизвестно' },
 ]
 
+const CLIENT_PERSONAL_DATA_CONSENT_TEXT =
+    'Подтверждаю, что Персональные данные Клиента получены мной законным способом, я располагаю необходимым законным основанием для их передачи Оператору, предоставленные сведения являются достоверными и актуальными, а в случае обработки на основании согласия Клиента согласие получено до передачи персональных данных Оператору'
+
 const clientCreateSchema = z.object({
     lastName: z.string().min(1, { message: 'Введите фамилию' }),
     firstName: z.string().min(1, { message: 'Введите имя' }),
@@ -375,6 +379,9 @@ const clientCreateSchema = z.object({
         .regex(RU_PHONE_REGEX, {
             message: 'Введите номер телефона',
         }),
+    personalDataConsent: z.boolean().refine((value) => value, {
+        message: 'Необходимо подтверждение',
+    }),
 })
 
 type ClientCreateSchema = z.infer<typeof clientCreateSchema>
@@ -399,6 +406,7 @@ const emptyClientForm: ClientCreateSchema = {
     firstName: '',
     middleName: '',
     phone: '',
+    personalDataConsent: false,
 }
 
 const emptyRelativeForm: RelativeCreateSchema = {
@@ -1659,7 +1667,7 @@ const FixationsCreateWizardDialog = ({
                 <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4">
                     <div className="shrink-0 pr-10 sm:pr-12">
                         <Steps
-                            className="mb-2 sm:mb-4 [&_.step-item-content]:hidden sm:[&_.step-item-content]:block [&_.step-item-icon]:!h-7 [&_.step-item-icon]:!min-w-7 [&_.step-item-icon]:!w-7 [&_.step-item-icon]:!text-xs sm:[&_.step-item-icon]:!h-9 sm:[&_.step-item-icon]:!min-w-9 sm:[&_.step-item-icon]:!w-9 sm:[&_.step-item-icon]:!text-base [&_.step-connect]:!ml-0 sm:[&_.step-connect.step-title]:!ml-2.5"
+                            className="mb-2 min-w-0 sm:mb-4 [&_.step-item-content]:hidden sm:[&_.step-item-content]:block [&_.step-item-icon]:!h-7 [&_.step-item-icon]:!min-w-7 [&_.step-item-icon]:!w-7 [&_.step-item-icon]:!text-xs sm:[&_.step-item-icon]:!h-9 sm:[&_.step-item-icon]:!min-w-9 sm:[&_.step-item-icon]:!w-9 sm:[&_.step-item-icon]:!text-base [&_.step-connect]:!ml-0 sm:[&_.step-connect]:!hidden sm:!justify-between sm:[&_.step-item]:!max-w-none sm:[&_.step-item]:!flex-none sm:[&_.step-item]:!basis-auto sm:[&_.step-item-content]:!ml-2 sm:[&_.step-item-content]:!overflow-visible sm:[&_.step-item-title]:!overflow-visible"
                             current={currentStepIndex}
                             isStepEnabled={canGoToStep}
                             onChange={handleStepIndexChange}
@@ -1793,6 +1801,43 @@ const FixationsCreateWizardDialog = ({
                                                 onBlur={field.onBlur}
                                                 onChange={field.onChange}
                                             />
+                                        )}
+                                    />
+                                </FormItem>
+                                <FormItem
+                                    className="mt-1 overflow-visible"
+                                    invalid={Boolean(
+                                        clientErrors.personalDataConsent,
+                                    )}
+                                    errorMessage={
+                                        clientErrors.personalDataConsent
+                                            ?.message
+                                    }
+                                >
+                                    <Controller
+                                        name="personalDataConsent"
+                                        control={clientControl}
+                                        render={({ field }) => (
+                                            <Checkbox
+                                                className="flex w-full min-w-0 !items-start gap-2.5 ps-1 [&>.checkbox-wrapper]:mt-0.5"
+                                                checked={field.value}
+                                                checkboxClass={
+                                                    clientErrors.personalDataConsent
+                                                        ? 'text-error ring-error border-error'
+                                                        : undefined
+                                                }
+                                                onChange={(checked) =>
+                                                    field.onChange(
+                                                        Boolean(checked),
+                                                    )
+                                                }
+                                            >
+                                                <span className="min-w-0 flex-1 text-sm font-normal leading-snug text-gray-700 dark:text-gray-300">
+                                                    {
+                                                        CLIENT_PERSONAL_DATA_CONSENT_TEXT
+                                                    }
+                                                </span>
+                                            </Checkbox>
                                         )}
                                     />
                                 </FormItem>

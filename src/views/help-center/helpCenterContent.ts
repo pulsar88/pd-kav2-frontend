@@ -68,3 +68,17 @@ export const extractFileNameFromSrc = (src: string): string => {
         return src
     }
 }
+
+/** Wrap bare <table> in .tableWrapper so wide tables scroll inside, not the page */
+export const wrapTablesInScrollContainers = (html: string): string => {
+    if (!html?.trim()) return html
+
+    return html.replace(/<table\b[\s\S]*?<\/table>/gi, (tableHtml, offset) => {
+        const before = html.slice(Math.max(0, offset - 80), offset)
+        if (/tableWrapper["'\s>][^>]*?>\s*$/i.test(before)) {
+            return tableHtml
+        }
+        return `<div class="tableWrapper">${tableHtml}</div>`
+    })
+}
+

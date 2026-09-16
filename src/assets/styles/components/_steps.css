@@ -1,6 +1,6 @@
 @layer components {
   .steps {
-    @apply flex justify-between items-center;
+    @apply flex items-center;
 
     &.steps-vertical {
       @apply flex-col items-start;
@@ -8,7 +8,7 @@
   }
 
   .step-item {
-    @apply flex items-center;
+    @apply flex min-w-0 items-center;
 
     &.step-item-vertical {
       @apply items-start flex-col;
@@ -49,12 +49,12 @@
   }
 
   .step-item-wrapper {
-    @apply flex items-center;
+    @apply flex min-w-0 shrink items-center;
   }
 
   .step-item-icon {
     min-width: 2.25rem;
-    @apply text-lg rounded-full w-9 h-9 flex items-center justify-center font-semibold;
+    @apply text-lg rounded-full w-9 h-9 flex items-center justify-center font-semibold shrink-0;
 
     &.step-item-icon-pending {
       @apply border-2 border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400;
@@ -66,11 +66,11 @@
   }
 
   .step-item-content {
-    @apply ltr:ml-3 rtl:mr-3 relative;
+    @apply relative min-w-0 overflow-hidden ltr:ml-3 rtl:mr-3;
   }
 
   .step-item-title {
-    @apply whitespace-nowrap font-bold block text-gray-600 dark:text-gray-300;
+    @apply block truncate font-bold text-gray-600 dark:text-gray-300;
 
     &.step-item-title-error {
       @apply text-red-500;
@@ -95,7 +95,8 @@
 
   .step-connect {
     height: 2px;
-    @apply w-full;
+    /* flex-1 keeps a visible line even when step titles are long */
+    @apply min-w-3 flex-1 basis-0;
 
     &.inactive {
       @apply bg-gray-200 dark:bg-gray-600;
@@ -104,6 +105,7 @@
     &.step-connect-vertical {
       min-height: 3.5rem;
       width: 2px;
+      flex: none;
       @apply ltr:ml-4 rtl:mr-4;
     }
   }

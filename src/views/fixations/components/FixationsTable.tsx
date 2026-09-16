@@ -302,6 +302,38 @@ const FixationsTable = ({
                     )
                     const canExtend =
                         fixation.status === 'fixed' && !hasExtendRequest
+                    const rejectReason = fixation.extendRejectReason
+                    const wasRejected = rejectReason != null
+                    const rejectReasonText = rejectReason?.trim() || ''
+
+                    const rejectedTooltip = (
+                        <div className="max-w-[260px] space-y-1.5 text-left">
+                            <div className="text-sm font-semibold text-rose-300">
+                                Продление отклонено
+                            </div>
+                            {rejectReasonText ? (
+                                <div className="rounded-md bg-rose-500/20 px-2 py-1.5 text-sm leading-snug text-white">
+                                    <span className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-rose-200">
+                                        Причина
+                                    </span>
+                                    {rejectReasonText}
+                                </div>
+                            ) : null}
+                            {hasExtendRequest ? (
+                                <div className="text-xs text-gray-300">
+                                    Запрос на продление уже существует
+                                </div>
+                            ) : canExtend ? (
+                                <div className="text-xs text-gray-300">
+                                    Можно создать новую заявку
+                                </div>
+                            ) : (
+                                <div className="text-xs text-gray-300">
+                                    Продление недоступно
+                                </div>
+                            )}
+                        </div>
+                    )
 
                     return (
                         <div
@@ -320,23 +352,42 @@ const FixationsTable = ({
                                 />
                             </Tooltip>
                             {hasExtendRequest ? (
-                                <Tooltip title="Запрос на продление уже существует">
-                                    <span className="inline-flex cursor-default items-center justify-center p-1 text-amber-500 dark:text-amber-400">
+                                <Tooltip
+                                    title={
+                                        wasRejected
+                                            ? rejectedTooltip
+                                            : 'Запрос на продление уже существует'
+                                    }
+                                >
+                                    <span
+                                        className={
+                                            wasRejected
+                                                ? 'inline-flex cursor-default items-center justify-center rounded-md bg-rose-50 p-1 text-rose-600 ring-1 ring-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-500/40'
+                                                : 'inline-flex cursor-default items-center justify-center p-1 text-amber-500 dark:text-amber-400'
+                                        }
+                                    >
                                         <TbCalendarTime className="text-lg" />
                                     </span>
                                 </Tooltip>
                             ) : (
                                 <Tooltip
                                     title={
-                                        canExtend
-                                            ? 'Создать заявку на продление'
-                                            : 'Продление недоступно'
+                                        wasRejected
+                                            ? rejectedTooltip
+                                            : canExtend
+                                              ? 'Создать заявку на продление'
+                                              : 'Продление недоступно'
                                     }
                                 >
                                     <span className="inline-flex">
                                         <Button
                                             size="xs"
                                             variant="plain"
+                                            className={
+                                                wasRejected
+                                                    ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100 hover:text-rose-700 dark:bg-rose-500/15 dark:text-rose-400 dark:ring-rose-500/40 dark:hover:bg-rose-500/25 dark:hover:text-rose-300'
+                                                    : undefined
+                                            }
                                             icon={<TbCalendarPlus />}
                                             disabled={!canExtend}
                                             onClick={() =>

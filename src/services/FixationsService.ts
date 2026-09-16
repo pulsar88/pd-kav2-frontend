@@ -504,6 +504,7 @@ export type FixationExtendRequest = {
     extend_days?: number
     days?: number
     comment?: string | null
+    reject_reason?: string | null
     created_at?: string
     updated_at?: string
     status?: string | { value?: string; name?: string; code?: string }
@@ -660,16 +661,19 @@ export async function apiApproveFixationExtendRequest(
 ): Promise<void> {
     await ApiService.fetchDataWithAxios({
         url: endpointConfig.fixationExtendRequestApprove(id),
-        method: 'get',
+        method: 'post',
     })
 }
 
 export async function apiRejectFixationExtendRequest(
     id: string | number,
+    rejectReason?: string,
 ): Promise<void> {
+    const trimmed = rejectReason?.trim()
     await ApiService.fetchDataWithAxios({
         url: endpointConfig.fixationExtendRequestReject(id),
-        method: 'delete',
+        method: 'post',
+        ...(trimmed ? { data: { reject_reason: trimmed } } : {}),
     })
 }
 

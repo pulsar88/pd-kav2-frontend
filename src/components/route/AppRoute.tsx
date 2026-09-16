@@ -1,7 +1,9 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { useRouteKeyStore } from '@/store/routeKeyStore'
 import { useLocation } from 'react-router'
 import { useThemeStore } from '@/store/themeStore'
+import navigationConfig from '@/configs/navigation.config'
+import type { NavigationTree } from '@/@types/navigation'
 import type { LayoutType } from '@/@types/theme'
 import type { ComponentType } from 'react'
 
@@ -9,6 +11,22 @@ export type AppRouteProps<T> = {
     component: ComponentType<T>
     routeKey: string
     layout?: LayoutType
+}
+
+const findExactNavKey = (
+    items: NavigationTree[],
+    pathname: string,
+): string | undefined => {
+    for (const item of items) {
+        if (item.path && item.path === pathname) {
+            return item.key
+        }
+        if (item.subMenu?.length) {
+            const nested = findExactNavKey(item.subMenu, pathname)
+            if (nested) return nested
+        }
+    }
+    return undefined
 }
 
 const AppRoute = <T extends Record<string, unknown>>({
@@ -28,8 +46,14 @@ const AppRoute = <T extends Record<string, unknown>>({
         (state) => state.setCurrentRouteKey,
     )
 
+    const resolvedRouteKey = useMemo(
+        () =>
+            findExactNavKey(navigationConfig, location.pathname) ?? routeKey,
+        [location.pathname, routeKey],
+    )
+
     const handleLayoutChange = useCallback(() => {
-        setCurrentRouteKey(routeKey)
+        setCurrentRouteKey(resolvedRouteKey)
 
         if (props.layout && props.layout !== layoutType) {
             setPreviousLayout(layoutType)
@@ -41,7 +65,7 @@ const AppRoute = <T extends Record<string, unknown>>({
             setPreviousLayout('')
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [props.layout, routeKey])
+    }, [props.layout, resolvedRouteKey])
 
     useEffect(() => {
         handleLayoutChange()

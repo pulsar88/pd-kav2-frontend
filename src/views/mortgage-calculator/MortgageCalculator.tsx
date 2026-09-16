@@ -21,9 +21,7 @@ import {
 import { downloadSchedulePdf } from './downloadSchedulePdf'
 import type { MortgageResult, PaymentType } from './types'
 import Tooltip from '@/components/ui/Tooltip'
-import { useNavigate } from 'react-router'
 import {
-    TbArrowNarrowLeft,
     TbCalculator,
     TbCalendarStats,
     TbCash,
@@ -43,7 +41,6 @@ type MonthOption = { value: number; label: string }
 type YearOption = { value: number; label: string }
 
 const currentYear = new Date().getFullYear()
-const currentMonth = new Date().getMonth() + 1
 const SCROLL_OFFSET = HEADER_HEIGHT + 16
 const SCHEDULE_PAGE_SIZE = 12
 
@@ -98,14 +95,13 @@ const DetailItem = ({
 )
 
 const MortgageCalculator = () => {
-    const navigate = useNavigate()
     const [paymentType, setPaymentType] = useState<PaymentType>('annuity')
-    const [propertyPrice, setPropertyPrice] = useState('8 000 000')
-    const [downPayment, setDownPayment] = useState('1 600 000')
-    const [termYears, setTermYears] = useState('20')
-    const [annualRate, setAnnualRate] = useState('18')
-    const [startMonth, setStartMonth] = useState(currentMonth)
-    const [startYear, setStartYear] = useState(currentYear)
+    const [propertyPrice, setPropertyPrice] = useState('')
+    const [downPayment, setDownPayment] = useState('')
+    const [termYears, setTermYears] = useState('')
+    const [annualRate, setAnnualRate] = useState('')
+    const [startMonth, setStartMonth] = useState<number | null>(null)
+    const [startYear, setStartYear] = useState<number | null>(null)
     const [error, setError] = useState('')
     const [result, setResult] = useState<MortgageResult | null>(null)
     const [schedulePage, setSchedulePage] = useState(1)
@@ -113,11 +109,17 @@ const MortgageCalculator = () => {
     const scheduleRef = useRef<HTMLDivElement>(null)
 
     const selectedMonth = useMemo(
-        () => MONTH_OPTIONS.find((m) => m.value === startMonth) || null,
+        () =>
+            startMonth == null
+                ? null
+                : MONTH_OPTIONS.find((m) => m.value === startMonth) ?? null,
         [startMonth],
     )
     const selectedYear = useMemo(
-        () => yearOptions.find((y) => y.value === startYear) || null,
+        () =>
+            startYear == null
+                ? null
+                : yearOptions.find((y) => y.value === startYear) ?? null,
         [startYear],
     )
 
@@ -151,6 +153,10 @@ const MortgageCalculator = () => {
         }
         if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
             setError('Укажите процентную ставку от 0 до 100')
+            return
+        }
+        if (startMonth == null || startYear == null) {
+            setError('Укажите месяц и год начала выплат')
             return
         }
 
@@ -210,18 +216,6 @@ const MortgageCalculator = () => {
                     bordered: true,
                     content: (
                         <div>
-                            <button
-                                type="button"
-                                className="mb-4 inline-flex items-center gap-3 text-gray-800 outline-hidden transition-colors hover:text-primary dark:text-gray-100 dark:hover:text-primary"
-                                onClick={() => navigate('/tools')}
-                            >
-                                <span className="rounded-full bg-gray-100 p-2 text-xl transition-colors hover:bg-primary/10 dark:bg-gray-700 dark:hover:bg-primary/20">
-                                    <TbArrowNarrowLeft />
-                                </span>
-                                <span className="text-sm font-semibold">
-                                    Назад
-                                </span>
-                            </button>
                             <h3 className="mb-1">Ипотечный калькулятор</h3>
                             <p className="text-sm font-normal text-gray-500 dark:text-gray-400">
                                 Рассчитайте ежемесячный платёж и график выплат
@@ -284,7 +278,7 @@ const MortgageCalculator = () => {
                         <FormItem label="Стоимость недвижимости, ₽">
                             <Input
                                 value={propertyPrice}
-                                placeholder="8 000 000"
+                                placeholder="Сумма"
                                 onChange={(e) =>
                                     setPropertyPrice(e.target.value)
                                 }
@@ -293,7 +287,7 @@ const MortgageCalculator = () => {
                         <FormItem label="Первоначальный взнос, ₽">
                             <Input
                                 value={downPayment}
-                                placeholder="1 600 000"
+                                placeholder="Сумма"
                                 onChange={(e) =>
                                     setDownPayment(e.target.value)
                                 }
@@ -302,14 +296,14 @@ const MortgageCalculator = () => {
                         <FormItem label="Срок ипотеки, лет">
                             <Input
                                 value={termYears}
-                                placeholder="20"
+                                placeholder="Лет"
                                 onChange={(e) => setTermYears(e.target.value)}
                             />
                         </FormItem>
                         <FormItem label="Процентная ставка, %">
                             <Input
                                 value={annualRate}
-                                placeholder="18"
+                                placeholder="Ставка"
                                 onChange={(e) => setAnnualRate(e.target.value)}
                             />
                         </FormItem>
@@ -317,8 +311,9 @@ const MortgageCalculator = () => {
                             <Select<MonthOption>
                                 options={MONTH_OPTIONS}
                                 value={selectedMonth}
+                                placeholder="Месяц"
                                 onChange={(option) => {
-                                    if (option) setStartMonth(option.value)
+                                    setStartMonth(option?.value ?? null)
                                 }}
                             />
                         </FormItem>
@@ -326,8 +321,9 @@ const MortgageCalculator = () => {
                             <Select<YearOption>
                                 options={yearOptions}
                                 value={selectedYear}
+                                placeholder="Год"
                                 onChange={(option) => {
-                                    if (option) setStartYear(option.value)
+                                    setStartYear(option?.value ?? null)
                                 }}
                             />
                         </FormItem>
@@ -442,7 +438,7 @@ const MortgageCalculator = () => {
                                 <TbCalculator />
                             </div>
                             <p className="max-w-xs text-sm text-gray-500 dark:text-gray-400">
-                                Заполните параметры слева и нажмите «Рассчитать
+                                Заполните параметры и нажмите «Рассчитать
                                 ипотеку»
                             </p>
                         </div>

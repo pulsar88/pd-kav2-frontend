@@ -209,18 +209,18 @@ const EditArticle = () => {
     return (
         <div
             className={classNames(
-                'flex h-[calc(100dvh-10rem)] flex-col overflow-hidden py-6',
+                'flex flex-col py-6',
                 PAGE_CONTAINER_GUTTER_X,
             )}
         >
             <Card
-                className="flex min-h-0 w-full flex-1 flex-col overflow-hidden"
-                bodyClass="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+                className="w-full"
+                bodyClass="flex flex-col gap-4"
             >
                 <Loading
                     type="cover"
                     loading={isLoading}
-                    className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+                    className="flex flex-col gap-4"
                 >
                     {data ? (
                         <>
@@ -266,8 +266,9 @@ const EditArticle = () => {
                 <p className="mt-3 text-sm font-medium text-amber-700 dark:text-amber-300">
                     Пользователей может быть много — уведомление получат все.
                 </p>
-                <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                     <Button
+                        className="w-full sm:w-auto"
                         variant="plain"
                         disabled={isSaving}
                         onClick={() => setIsNotifyDialogOpen(false)}
@@ -275,20 +276,25 @@ const EditArticle = () => {
                         Отмена
                     </Button>
                     <Button
+                        className="w-full sm:w-auto"
                         variant="default"
+                        disabled={isSaving}
+                        loading={isSaving && pendingNotify === true}
+                        customColorClass={() =>
+                            'border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 active:bg-red-100 dark:border-red-500/50 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20'
+                        }
+                        onClick={() => void handleSave(false, true)}
+                    >
+                        Уведомить всех
+                    </Button>
+                    <Button
+                        className="w-full sm:w-auto"
+                        variant="solid"
                         disabled={isSaving}
                         loading={isSaving && pendingNotify === false}
                         onClick={() => void handleSave(false, false)}
                     >
                         Без уведомления
-                    </Button>
-                    <Button
-                        variant="solid"
-                        disabled={isSaving}
-                        loading={isSaving && pendingNotify === true}
-                        onClick={() => void handleSave(false, true)}
-                    >
-                        Уведомить всех
                     </Button>
                 </div>
             </Dialog>

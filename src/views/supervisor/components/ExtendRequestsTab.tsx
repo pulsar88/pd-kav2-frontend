@@ -5,6 +5,7 @@ import Tag from '@/components/ui/Tag'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import Dropdown from '@/components/ui/Dropdown'
+import Input from '@/components/ui/Input'
 import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
@@ -149,9 +150,8 @@ export const getExtendDays = (item: FixationExtendRequest): number | null => {
 }
 
 export const getComment = (item: FixationExtendRequest): string => {
-    if (item.comment) return item.comment
-    if (item.fixation?.comment) return item.fixation.comment
-    return '—'
+    const comment = item.comment?.trim()
+    return comment || '—'
 }
 
 export const getRequestStatus = (item: FixationExtendRequest): string => {
@@ -205,6 +205,13 @@ const ExtendRequestsTab = () => {
     const [dialogType, setDialogType] = useState<'approve' | 'reject' | null>(
         null,
     )
+    const [rejectReason, setRejectReason] = useState('')
+
+    const closeActionDialog = () => {
+        setSelectedRequest(null)
+        setDialogType(null)
+        setRejectReason('')
+    }
 
     useEffect(() => {
         saveColumnVisibility(columnVisibility)
@@ -267,7 +274,10 @@ const ExtendRequestsTab = () => {
                     { placement: 'top-center' },
                 )
             } else {
-                await apiRejectFixationExtendRequest(selectedRequest.id)
+                await apiRejectFixationExtendRequest(
+                    selectedRequest.id,
+                    rejectReason,
+                )
                 toast.push(
                     <Notification type="info">
                         Запрос на продление для «{clientName}» отклонен
@@ -275,8 +285,7 @@ const ExtendRequestsTab = () => {
                     { placement: 'top-center' },
                 )
             }
-            setSelectedRequest(null)
-            setDialogType(null)
+            closeActionDialog()
             void loadRequests()
         } catch (err: unknown) {
             const actionText =
@@ -536,6 +545,7 @@ const ExtendRequestsTab = () => {
                                     }
                                     onClick={() => {
                                         setSelectedRequest(item)
+                                        setRejectReason('')
                                         setDialogType('reject')
                                     }}
                                 />
@@ -663,17 +673,11 @@ const ExtendRequestsTab = () => {
                             ? 'bg-emerald-600 hover:bg-emerald-700'
                             : 'bg-rose-600 hover:bg-rose-700',
                 }}
-                onClose={() => {
-                    setSelectedRequest(null)
-                    setDialogType(null)
-                }}
-                onCancel={() => {
-                    setSelectedRequest(null)
-                    setDialogType(null)
-                }}
+                onClose={closeActionDialog}
+                onCancel={closeActionDialog}
                 onConfirm={handleConfirmAction}
             >
-                <div className="space-y-2">
+                <div className="space-y-3">
                     <p>
                         {dialogType === 'approve'
                             ? `Вы уверены, что хотите одобрить продление фиксации для клиента «${
@@ -693,9 +697,27 @@ const ExtendRequestsTab = () => {
                     {selectedRequest &&
                         getComment(selectedRequest) !== '—' && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                Комментарий: «{getComment(selectedRequest)}»
+                                Комментарий к запросу: «
+                                {getComment(selectedRequest)}»
                             </p>
                         )}
+                    {dialogType === 'reject' ? (
+                        <div>
+                            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                                Причина отклонения
+                            </label>
+                            <Input
+                                textArea
+                                rows={3}
+                                value={rejectReason}
+                                placeholder="Укажите причину отклонения"
+                                disabled={actionLoading}
+                                onChange={(e) =>
+                                    setRejectReason(e.target.value)
+                                }
+                            />
+                        </div>
+                    ) : null}
                 </div>
             </ConfirmDialog>
         </div>

@@ -9,6 +9,7 @@ export type SpecialOffer = {
     end_date: string
     badge_icon: string | null
     badge_text: string | null
+    has_discount: boolean
     properties_count?: number
 }
 

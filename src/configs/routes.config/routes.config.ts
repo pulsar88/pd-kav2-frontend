@@ -81,18 +81,8 @@ export const protectedRoutes: Routes = [
         authority: agentCabinetAuthority,
     },
     {
-        key: 'tools',
-        path: '/tools',
-        component: lazy(() => import('@/views/tools')),
-        authority: agentCabinetAuthority,
-        meta: {
-            pageContainerType: 'gutterless',
-            pageBackgroundType: 'plain',
-        },
-    },
-    {
-        key: 'tools',
-        path: '/tools/mortgage-calculator',
+        key: 'mortgageCalculator',
+        path: '/mortgage-calculator',
         component: lazy(() => import('@/views/mortgage-calculator')),
         authority: agentCabinetAuthority,
         meta: {

@@ -12,6 +12,7 @@ import {
     PiCalculatorDuotone,
     PiScalesDuotone,
     PiPercentDuotone,
+    PiCurrencyCircleDollarDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
 import { TbMailForward, TbUserCheck } from 'react-icons/tb'
@@ -28,6 +29,7 @@ const navigationIcon: NavigationIcons = {
     tools: <PiWrenchDuotone />,
     calculator: <PiCalculatorDuotone />,
     help: <PiQuestionDuotone />,
+    agentCommission: <PiCurrencyCircleDollarDuotone />,
     news: <PiNewspaperDuotone />,
     events: <PiCalendarDuotone />,
     offers: <PiPercentDuotone />,

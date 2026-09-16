@@ -40,7 +40,7 @@ const endpointConfig = {
     fixationExtendRequestApprove: (requestId: string | number) =>
         `/v2/fixations/extend_requests/${requestId}/approve`,
     fixationExtendRequestReject: (requestId: string | number) =>
-        `/v2/fixations/extend_requests/${requestId}`,
+        `/v2/fixations/extend_requests/${requestId}/reject`,
     fixationRestore: (fixationId: string | number) =>
         `/v2/fixations/${fixationId}/restore`,
     fixationGigalogs: (fixationId: string | number) =>

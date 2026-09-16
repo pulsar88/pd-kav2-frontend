@@ -21,7 +21,7 @@ export const mapUserToProfileForm = (
     img: user.avatar || '',
     agency: user.agencyName || user.agency?.name || '',
     role: getUserRoleLabel(user.authority?.[0]),
-    level: '—',
+    accessLevel: user.accessLevel ?? null,
 })
 
 export const mapProfileFormToUpdateUserPayload = (

@@ -574,7 +574,7 @@ const FixationDetails = () => {
                                         }
                                     />
                                     <SummaryStat
-                                        label="ЖК"
+                                        label="ЖК и срок фиксации"
                                         value={
                                             <div>
                                                 <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
@@ -585,22 +585,53 @@ const FixationDetails = () => {
                                                         {data.apartment}
                                                     </div>
                                                 ) : null}
+                                                <div className="mt-1 text-sm font-medium break-words">
+                                                    <span className="text-gray-500 dark:text-gray-400">
+                                                        до{' '}
+                                                    </span>
+                                                    <FixationExpiryDate
+                                                        value={data.expiresAt}
+                                                    />
+                                                </div>
                                             </div>
                                         }
                                     />
                                     <SummaryStat
-                                        label="Срок фиксации"
-                                        value={
-                                            <FixationExpiryDate
-                                                value={data.expiresAt}
-                                            />
-                                        }
+                                        label="Ответственный агент"
+                                        value={(() => {
+                                            const hasTargetAgent = Boolean(
+                                                data.targetAgentName ||
+                                                    data.targetAgentPhone,
+                                            )
+                                            const name = hasTargetAgent
+                                                ? data.targetAgentName || '—'
+                                                : data.agent.fullName || '—'
+                                            const phone = hasTargetAgent
+                                                ? data.targetAgentPhone || '—'
+                                                : data.agent.phone || '—'
+
+                                            return (
+                                                <div>
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
+                                                        {name}
+                                                    </div>
+                                                    <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words">
+                                                        {phone}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
                                     />
                                     <SummaryStat
-                                        label="Ответственный агент"
+                                        label="Менеджер"
                                         value={
-                                            <div className="break-words [overflow-wrap:anywhere]">
-                                                {data.agent.fullName || '—'}
+                                            <div>
+                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
+                                                    {data.managerName || '—'}
+                                                </div>
+                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words">
+                                                    {data.managerPhone || '—'}
+                                                </div>
                                             </div>
                                         }
                                     />

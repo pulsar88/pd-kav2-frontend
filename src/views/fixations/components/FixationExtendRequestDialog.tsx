@@ -91,6 +91,24 @@ const FixationExtendRequestDialog = ({
                     : 'Фиксация'}
             </p>
 
+            {fixation?.extendRejectReason != null ? (
+                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 dark:border-rose-500/40 dark:bg-rose-500/10">
+                    <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
+                        Предыдущее продление отклонено
+                    </p>
+                    {fixation.extendRejectReason.trim() ? (
+                        <p className="mt-1.5 text-sm leading-relaxed text-rose-800 dark:text-rose-200">
+                            <span className="font-medium">Причина: </span>
+                            {fixation.extendRejectReason.trim()}
+                        </p>
+                    ) : (
+                        <p className="mt-1 text-xs text-rose-600/80 dark:text-rose-300/80">
+                            Причина отклонения не указана
+                        </p>
+                    )}
+                </div>
+            ) : null}
+
             <Form onSubmit={handleSubmit(handleFormSubmit)}>
                 <FormItem
                     label="На сколько дней продлить"

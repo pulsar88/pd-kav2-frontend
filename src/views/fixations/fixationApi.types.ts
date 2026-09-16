@@ -106,6 +106,15 @@ export type FixationApiAdditionalClient = FixationApiClient & {
     }
 }
 
+export type FixationApiExtendRequest = {
+    id?: number | string
+    comment?: string | null
+    reject_reason?: string | null
+    status?: string | { value?: string; name?: string; code?: string }
+    created_at?: string
+    updated_at?: string
+}
+
 export type FixationApiItem = {
     id: number
     status: FixationApiStatusRelation
@@ -131,6 +140,8 @@ export type FixationApiItem = {
     has_extend_request?: boolean
     agent_name?: string | null
     agent_phone?: string | null
+    extend_requests?: FixationApiExtendRequest[]
+    extendRequests?: FixationApiExtendRequest[]
 }
 
 export type FixationsApiMeta = {

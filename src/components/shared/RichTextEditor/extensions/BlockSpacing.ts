@@ -17,9 +17,15 @@ declare module '@tiptap/core' {
 
 const toStyle = (attrs: BlockSpacingAttrs) => {
     const parts: string[] = []
-    if (attrs.marginTop) parts.push(`margin-top: ${attrs.marginTop}`)
-    if (attrs.marginBottom) parts.push(`margin-bottom: ${attrs.marginBottom}`)
-    if (attrs.paddingLeft) parts.push(`padding-left: ${attrs.paddingLeft}`)
+    if (attrs.marginTop != null && attrs.marginTop !== '') {
+        parts.push(`margin-top: ${attrs.marginTop}`)
+    }
+    if (attrs.marginBottom != null && attrs.marginBottom !== '') {
+        parts.push(`margin-bottom: ${attrs.marginBottom}`)
+    }
+    if (attrs.paddingLeft != null && attrs.paddingLeft !== '') {
+        parts.push(`padding-left: ${attrs.paddingLeft}`)
+    }
     return parts.length ? parts.join('; ') : null
 }
 

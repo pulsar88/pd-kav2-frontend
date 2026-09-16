@@ -3,20 +3,18 @@ import Loading from '@/components/shared/Loading'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import MediaSkeleton from '@/components/shared/loaders/MediaSkeleton'
 import TextBlockSkeleton from '@/components/shared/loaders/TextBlockSkeleton'
-import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Notification from '@/components/ui/Notification'
-import Tag from '@/components/ui/Tag'
 import toast from '@/components/ui/toast'
 import ArticleBody from './components/ArticleBody'
 import ArticleTableOfContent from './components/ArticleTableOfContent'
+import ArticleViewActions from './components/ArticleViewActions'
 import {
     apiDeleteSupportHubArticle,
     apiGetSupportHubArticle,
 } from '@/services/HelpCenterService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { useNavigate, useParams } from 'react-router'
-import { TbArrowNarrowLeft, TbEdit, TbTrash } from 'react-icons/tb'
 import { CONTENT_MANAGER } from '@/constants/roles.constant'
 import { PAGE_CONTAINER_GUTTER_X } from '@/constants/theme.constant'
 import { useSessionUser } from '@/store/authStore'
@@ -106,61 +104,7 @@ const Article = () => {
             )}
         >
             <div className="min-w-0 gap-4 lg:flex">
-                <Card
-                    className="min-w-0 w-full flex-1"
-                    header={{
-                        bordered: true,
-                        className: 'card-header-extra',
-                        content: (
-                            <button
-                                type="button"
-                                className="inline-flex shrink-0 items-center gap-3 text-gray-800 outline-hidden transition-colors hover:text-primary dark:text-gray-100 dark:hover:text-primary"
-                                onClick={() => navigate(kind.basePath)}
-                            >
-                                <span className="rounded-full bg-gray-100 p-2 text-xl transition-colors hover:bg-primary/10 dark:bg-gray-700 dark:hover:bg-primary/20">
-                                    <TbArrowNarrowLeft />
-                                </span>
-                                <span className="text-sm font-semibold">
-                                    Назад
-                                </span>
-                            </button>
-                        ),
-                        extra: (
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                {data?.isDraft ? (
-                                    <Tag className="border-amber-200 bg-amber-50 text-xs font-semibold text-amber-600 dark:border-amber-700/50 dark:bg-amber-500/20">
-                                        Черновик
-                                    </Tag>
-                                ) : null}
-                                {slug && canManageContent ? (
-                                    <>
-                                        <Button
-                                            variant="solid"
-                                            icon={<TbEdit />}
-                                            onClick={() =>
-                                                navigate(
-                                                    `${kind.basePath}/${slug}/edit`,
-                                                )
-                                            }
-                                        >
-                                            Редактировать
-                                        </Button>
-                                        <Button
-                                            variant="plain"
-                                            icon={<TbTrash />}
-                                            className="border border-error text-error hover:bg-error/10 hover:text-error"
-                                            onClick={() =>
-                                                setIsDeleteOpen(true)
-                                            }
-                                        >
-                                            Удалить
-                                        </Button>
-                                    </>
-                                ) : null}
-                            </div>
-                        ),
-                    }}
-                >
+                <Card className="min-w-0 w-full flex-1">
                     <Loading
                         loading={isLoading}
                         customLoader={
@@ -178,6 +122,16 @@ const Article = () => {
                     <ArticleTableOfContent content={data.tableOfContent} />
                 ) : null}
             </div>
+
+            <ArticleViewActions
+                onBack={() => navigate(kind.basePath)}
+                canManage={Boolean(slug && canManageContent)}
+                isDraft={Boolean(data?.isDraft)}
+                onEdit={() =>
+                    navigate(`${kind.basePath}/${slug}/edit`)
+                }
+                onDelete={() => setIsDeleteOpen(true)}
+            />
 
             <ConfirmDialog
                 isOpen={isDeleteOpen}

@@ -14,7 +14,15 @@
 
 .ProseMirror img {
     cursor: pointer;
-    transition: outline 0.15s ease-in-out, box-shadow 0.15s ease-in-out, filter 0.15s ease-in-out;
+    box-sizing: border-box;
+    max-width: 100%;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    transition: outline 0.15s ease-in-out, box-shadow 0.15s ease-in-out, filter 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.dark .ProseMirror img {
+    border-color: rgb(75 85 99);
 }
 
 .ProseMirror img:hover {
@@ -29,14 +37,31 @@
 }
 
 /* TipTap tables — keep readable columns; scroll horizontally when wide */
+.ProseMirror {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    /* Место под outline/ring выбора картинок и пунктир блоков — без overflow, иначе обрезает */
+    padding-inline: 0.625rem;
+    padding-block: 0.375rem;
+    box-sizing: border-box;
+}
+
+.prose {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .ProseMirror .tableWrapper,
 .prose .tableWrapper {
     display: block;
     width: 100%;
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     margin: 1rem 0;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
 }
 
 .ProseMirror table.rich-text-table,
@@ -157,8 +182,11 @@
 .ProseMirror.article-editor-show-blocks > ol {
     position: relative;
     border-radius: 0.25rem;
-    outline: 1px dashed rgba(148, 163, 184, 0.55);
-    outline-offset: 2px;
+    border: 1px dashed rgba(148, 163, 184, 0.55);
+    margin-block: 0.4rem;
+    padding-block: 0.15rem;
+    padding-inline: 0.35rem;
+    outline: none;
 }
 
 .dark .ProseMirror.article-editor-show-blocks > p,
@@ -172,7 +200,24 @@
 .dark .ProseMirror.article-editor-show-blocks > pre,
 .dark .ProseMirror.article-editor-show-blocks > ul,
 .dark .ProseMirror.article-editor-show-blocks > ol {
-    outline-color: rgba(100, 116, 139, 0.65);
+    border-color: rgba(100, 116, 139, 0.65);
+}
+
+/* Маркеры в padding списка — внутри рамки, текст на одной строке с маркером */
+.ProseMirror.article-editor-show-blocks > ul,
+.ProseMirror.article-editor-show-blocks > ol {
+    list-style-position: outside;
+    padding-inline-start: 1.75rem;
+    padding-inline-end: 0.5rem;
+}
+
+.ProseMirror.article-editor-show-blocks > ul ul,
+.ProseMirror.article-editor-show-blocks > ul ol,
+.ProseMirror.article-editor-show-blocks > ol ul,
+.ProseMirror.article-editor-show-blocks > ol ol {
+    list-style-position: outside;
+    padding-inline-start: 1.5rem;
+    margin-block: 0.25rem;
 }
 
 .ProseMirror.article-editor-show-blocks > p {

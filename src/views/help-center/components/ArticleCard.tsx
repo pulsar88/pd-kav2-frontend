@@ -32,7 +32,7 @@ const ArticleCard = ({
     const itemSlug = buildItemSlug(id, code)
 
     return (
-        <div className="group flex h-full flex-col rounded-xl border border-transparent bg-gray-100 p-6 text-left transition-colors hover:border-primary/40 hover:bg-primary/10 dark:bg-gray-700 dark:bg-gray-700/15">
+        <div className="group flex h-full flex-col rounded-xl border border-gray-200 bg-gray-100 p-6 text-left transition-[border-color,background-color] hover:border-[var(--primary)] hover:bg-primary/10 dark:border-gray-600 dark:hover:border-[var(--primary)] dark:bg-gray-700/15">
             <div className="mb-4 flex items-center justify-between gap-2">
                 <button
                     type="button"

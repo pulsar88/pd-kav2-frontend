@@ -136,6 +136,62 @@ export const unwrapFixationApiResponse = (
     return null
 }
 
+const getExtendRequestStatusValue = (request: {
+    status?: string | { value?: string; name?: string; code?: string }
+}): string => {
+    if (typeof request.status === 'string') {
+        return request.status.toLowerCase()
+    }
+    if (request.status && typeof request.status === 'object') {
+        const val =
+            request.status.value ||
+            request.status.code ||
+            request.status.name ||
+            ''
+        return String(val).toLowerCase()
+    }
+    return ''
+}
+
+const resolveExtendRejectReason = (
+    item: FixationApiItem,
+): string | undefined => {
+    const requests = item.extend_requests ?? item.extendRequests
+    if (!Array.isArray(requests) || requests.length === 0) return undefined
+
+    const latest = [...requests].sort((a, b) => {
+        const aTime = Date.parse(a.updated_at || a.created_at || '') || 0
+        const bTime = Date.parse(b.updated_at || b.created_at || '') || 0
+        return bTime - aTime
+    })[0]
+
+    if (!latest) return undefined
+
+    const status = getExtendRequestStatusValue(latest)
+    if (!status.includes('reject')) return undefined
+
+    // Пустая строка = отклонено без текста причины (отличие от undefined = не отклонено)
+    return latest.reject_reason?.trim() || ''
+}
+
+const isPendingExtendRequest = (request: {
+    status?: string | { value?: string; name?: string; code?: string }
+}): boolean => {
+    if (typeof request.status === 'string') {
+        return request.status.toLowerCase() === 'pending'
+    }
+    if (request.status && typeof request.status === 'object') {
+        const val =
+            request.status.code ||
+            request.status.value ||
+            request.status.name ||
+            ''
+        return String(val).toLowerCase() === 'pending'
+    }
+    // Без статуса считаем активным (как раньше — наличие записи)
+    return true
+}
+
 const resolveHasExtendRequest = (item: FixationApiItem): boolean => {
     const raw = item as Record<string, unknown>
     if (
@@ -152,11 +208,29 @@ const resolveHasExtendRequest = (item: FixationApiItem): boolean => {
     ) {
         return true
     }
-    if (Array.isArray(raw.extend_requests) && raw.extend_requests.length > 0) {
-        return true
+    if (Array.isArray(raw.extend_requests)) {
+        return (raw.extend_requests as Array<{ status?: unknown }>).some(
+            (request) =>
+                isPendingExtendRequest(
+                    request as {
+                        status?:
+                            | string
+                            | { value?: string; name?: string; code?: string }
+                    },
+                ),
+        )
     }
-    if (Array.isArray(raw.extendRequests) && raw.extendRequests.length > 0) {
-        return true
+    if (Array.isArray(raw.extendRequests)) {
+        return (raw.extendRequests as Array<{ status?: unknown }>).some(
+            (request) =>
+                isPendingExtendRequest(
+                    request as {
+                        status?:
+                            | string
+                            | { value?: string; name?: string; code?: string }
+                    },
+                ),
+        )
     }
     return false
 }
@@ -169,6 +243,7 @@ export const mapFixationApiItemToFixation = (
     const budget = formatBudget(item.budget)
     const meetingDate = item.meeting_date?.trim() || undefined
     const hasExtend = resolveHasExtendRequest(item)
+    const extendRejectReason = resolveExtendRejectReason(item)
 
     return {
         id: String(item.id),
@@ -206,5 +281,6 @@ export const mapFixationApiItemToFixation = (
         history: [],
         has_extend_request: hasExtend,
         hasExtendRequest: hasExtend,
+        extendRejectReason,
     }
 }

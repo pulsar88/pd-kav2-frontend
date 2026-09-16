@@ -91,7 +91,7 @@ export async function apiGetAgencyRequests(
         url: endpointConfig.agencyRequests,
         method: 'get',
         params: {
-            with: 'agent',
+            with: 'agent,agent.profilePicture,agency,agency.supervisor',
             sort_by: 'created_at',
             order: 'desc',
             ...params,

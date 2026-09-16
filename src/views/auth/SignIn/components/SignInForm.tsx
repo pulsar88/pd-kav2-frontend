@@ -131,7 +131,9 @@ const phoneSchema = z.object({
     privacyPoliciesAccepted: z.boolean().refine((value) => value, {
         message: 'Необходимо подтвердить ознакомление с политиками',
     }),
-    marketingConsent: z.boolean(),
+    marketingConsent: z.boolean().refine((value) => value, {
+        message: 'Необходимо согласие на получение рекламных сообщений',
+    }),
 })
 
 const passwordSchema = z.object({
@@ -668,6 +670,9 @@ const SignInForm = (props: SignInFormProps) => {
                                             next &&
                                             phoneForm.getValues(
                                                 'privacyPoliciesAccepted',
+                                            ) &&
+                                            phoneForm.getValues(
+                                                'marketingConsent',
                                             )
                                         ) {
                                             setHighlightConsents(false)
@@ -707,7 +712,10 @@ const SignInForm = (props: SignInFormProps) => {
                                         field.onChange(next)
                                         if (
                                             next &&
-                                            phoneForm.getValues('opdConsent')
+                                            phoneForm.getValues('opdConsent') &&
+                                            phoneForm.getValues(
+                                                'marketingConsent',
+                                            )
                                         ) {
                                             setHighlightConsents(false)
                                         }
@@ -727,16 +735,38 @@ const SignInForm = (props: SignInFormProps) => {
                         />
                     </FormItem>
 
-                    <FormItem className="!mb-6" errorMode="none">
+                    <FormItem
+                        className="!mb-6"
+                        errorMode="none"
+                        invalid={
+                            highlightConsents &&
+                            !phoneForm.watch('marketingConsent')
+                        }
+                    >
                         <Controller
                             name="marketingConsent"
                             control={phoneForm.control}
                             render={({ field }) => (
                                 <Checkbox
                                     checked={field.value}
-                                    onChange={(checked) =>
-                                        field.onChange(Boolean(checked))
+                                    checkboxClass={
+                                        highlightConsents && !field.value
+                                            ? 'text-error ring-error border-error'
+                                            : undefined
                                     }
+                                    onChange={(checked) => {
+                                        const next = Boolean(checked)
+                                        field.onChange(next)
+                                        if (
+                                            next &&
+                                            phoneForm.getValues('opdConsent') &&
+                                            phoneForm.getValues(
+                                                'privacyPoliciesAccepted',
+                                            )
+                                        ) {
+                                            setHighlightConsents(false)
+                                        }
+                                    }}
                                 >
                                     Даю{' '}
                                     <DocLink href={LEGAL_DOCS.soglasieReklama}>
