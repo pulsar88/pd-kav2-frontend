@@ -18,7 +18,7 @@ function App() {
         dismissUpdateBanner,
     } = useAppVersionCheck()
 
-    const showSoftUpdateBanner = true
+    const showSoftUpdateBanner =
         hasNewVersion && !isUpdateBannerDismissed && !isPreloadBlocked
 
     if (isPreloadBlocked) {
