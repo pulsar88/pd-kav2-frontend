@@ -3,7 +3,12 @@ import { useEffect, useState } from 'react'
 const VERSION_CHECK_INTERVAL_MS = 5 * 60 * 1000
 
 type UseAppVersionCheckResult = {
+    /** Мягкий режим: новая версия на сервере, приложение ещё работает */
     hasNewVersion: boolean
+    /**
+     * Жёсткий режим: не удалось загрузить chunk после деплоя.
+     * Нужно размонтировать роутер и показать баннер вместо чёрного экрана.
+     */
     isPreloadBlocked: boolean
     isUpdateBannerDismissed: boolean
     dismissUpdateBanner: () => void
@@ -22,7 +27,8 @@ const useAppVersionCheck = (): UseAppVersionCheckResult => {
 
         let baselineEtag: string | null = null
 
-        const handlePreloadError = () => {
+        const handlePreloadError = (event: Event) => {
+            event.preventDefault()
             setIsPreloadBlocked(true)
             setIsUpdateBannerDismissed(false)
         }

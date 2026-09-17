@@ -18,29 +18,40 @@ function App() {
         dismissUpdateBanner,
     } = useAppVersionCheck()
 
-    const showUpdateBanner =
-        (hasNewVersion || isPreloadBlocked) && !isUpdateBannerDismissed
+    const showSoftUpdateBanner = true
+        hasNewVersion && !isUpdateBannerDismissed && !isPreloadBlocked
+
+    if (isPreloadBlocked) {
+        return (
+            <Theme>
+                <UpdateWindowBanner allowDismiss={false} />
+            </Theme>
+        )
+    }
 
     return (
-        <Theme>
-            <BrowserRouter>
-                <AuthProvider>
-                    <UserLogsBroadcastListener />
-                    <Layout>
-                        <Views />
-                    </Layout>
-                    <CookieBanner />
-                    <PwaInstallBanner />
-                    <ServerUnavailableGate />
-                    {showUpdateBanner ? (
-                        <UpdateWindowBanner
-                            allowDismiss={!isPreloadBlocked}
-                            onDismiss={dismissUpdateBanner}
-                        />
-                    ) : null}
-                </AuthProvider>
-            </BrowserRouter>
-        </Theme>
+        <>
+            {showSoftUpdateBanner ? (
+                <UpdateWindowBanner
+                    allowDismiss
+                    onDismiss={dismissUpdateBanner}
+                />
+            ) : null}
+
+            <Theme>
+                <BrowserRouter>
+                    <AuthProvider>
+                        <UserLogsBroadcastListener />
+                        <Layout>
+                            <Views />
+                        </Layout>
+                        <CookieBanner />
+                        <PwaInstallBanner />
+                        <ServerUnavailableGate />
+                    </AuthProvider>
+                </BrowserRouter>
+            </Theme>
+        </>
     )
 }
 
