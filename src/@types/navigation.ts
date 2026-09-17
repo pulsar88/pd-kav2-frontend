@@ -21,6 +21,8 @@ export interface NavigationTree {
     icon: string
     type: 'title' | 'collapse' | 'item'
     authority: string[]
+    /** Обязательные bonuses из /current (value); пусто = без проверки */
+    bonuses?: string[]
     subMenu: NavigationTree[]
     description?: string
     meta?: {

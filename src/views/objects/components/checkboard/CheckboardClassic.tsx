@@ -17,6 +17,8 @@ import {
     getSectionFloors,
 } from '../../checkboardUtils'
 import { propertyHasSpecialOffer } from '../../specialOfferUtils'
+import { USER_BONUS } from '@/constants/bonuses.constant'
+import { useHasUserBonus } from '@/utils/hooks/useUserBonus'
 import DualHorizontalScroll from './DualHorizontalScroll'
 import CheckboardSharedPropertyTooltip from './CheckboardSharedPropertyTooltip'
 import {
@@ -81,6 +83,7 @@ const ClassicBlock = ({
     isPropertySelectable,
     onPropertySelect,
 }: BlockProps) => {
+    const canUseSpecialOffers = useHasUserBonus(USER_BONUS.SPECIAL_OFFERS)
     if (columns.length === 0) return null
 
     const renderLabels = (position: 'top' | 'bottom') =>
@@ -208,7 +211,8 @@ const ClassicBlock = ({
                                     }}
                                 >
                                     {getCellLabel(property, labelMode)}
-                                    {propertyHasSpecialOffer(property) ? (
+                                    {canUseSpecialOffers &&
+                                    propertyHasSpecialOffer(property) ? (
                                         <span
                                             className="absolute -right-0.5 -top-0.5 max-w-[calc(100%+4px)] truncate rounded px-1 py-px text-[8px] font-bold leading-tight shadow-sm"
                                             style={{

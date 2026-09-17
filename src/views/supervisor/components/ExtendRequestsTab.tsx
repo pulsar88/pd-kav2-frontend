@@ -22,6 +22,7 @@ import {
     formatFixationDateTime,
     formatFixationPhone,
 } from '@/views/fixations/utils'
+import { getUserRoleLabel } from '@/constants/roles.constant'
 import type { ColumnDef } from '@/components/shared/DataTable'
 import {
     TbCheck,
@@ -42,6 +43,7 @@ export type ExtendColumnId =
     | 'fixationCreatedAt'
     | 'fixedTill'
     | 'createdAt'
+    | 'reviewer'
 
 export type ExtendColumnVisibility = Record<ExtendColumnId, boolean>
 
@@ -56,6 +58,7 @@ export const EXTEND_COLUMN_OPTIONS: Array<{
     { id: 'fixationCreatedAt', label: 'Дата создания' },
     { id: 'fixedTill', label: 'Дата окончания' },
     { id: 'createdAt', label: 'Дата запроса' },
+    { id: 'reviewer', label: 'Рассмотрел' },
 ]
 
 export const DEFAULT_EXTEND_COLUMN_VISIBILITY: ExtendColumnVisibility = {
@@ -66,6 +69,7 @@ export const DEFAULT_EXTEND_COLUMN_VISIBILITY: ExtendColumnVisibility = {
     fixationCreatedAt: true,
     fixedTill: true,
     createdAt: true,
+    reviewer: true,
 }
 
 const STORAGE_KEY = 'agent-cabinet:supervisor-extend-column-visibility'
@@ -484,6 +488,46 @@ const ExtendRequestsTab = () => {
                                     {status.label}
                                 </Tag>
                             )}
+                        </div>
+                    )
+                },
+            },
+            {
+                id: 'reviewer',
+                header: 'Рассмотрел',
+                size: 180,
+                minSize: 160,
+                cell: (props) => {
+                    const reviewer = props.row.original.reviewer
+                    if (!reviewer) {
+                        return (
+                            <span className="text-gray-400 whitespace-nowrap">
+                                —
+                            </span>
+                        )
+                    }
+
+                    const roleLabel = getUserRoleLabel(reviewer.roles?.[0])
+
+                    return (
+                        <div className="flex min-w-[160px] flex-col gap-0.5 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100">
+                                <TbUser className="shrink-0 text-gray-400" />
+                                <span>{reviewer.name || '—'}</span>
+                            </div>
+                            {reviewer.phone ? (
+                                <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                    <TbPhone className="shrink-0 text-gray-400" />
+                                    <span>
+                                        {formatFixationPhone(reviewer.phone)}
+                                    </span>
+                                </div>
+                            ) : null}
+                            {roleLabel !== '—' ? (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {roleLabel}
+                                </div>
+                            ) : null}
                         </div>
                     )
                 },

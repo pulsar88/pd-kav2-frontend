@@ -25,9 +25,9 @@ import {
     matchesObjectsSearchFilters,
 } from './checkboardUtils'
 import {
-    CHECKBOARD_SPECIAL_OFFER_STATUS,
-    CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
-    getSpecialOfferFilterIds,
+    // CHECKBOARD_SPECIAL_OFFER_STATUS,
+    // CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
+    // getSpecialOfferFilterIds,
     matchesCheckboardStatusFilter,
 } from './specialOfferUtils'
 import CheckboardClassic from './components/checkboard/CheckboardClassic'
@@ -150,17 +150,19 @@ const ComplexCheckboard = () => {
                     const defaults = getDefaultActiveStatusCodes(
                         collectStatuses(result),
                     )
-                    const urlFilters = withoutComplexFilters(
-                        parseObjectsSearchFilters(window.location.search),
-                    )
-                    setActiveStatusCodes(
-                        getSpecialOfferFilterIds(urlFilters).length > 0
-                            ? [
-                                  ...defaults,
-                                  CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
-                              ]
-                            : defaults,
-                    )
+                    // URL-фильтры (в т.ч. fromInvestor) подставляются ниже из search
+                    // const urlFilters = withoutComplexFilters(
+                    //     parseObjectsSearchFilters(window.location.search),
+                    // )
+                    // setActiveStatusCodes(
+                    //     getSpecialOfferFilterIds(urlFilters).length > 0
+                    //         ? [
+                    //               ...defaults,
+                    //               CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
+                    //           ]
+                    //         : defaults,
+                    // )
+                    setActiveStatusCodes(defaults)
                 }
             })
             .finally(() => {
@@ -264,14 +266,15 @@ const ComplexCheckboard = () => {
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
 
-        const offerFilterIds = getSpecialOfferFilterIds(nextFilters)
-        if (offerFilterIds.length > 0) {
-            setActiveStatusCodes((prev) =>
-                prev.includes(CHECKBOARD_SPECIAL_OFFER_STATUS_CODE)
-                    ? prev
-                    : [...prev, CHECKBOARD_SPECIAL_OFFER_STATUS_CODE],
-            )
-        }
+        // Статус «Акции» временно отключён — акционные помещения фильтруем через «От инвестора»
+        // const offerFilterIds = getSpecialOfferFilterIds(nextFilters)
+        // if (offerFilterIds.length > 0) {
+        //     setActiveStatusCodes((prev) =>
+        //         prev.includes(CHECKBOARD_SPECIAL_OFFER_STATUS_CODE)
+        //             ? prev
+        //             : [...prev, CHECKBOARD_SPECIAL_OFFER_STATUS_CODE],
+        //     )
+        // }
 
         const param = new URLSearchParams(window.location.search).get(
             'property_id',
@@ -300,30 +303,31 @@ const ComplexCheckboard = () => {
         [data],
     )
 
-    const isSpecialOfferStatusActive = activeStatusCodes.includes(
-        CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
-    )
+    // const isSpecialOfferStatusActive = activeStatusCodes.includes(
+    //     CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
+    // )
 
-    const ensureSpecialOfferStatusActive = (
-        filters: ObjectsSearchFilters,
-    ) => {
-        if (getSpecialOfferFilterIds(filters).length === 0) return
-        setActiveStatusCodes((prev) =>
-            prev.includes(CHECKBOARD_SPECIAL_OFFER_STATUS_CODE)
-                ? prev
-                : [...prev, CHECKBOARD_SPECIAL_OFFER_STATUS_CODE],
-        )
-    }
+    // const ensureSpecialOfferStatusActive = (
+    //     filters: ObjectsSearchFilters,
+    // ) => {
+    //     if (getSpecialOfferFilterIds(filters).length === 0) return
+    //     setActiveStatusCodes((prev) =>
+    //         prev.includes(CHECKBOARD_SPECIAL_OFFER_STATUS_CODE)
+    //             ? prev
+    //             : [...prev, CHECKBOARD_SPECIAL_OFFER_STATUS_CODE],
+    //     )
+    // }
 
-    /** Фильтр по конкретной акции из URL действует только при включённом статусе «Акции» */
-    const effectiveSearchFilters = useMemo((): ObjectsSearchFilters => {
-        if (isSpecialOfferStatusActive) return appliedFilters
-        return {
-            ...appliedFilters,
-            specialOfferId: '',
-            specialOfferIds: [],
-        }
-    }, [appliedFilters, isSpecialOfferStatusActive])
+    /** Фильтр по конкретной акции из URL раньше зависел от статуса «Акции» */
+    // const effectiveSearchFilters = useMemo((): ObjectsSearchFilters => {
+    //     if (isSpecialOfferStatusActive) return appliedFilters
+    //     return {
+    //         ...appliedFilters,
+    //         specialOfferId: '',
+    //         specialOfferIds: [],
+    //     }
+    // }, [appliedFilters, isSpecialOfferStatusActive])
+    const effectiveSearchFilters = appliedFilters
 
     const hasSearchFilters = hasActiveObjectsSearchFilters(effectiveSearchFilters)
 
@@ -407,7 +411,8 @@ const ComplexCheckboard = () => {
 
     const statuses = useMemo(() => {
         const list = data ? collectStatuses(data) : []
-        return [...list, CHECKBOARD_SPECIAL_OFFER_STATUS]
+        // return [...list, CHECKBOARD_SPECIAL_OFFER_STATUS]
+        return list
     }, [data])
 
     const handleApplyFilters = () => {
@@ -415,7 +420,7 @@ const ComplexCheckboard = () => {
 
         setDraftFilters(nextFilters)
         setAppliedFilters(nextFilters)
-        ensureSpecialOfferStatusActive(nextFilters)
+        // ensureSpecialOfferStatusActive(nextFilters)
         syncSearchStateInUrl(nextFilters, selectedPropertyId)
     }
 
@@ -432,7 +437,7 @@ const ComplexCheckboard = () => {
 
         if (hasActiveObjectsSearchFilters(appliedFilters)) {
             setAppliedFilters(normalized)
-            ensureSpecialOfferStatusActive(normalized)
+            // ensureSpecialOfferStatusActive(normalized)
             syncSearchStateInUrl(normalized, selectedPropertyId)
         }
     }
@@ -522,7 +527,7 @@ const ComplexCheckboard = () => {
                                     appliedFilters,
                                 )}
                                 desktopActionsInGrid
-                                showFromInvestorFilter={false}
+                                showFromInvestorFilter
                                 onCollapsedChange={() => {}}
                                 onChange={handleDraftFiltersChange}
                                 onSearch={handleApplyFilters}

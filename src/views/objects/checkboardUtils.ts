@@ -10,6 +10,7 @@ import type {
 import type { ObjectsSearchFilters, Premise, PremiseType, RealtyPropertyTypeCode } from './types'
 import { matchesRealtyRoomFilters } from './realtyPropertyQuery'
 import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
+import { propertyHasSpecialOffer } from './specialOfferUtils'
 
 const mapCheckboardTypeCodeToPremiseType = (code: string): PremiseType => {
     const normalized = code.toLowerCase()
@@ -465,6 +466,12 @@ export const matchesObjectsSearchFilters = (
         if (!offerFilterIds.some((id) => propertyOfferIds.has(id))) {
             return false
         }
+    }
+
+    if (filters.fromInvestor === '1' || filters.fromInvestor === '0') {
+        const hasOffer = propertyHasSpecialOffer(property)
+        if (filters.fromInvestor === '1' && !hasOffer) return false
+        if (filters.fromInvestor === '0' && hasOffer) return false
     }
 
     return true

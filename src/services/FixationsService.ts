@@ -575,6 +575,14 @@ export type FixationExtendRequest = {
         roles?: string[]
         agency?: { name?: string } | string
     }
+    reviewer?: {
+        id?: number | string
+        name?: string
+        email?: string | null
+        phone?: string | null
+        country_code?: string
+        roles?: string[]
+    }
     client?: {
         id?: number | string
         name?: string
@@ -602,7 +610,7 @@ export async function apiGetFixationExtendRequests(params?: {
     with?: string
 }): Promise<{ list: FixationExtendRequest[]; total: number }> {
     const queryParams: Record<string, unknown> = {
-        with: 'fixation.object,fixation.client,fixation.client.phones,fixation.agent',
+        with: 'fixation.object,fixation.client,fixation.client.phones,fixation.agent,reviewer',
         ...(params ? toAxiosParams(params) : {}),
     }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Container from '@/components/shared/Container'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -17,6 +17,7 @@ import {
 } from '@/services/AgencyService'
 import type { AgencyRequestStatus, JoinAgencyRequest } from '@/@types/agency'
 import { formatRuPhone } from '@/views/fixations/utils'
+import { getUserRoleLabel } from '@/constants/roles.constant'
 import {
     TbBuilding,
     TbCheck,
@@ -69,9 +70,9 @@ const STATUS_FILTER_OPTIONS: StatusOption[] = [
 ]
 
 const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '—'
+    if (!dateStr) return null
     const d = new Date(dateStr)
-    if (Number.isNaN(d.getTime())) return dateStr
+    if (Number.isNaN(d.getTime())) return null
 
     const hh = String(d.getHours()).padStart(2, '0')
     const mm = String(d.getMinutes()).padStart(2, '0')
@@ -79,7 +80,38 @@ const formatDate = (dateStr?: string) => {
     const month = String(d.getMonth() + 1).padStart(2, '0')
     const yyyy = d.getFullYear()
 
-    return `${hh}:${mm} ${day}.${month}.${yyyy}`
+    return {
+        time: `${hh}:${mm}`,
+        date: `${day}.${month}.${yyyy}`,
+    }
+}
+
+const DateTimeCell = ({
+    dateStr,
+    icon,
+}: {
+    dateStr?: string
+    icon: ReactNode
+}) => {
+    const formatted = formatDate(dateStr)
+
+    return (
+        <div className="flex items-start gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+            <span className="mt-0.5 shrink-0 text-base opacity-70">{icon}</span>
+            {formatted ? (
+                <div className="min-w-0 leading-snug">
+                    <div className="font-medium text-gray-800 dark:text-gray-200">
+                        {formatted.time}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {formatted.date}
+                    </div>
+                </div>
+            ) : (
+                <span>—</span>
+            )}
+        </div>
+    )
 }
 
 const resolveSupervisor = (item: JoinAgencyRequest) =>
@@ -102,7 +134,7 @@ const AgencyRequests = () => {
         setIsLoading(true)
         try {
             const response = await apiGetAgencyRequests({
-                with: 'agent,agent.profilePicture,agency,agency.supervisor',
+                with: 'agent,agent.profilePicture,agency,agency.supervisor,reviewer',
                 ...(statusFilter ? { status: statusFilter } : {}),
             })
             setRequests(response.data || [])
@@ -195,12 +227,13 @@ const AgencyRequests = () => {
                             <THead>
                                 <Tr>
                                     <Th>Агент</Th>
-                                    <Th>Телефон</Th>
                                     <Th>Агентство</Th>
-                                    <Th>Руководитель</Th>
-                                    <Th>Подана</Th>
-                                    <Th>Обновлена</Th>
+                                    <Th className="whitespace-nowrap">Подана</Th>
+                                    <Th className="whitespace-nowrap">
+                                        Обновлена
+                                    </Th>
                                     <Th>Статус</Th>
+                                    <Th>Рассмотрел</Th>
                                     <Th className="text-right">Действия</Th>
                                 </Tr>
                             </THead>
@@ -221,11 +254,15 @@ const AgencyRequests = () => {
                                             item.agent?.profile_picture?.src
                                         const supervisor =
                                             resolveSupervisor(item)
+                                        const reviewer = item.reviewer
+                                        const reviewerRole = getUserRoleLabel(
+                                            reviewer?.roles?.[0],
+                                        )
 
                                         return (
                                             <Tr key={item.id}>
                                                 <Td>
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="flex min-w-[200px] items-center gap-3">
                                                         <Avatar
                                                             shape="circle"
                                                             size={40}
@@ -251,36 +288,36 @@ const AgencyRequests = () => {
                                                                     }
                                                                 </div>
                                                             ) : null}
+                                                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                <TbPhone className="shrink-0 text-gray-400" />
+                                                                <span>
+                                                                    {item.agent
+                                                                        ?.phone
+                                                                        ? formatRuPhone(
+                                                                              item
+                                                                                  .agent
+                                                                                  .phone,
+                                                                          )
+                                                                        : '—'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </Td>
 
-                                                <Td className="whitespace-nowrap">
-                                                    <span className="font-medium text-gray-800 dark:text-gray-200">
-                                                        {item.agent?.phone
-                                                            ? formatRuPhone(
-                                                                  item.agent
-                                                                      .phone,
-                                                              )
-                                                            : '—'}
-                                                    </span>
-                                                </Td>
-
                                                 <Td>
-                                                    <div className="flex items-center gap-1.5 min-w-0">
-                                                        <TbBuilding className="shrink-0 text-gray-400" />
-                                                        <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                            {item.agency
-                                                                ?.name || '—'}
-                                                        </span>
-                                                    </div>
-                                                </Td>
-
-                                                <Td>
-                                                    <div className="min-w-0 whitespace-nowrap">
-                                                        <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100">
+                                                    <div className="min-w-[180px]">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <TbBuilding className="shrink-0 text-gray-400" />
+                                                            <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                                {item.agency
+                                                                    ?.name ||
+                                                                    '—'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                                                             <TbUser className="shrink-0 text-gray-400" />
-                                                            <span>
+                                                            <span className="truncate">
                                                                 {supervisor?.name ||
                                                                     '—'}
                                                             </span>
@@ -299,25 +336,17 @@ const AgencyRequests = () => {
                                                 </Td>
 
                                                 <Td className="whitespace-nowrap">
-                                                    <div className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
-                                                        <TbClock className="text-base shrink-0" />
-                                                        <span>
-                                                            {formatDate(
-                                                                item.created_at,
-                                                            )}
-                                                        </span>
-                                                    </div>
+                                                    <DateTimeCell
+                                                        dateStr={item.created_at}
+                                                        icon={<TbClock />}
+                                                    />
                                                 </Td>
 
                                                 <Td className="whitespace-nowrap">
-                                                    <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                                        <TbRefresh className="text-base shrink-0 opacity-70" />
-                                                        <span>
-                                                            {formatDate(
-                                                                item.updated_at,
-                                                            )}
-                                                        </span>
-                                                    </div>
+                                                    <DateTimeCell
+                                                        dateStr={item.updated_at}
+                                                        icon={<TbRefresh />}
+                                                    />
                                                 </Td>
 
                                                 <Td className="whitespace-nowrap">
@@ -328,17 +357,57 @@ const AgencyRequests = () => {
                                                     </Tag>
                                                 </Td>
 
+                                                <Td>
+                                                    <div className="min-w-[160px]">
+                                                        {reviewer ? (
+                                                            <>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <TbUser className="shrink-0 text-gray-400" />
+                                                                    <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                                        {reviewer.name ||
+                                                                            '—'}
+                                                                    </span>
+                                                                </div>
+                                                                {reviewer.phone ? (
+                                                                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                        <TbPhone className="shrink-0 text-gray-400" />
+                                                                        <span>
+                                                                            {formatRuPhone(
+                                                                                reviewer.phone,
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : null}
+                                                                {reviewerRole !==
+                                                                '—' ? (
+                                                                    <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                        {
+                                                                            reviewerRole
+                                                                        }
+                                                                    </div>
+                                                                ) : null}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-gray-400">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </Td>
+
                                                 <Td className="text-right whitespace-nowrap">
                                                     {item.status ===
                                                     'pending' ? (
-                                                        <div className="flex items-center justify-end gap-2">
+                                                        <div className="inline-flex items-center justify-end gap-1">
                                                             <Button
                                                                 size="sm"
-                                                                variant="solid"
-                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                                variant="plain"
+                                                                className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
                                                                 icon={
-                                                                    <TbCheck />
+                                                                    <TbCheck className="text-lg" />
                                                                 }
+                                                                title="Принять"
+                                                                aria-label="Принять"
                                                                 onClick={() => {
                                                                     setSelectedRequest(
                                                                         item,
@@ -347,14 +416,16 @@ const AgencyRequests = () => {
                                                                         'approve',
                                                                     )
                                                                 }}
-                                                            >
-                                                                Принять
-                                                            </Button>
+                                                            />
                                                             <Button
                                                                 size="sm"
                                                                 variant="plain"
                                                                 className="text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10"
-                                                                icon={<TbX />}
+                                                                icon={
+                                                                    <TbX className="text-lg" />
+                                                                }
+                                                                title="Отклонить"
+                                                                aria-label="Отклонить"
                                                                 onClick={() => {
                                                                     setSelectedRequest(
                                                                         item,
@@ -363,9 +434,7 @@ const AgencyRequests = () => {
                                                                         'reject',
                                                                     )
                                                                 }}
-                                                            >
-                                                                Отклонить
-                                                            </Button>
+                                                            />
                                                         </div>
                                                     ) : (
                                                         <span className="text-xs text-gray-400">
@@ -379,7 +448,7 @@ const AgencyRequests = () => {
                                 ) : (
                                     <Tr>
                                         <Td
-                                            colSpan={8}
+                                            colSpan={7}
                                             className="text-center py-12"
                                         >
                                             <div className="flex flex-col items-center justify-center text-gray-400">

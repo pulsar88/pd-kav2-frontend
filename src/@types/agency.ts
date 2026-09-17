@@ -77,6 +77,7 @@ export type JoinAgencyRequest = {
     agency?: AgencyShort | null
     agent?: AgencyAgent | null
     supervisor?: AgencyUserShort | null
+    reviewer?: AgencyAgent | null
     created_at: string
     updated_at?: string
 }

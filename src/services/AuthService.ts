@@ -49,6 +49,7 @@ export const mapCurrentUserToUser = (
             ? resolveProfilePictureUrl(data.profile_picture)
             : previousAvatar || '',
     accessLevel: data.access_level ?? null,
+    bonuses: Array.isArray(data.bonuses) ? data.bonuses : [],
 })
 
 export async function apiRegisterSendCode(data: CheckPhoneCredential) {

@@ -163,6 +163,7 @@ const ColumnsLayout = (
                                 key={nav.key}
                                 userAuthority={userAuthority}
                                 authority={nav.authority}
+                                bonuses={nav.bonuses}
                             >
                                 <div className="max-w-[250px]">
                                     {showColumnTitle && (
@@ -175,6 +176,7 @@ const ColumnsLayout = (
                                             key={subNav.key}
                                             userAuthority={userAuthority}
                                             authority={subNav.authority}
+                                            bonuses={subNav.bonuses}
                                         >
                                             <div key={subNav.key}>
                                                 <MenuLink
@@ -229,6 +231,7 @@ const ColumnsLayout = (
                                     key={nav.key}
                                     userAuthority={userAuthority}
                                     authority={nav.authority}
+                                bonuses={nav.bonuses}
                                 >
                                     <MenuLink
                                         key={nav.key}
@@ -276,6 +279,7 @@ const DefaultLayout = ({
                         key={nav.key}
                         userAuthority={userAuthority}
                         authority={nav.authority}
+                                bonuses={nav.bonuses}
                     >
                         <ul>
                             {nav.type === NAV_ITEM_TYPE_ITEM && (
@@ -347,6 +351,7 @@ const TabLayout = ({
                                 key={nav.key}
                                 userAuthority={userAuthority}
                                 authority={nav.authority}
+                                bonuses={nav.bonuses}
                             >
                                 <div className="min-w-[250px]">
                                     <div key={nav.key}>
@@ -420,6 +425,7 @@ const TabLayout = ({
                                     key={nav.key}
                                     userAuthority={userAuthority}
                                     authority={nav.authority}
+                                bonuses={nav.bonuses}
                                 >
                                     <HorizontalMenuNavLink
                                         path={nav.path}

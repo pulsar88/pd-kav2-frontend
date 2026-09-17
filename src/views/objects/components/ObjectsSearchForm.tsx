@@ -14,6 +14,8 @@ import type {
     RealtyPropertiesFilters,
 } from '../types'
 import { hasActiveObjectsSearchFilters } from '../filtersQuery'
+import { USER_BONUS } from '@/constants/bonuses.constant'
+import { useHasUserBonus } from '@/utils/hooks/useUserBonus'
 
 type Option = { value: string; label: string }
 
@@ -27,7 +29,7 @@ type ObjectsSearchFormProps = {
     desktopActionsInGrid?: boolean
     /** Опции акций для фильтра (не на шахматке) */
     specialOfferOptions?: Option[]
-    /** Показывать фильтр «От инвестора» (на шахматке скрыт) */
+    /** Показывать фильтр «От инвестора» (список объектов + шахматка) */
     showFromInvestorFilter?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
     onChange: (filters: ObjectsSearchFilters) => void
@@ -95,6 +97,8 @@ const ObjectsSearchForm = ({
     onReset,
 }: ObjectsSearchFormProps) => {
     const navigate = useNavigate()
+    const canUseSpecialOffers = useHasUserBonus(USER_BONUS.SPECIAL_OFFERS)
+    const showInvestorFilter = showFromInvestorFilter && canUseSpecialOffers
     const [internalCollapsed, setInternalCollapsed] = useState(false)
     const collapsed = collapsedProp ?? internalCollapsed
     const setCollapsed = (value: boolean) => {
@@ -194,12 +198,18 @@ const ObjectsSearchForm = ({
 
     const actionButtons = (
         <>
-            <Button type="button" disabled={!canReset} onClick={onReset}>
+            <Button
+                type="button"
+                className="!px-2.5"
+                disabled={!canReset}
+                onClick={onReset}
+            >
                 Сбросить
             </Button>
             <Button
                 variant="solid"
                 type="button"
+                className="!px-2.5"
                 loading={isSearching}
                 onClick={onSearch}
             >
@@ -361,7 +371,7 @@ const ObjectsSearchForm = ({
                                         }
                                     />
                                 </FormItem>
-                                {showFromInvestorFilter ? (
+                                {showInvestorFilter ? (
                                     <FormItem label="От инвестора">
                                         <Select<Option>
                                             {...selectMenuProps}
@@ -387,49 +397,53 @@ const ObjectsSearchForm = ({
                                         />
                                     </FormItem>
                                 ) : null}
-                                <FormItem label="Акция">
-                                    <div className="relative">
-                                        <Select<Option, false>
-                                            {...selectMenuProps}
-                                            isDisabled={!lockedOfferOption}
-                                            isClearable={Boolean(
-                                                lockedOfferOption,
-                                            )}
-                                            isSearchable={false}
-                                            openMenuOnClick={false}
-                                            openMenuOnFocus={false}
-                                            menuIsOpen={false}
-                                            options={
-                                                lockedOfferOption
-                                                    ? [lockedOfferOption]
-                                                    : []
-                                            }
-                                            value={lockedOfferOption}
-                                            placeholder="Не выбрана"
-                                            components={{
-                                                DropdownIndicator: () => null,
-                                            }}
-                                            onChange={(option) => {
-                                                if (!option) {
-                                                    patch({
-                                                        specialOfferId: '',
-                                                    })
+                                {canUseSpecialOffers ? (
+                                    <FormItem label="Акция">
+                                        <div className="relative">
+                                            <Select<Option, false>
+                                                {...selectMenuProps}
+                                                isDisabled={!lockedOfferOption}
+                                                isClearable={Boolean(
+                                                    lockedOfferOption,
+                                                )}
+                                                isSearchable={false}
+                                                openMenuOnClick={false}
+                                                openMenuOnFocus={false}
+                                                menuIsOpen={false}
+                                                options={
+                                                    lockedOfferOption
+                                                        ? [lockedOfferOption]
+                                                        : []
                                                 }
-                                            }}
-                                        />
-                                        {!lockedOfferOption ? (
-                                            <button
-                                                type="button"
-                                                className="absolute inset-0 z-10 cursor-pointer rounded-xl"
-                                                aria-label="Перейти к списку акций"
-                                                onClick={() =>
-                                                    navigate('/offers')
-                                                }
+                                                value={lockedOfferOption}
+                                                placeholder="Не выбрана"
+                                                components={{
+                                                    DropdownIndicator: () =>
+                                                        null,
+                                                }}
+                                                onChange={(option) => {
+                                                    if (!option) {
+                                                        patch({
+                                                            specialOfferId: '',
+                                                        })
+                                                    }
+                                                }}
                                             />
-                                        ) : null}
-                                    </div>
-                                </FormItem>
-                                {specialOfferOptions &&
+                                            {!lockedOfferOption ? (
+                                                <button
+                                                    type="button"
+                                                    className="absolute inset-0 z-10 cursor-pointer rounded-xl"
+                                                    aria-label="Перейти к списку акций"
+                                                    onClick={() =>
+                                                        navigate('/offers')
+                                                    }
+                                                />
+                                            ) : null}
+                                        </div>
+                                    </FormItem>
+                                ) : null}
+                                {canUseSpecialOffers &&
+                                specialOfferOptions &&
                                 specialOfferOptions.length > 0 ? (
                                     <FormItem label="Акции">
                                         <Select<Option, true>
@@ -461,9 +475,15 @@ const ObjectsSearchForm = ({
                                     </FormItem>
                                 ) : null}
                                 {desktopActionsInGrid ? (
-                                    <div className="hidden xl:col-span-1 xl:flex xl:flex-nowrap xl:items-end xl:justify-end xl:gap-2 2xl:col-span-3">
-                                        {actionButtons}
-                                    </div>
+                                    <FormItem
+                                        className="hidden xl:col-start-2 xl:block 2xl:col-start-4"
+                                        label="Действия"
+                                        labelClass="invisible select-none"
+                                    >
+                                        <div className="flex flex-nowrap items-center justify-end gap-2">
+                                            {actionButtons}
+                                        </div>
+                                    </FormItem>
                                 ) : null}
                             </div>
 
