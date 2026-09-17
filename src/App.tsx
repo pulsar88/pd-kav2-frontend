@@ -13,25 +13,15 @@ import Views from '@/views'
 function App() {
     const {
         hasNewVersion,
-        isPreloadBlocked,
         isUpdateBannerDismissed,
         dismissUpdateBanner,
     } = useAppVersionCheck()
 
-    const showSoftUpdateBanner =
-        hasNewVersion && !isUpdateBannerDismissed && !isPreloadBlocked
-
-    if (isPreloadBlocked) {
-        return (
-            <Theme>
-                <UpdateWindowBanner allowDismiss={false} />
-            </Theme>
-        )
-    }
+    const showUpdateBanner = hasNewVersion && !isUpdateBannerDismissed
 
     return (
         <>
-            {showSoftUpdateBanner ? (
+            {showUpdateBanner ? (
                 <UpdateWindowBanner
                     allowDismiss
                     onDismiss={dismissUpdateBanner}
