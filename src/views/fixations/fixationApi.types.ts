@@ -11,6 +11,8 @@ export type FixationApiStatus =
     | 'failed'
     | 'deleted'
     | 'expired'
+    | 'lost'
+    | 'LOST'
 
 export type FixationApiStatusRelation = {
     value: FixationApiStatus

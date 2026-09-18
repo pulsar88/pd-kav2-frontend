@@ -37,7 +37,7 @@ export const fixationStatusMap: Record<
             'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300',
     },
     fixed: {
-        label: 'Фиксирована',
+        label: 'Фиксация',
         className:
             'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
     },
@@ -70,6 +70,11 @@ export const fixationStatusMap: Record<
         label: 'Истекла',
         className:
             'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300',
+    },
+    lost: {
+        label: 'Утеряна',
+        className:
+            'bg-stone-100 text-stone-700 dark:bg-stone-500/20 dark:text-stone-300',
     },
 }
 

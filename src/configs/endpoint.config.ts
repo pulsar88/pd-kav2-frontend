@@ -12,8 +12,11 @@ const endpointConfig = {
     authResetPassword: '/v2/auth/reset_password',
     authChangePassword: '/v2/auth/change_password',
     usersCurrent: '/v2/user/current',
+    users: '/v2/users',
     userProfilePicture: '/v2/user/profile_picture',
     usersUpdate: (userId: string | number) => `/v2/users/${userId}`,
+    userChangeAgency: (userId: string | number) =>
+        `/v2/users/${userId}/change_agency`,
     userLogs: '/v2/user/logs',
     userLogsRead: '/v2/user/logs/read',
     logsUnreadCount: '/v2/user/logs/unread-count',

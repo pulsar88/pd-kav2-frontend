@@ -39,6 +39,7 @@ import {
 } from '@/views/fixations/dashboard.constants'
 import {
     formatStatsApiDate,
+    getActiveStatusesFromTimeline,
     getDefaultFixationsStatsDateRange,
 } from '@/views/fixations/fixationStatsMapper'
 import { fixationStatusMap } from '@/views/fixations/utils'
@@ -312,47 +313,42 @@ const Home = () => {
         [navigate, statusSummary],
     )
 
-    const transitions = useMemo(
-        () => transitionsData?.transitions ?? [],
-        [transitionsData?.transitions],
+    const statusTimeline = useMemo(
+        () => transitionsData?.statusTimeline ?? [],
+        [transitionsData?.statusTimeline],
     )
 
-    const transitionTimeline = useMemo(
-        () => transitionsData?.transitionTimeline ?? [],
-        [transitionsData?.transitionTimeline],
+    const activeTimelineStatuses = useMemo(
+        () => getActiveStatusesFromTimeline(statusTimeline),
+        [statusTimeline],
     )
 
     const transitionCategories = useMemo(
         () =>
-            transitionTimeline.map((point) => {
+            statusTimeline.map((point) => {
                 const [, month, day] = point.date.split('-')
                 return `${Number(day)}.${month}`
             }),
-        [transitionTimeline],
+        [statusTimeline],
     )
 
     const transitionSeries = useMemo(
         () =>
-            transitions.map((item) => {
-                const key = `${item.from}→${item.to}`
-                return {
-                    name: `${item.fromLabel} → ${item.toLabel}`,
-                    data: transitionTimeline.map(
-                        (point) => point.counts[key] ?? 0,
-                    ),
-                }
-            }),
-        [transitionTimeline, transitions],
+            activeTimelineStatuses.map((status) => ({
+                name: fixationStatusMap[status].label,
+                data: statusTimeline.map(
+                    (point) => point.counts[status] ?? 0,
+                ),
+            })),
+        [activeTimelineStatuses, statusTimeline],
     )
 
     const transitionColors = useMemo(
         () =>
-            transitions.map(
-                (item) =>
-                    FIXATION_STATUS_COLORS[item.to as FixationStatus] ??
-                    '#6b7280',
+            activeTimelineStatuses.map(
+                (status) => FIXATION_STATUS_COLORS[status],
             ),
-        [transitions],
+        [activeTimelineStatuses],
     )
 
     const transitionOptions = useMemo<ApexOptions>(
@@ -395,6 +391,12 @@ const Home = () => {
             grid: {
                 strokeDashArray: 4,
                 borderColor: 'rgba(148, 163, 184, 0.25)',
+                padding: {
+                    left: 8,
+                    right: 8,
+                    top: 8,
+                    bottom: 0,
+                },
             },
             xaxis: {
                 title: {
@@ -408,7 +410,7 @@ const Home = () => {
             },
             yaxis: {
                 title: {
-                    text: 'Количество переходов',
+                    text: 'Накопительно по статусу',
                 },
                 min: 0,
                 forceNiceScale: true,
@@ -425,28 +427,28 @@ const Home = () => {
     )
 
     const transitionChartDesiredWidth = useMemo(() => {
-        const perDayPx = 56
+        const perDayPx = 40
         return Math.max(480, transitionCategories.length * perDayPx)
     }, [transitionCategories.length])
 
     const transitionChartScrollRef = useRef<HTMLDivElement>(null)
-    const [transitionChartMinWidth, setTransitionChartMinWidth] = useState<
-        number | undefined
-    >(undefined)
+    const [transitionChartWidth, setTransitionChartWidth] = useState<
+        number | '100%'
+    >('100%')
 
     useLayoutEffect(() => {
         const el = transitionChartScrollRef.current
         if (!el) {
-            setTransitionChartMinWidth(undefined)
+            setTransitionChartWidth('100%')
             return
         }
 
         const update = () => {
             const available = el.clientWidth
-            setTransitionChartMinWidth(
+            setTransitionChartWidth(
                 transitionChartDesiredWidth > available
                     ? transitionChartDesiredWidth
-                    : undefined,
+                    : '100%',
             )
         }
 
@@ -454,7 +456,7 @@ const Home = () => {
         const observer = new ResizeObserver(update)
         observer.observe(el)
         return () => observer.disconnect()
-    }, [transitionChartDesiredWidth, transitions.length])
+    }, [transitionChartDesiredWidth, activeTimelineStatuses.length])
 
     const phoneDisplay = profile.phone || '—'
     const hideAgencyAndLevel = analyticsScope.isSupervisor
@@ -685,7 +687,7 @@ const Home = () => {
                         <div>
                             <h3 className="mb-1">Статистика фиксаций</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Распределение по статусам и переходы между ними
+                                Распределение по статусам и динамика по дням
                             </p>
                         </div>
                         <DashboardAnalyticsFilters
@@ -820,11 +822,11 @@ const Home = () => {
                             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                                 <div className="min-w-0">
                                     <h4 className="mb-1">
-                                        Переходы между статусами
+                                        Динамика по конечным статусам
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                                        Динамика переходов фиксаций из одного
-                                        статуса в другой по дням
+                                        Накопительное число переходов в каждый
+                                        статус по дням
                                     </p>
                                 </div>
                                 <div className="w-full sm:w-80">
@@ -848,7 +850,7 @@ const Home = () => {
                                 <div className="flex min-h-56 items-center justify-center">
                                     <Spinner size={32} />
                                 </div>
-                            ) : transitions.length === 0 ? (
+                            ) : activeTimelineStatuses.length === 0 ? (
                                 <div className="relative flex min-h-56 flex-col items-center justify-center text-center">
                                     {isTransitionsRefreshing ? (
                                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
@@ -856,7 +858,7 @@ const Home = () => {
                                         </div>
                                     ) : null}
                                     <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                        Нет переходов за период
+                                        Нет данных за период
                                     </p>
                                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                         Изменения статусов появятся здесь после
@@ -881,21 +883,24 @@ const Home = () => {
                                             className="overflow-x-auto overflow-y-hidden"
                                         >
                                             <div
-                                                className="overflow-hidden"
+                                                className="w-full"
                                                 style={
-                                                    transitionChartMinWidth
+                                                    typeof transitionChartWidth ===
+                                                    'number'
                                                         ? {
-                                                              minWidth: `${transitionChartMinWidth}px`,
+                                                              width: `${transitionChartWidth}px`,
                                                           }
                                                         : undefined
                                                 }
                                             >
                                                 <Chart
+                                                    key={`status-timeline-${transitionChartWidth}-${transitionCategories.length}`}
                                                     type="line"
                                                     series={transitionSeries}
                                                     xAxis={
                                                         transitionCategories
                                                     }
+                                                    width={transitionChartWidth}
                                                     height={360}
                                                     customOptions={
                                                         transitionOptions

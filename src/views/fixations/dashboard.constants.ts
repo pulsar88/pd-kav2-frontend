@@ -11,6 +11,7 @@ export const FIXATION_STATUS_ORDER: FixationStatus[] = [
     'denied',
     'deleted',
     'expired',
+    'lost',
 ]
 
 export const FIXATION_STATUS_COLORS: Record<FixationStatus, string> = {
@@ -24,10 +25,17 @@ export const FIXATION_STATUS_COLORS: Record<FixationStatus, string> = {
     failed: '#f59e0b',
     deleted: '#6b7280',
     expired: '#ea580c',
+    lost: '#78716c',
 }
 
 export type FixationsStatusCounts = Record<FixationStatus, number>
 
+export type FixationsStatusTimelinePoint = {
+    date: string
+    counts: FixationsStatusCounts
+}
+
+/** @deprecated kept for mapper compatibility during transition chart removal */
 export type FixationsStatusTransition = {
     from: string
     to: string
@@ -36,6 +44,7 @@ export type FixationsStatusTransition = {
     count: number
 }
 
+/** @deprecated use FixationsStatusTimelinePoint */
 export type FixationsTransitionTimelinePoint = {
     date: string
     counts: Record<string, number>
@@ -45,8 +54,7 @@ export type FixationsDashboardStats = {
     dateFrom: string
     dateTo: string
     statusCounts: FixationsStatusCounts
-    transitions: FixationsStatusTransition[]
-    transitionTimeline: FixationsTransitionTimelinePoint[]
+    statusTimeline: FixationsStatusTimelinePoint[]
 }
 
 export const createEmptyFixationsStatusCounts = (): FixationsStatusCounts =>
@@ -59,6 +67,5 @@ export const createEmptyFixationsDashboardStats =
         dateFrom: '',
         dateTo: '',
         statusCounts: createEmptyFixationsStatusCounts(),
-        transitions: [],
-        transitionTimeline: [],
+        statusTimeline: [],
     })

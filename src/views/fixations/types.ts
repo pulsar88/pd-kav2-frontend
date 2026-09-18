@@ -11,6 +11,7 @@ export type FixationStatus =
     | 'failed'
     | 'deleted'
     | 'expired'
+    | 'lost'
 
 export type FixationAgent = {
     email: string

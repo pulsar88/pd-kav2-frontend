@@ -10,8 +10,7 @@ import {
     formatStatsApiDate,
     getDefaultFixationsStatsDateRange,
     mapFixationsStatsStatusesToCounts,
-    mapFixationsStatsToTransitionTimeline,
-    mapFixationsStatsToTransitions,
+    mapFixationsStatsToFinalStatusTimeline,
     parseStatsApiDate,
     type FixationsStatsStatusApiItem,
 } from '@/views/fixations/fixationStatsMapper'
@@ -196,10 +195,7 @@ export async function apiGetFixationsTransitionStats(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<
-    Pick<
-        FixationsDashboardStats,
-        'dateFrom' | 'dateTo' | 'transitions' | 'transitionTimeline'
-    >
+    Pick<FixationsDashboardStats, 'dateFrom' | 'dateTo' | 'statusTimeline'>
 > {
     const defaults = getDefaultFixationsStatsDateRange()
     const fromDate = parseStatsApiDate(params.date_from) ?? defaults[0]
@@ -213,22 +209,22 @@ export async function apiGetFixationsTransitionStats(params: {
             date_to: dateTo,
             agent_id: params.agent_id,
         })
-        const transitions = mapFixationsStatsToTransitions(events)
-        const { timeline: transitionTimeline } =
-            mapFixationsStatsToTransitionTimeline(events, fromDate, toDate)
+        const statusTimeline = mapFixationsStatsToFinalStatusTimeline(
+            events,
+            fromDate,
+            toDate,
+        )
 
         return {
             dateFrom,
             dateTo,
-            transitions,
-            transitionTimeline,
+            statusTimeline,
         }
     } catch {
         return {
             dateFrom,
             dateTo,
-            transitions: [],
-            transitionTimeline: [],
+            statusTimeline: [],
         }
     }
 }

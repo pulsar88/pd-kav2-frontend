@@ -131,6 +131,16 @@ const navigationConfig: NavigationTree[] = [
                 authority: supervisorOnlyAuthority,
                 subMenu: [],
             },
+            {
+                key: 'supervisorUsers',
+                path: '/supervisor/users',
+                title: 'Пользователи',
+                translateKey: 'nav.supervisorUsers',
+                icon: 'users',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: supervisorOnlyAuthority,
+                subMenu: [],
+            },
         ],
     },
     {

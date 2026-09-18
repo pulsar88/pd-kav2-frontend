@@ -261,5 +261,11 @@ export const protectedRoutes: Routes = [
         component: lazy(() => import('@/views/supervisor')),
         authority: supervisorOnlyAuthority,
     },
+    {
+        key: 'supervisorUsers',
+        path: '/supervisor/users',
+        component: lazy(() => import('@/views/supervisor/users')),
+        authority: supervisorOnlyAuthority,
+    },
     ...othersRoute,
 ]
