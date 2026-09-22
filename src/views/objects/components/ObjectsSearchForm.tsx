@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { AnimatePresence, motion } from 'framer-motion'
 import { HiChevronDown } from 'react-icons/hi'
 import classNames from 'classnames'
@@ -7,7 +6,6 @@ import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
 import { FormItem } from '@/components/ui/Form'
 import { apiGetRealtyPropertiesFilters } from '@/services/ObjectsService'
-import { apiGetSpecialOffer } from '@/services/SpecialOffersService'
 import RangeInputGroup from './RangeInputGroup'
 import type {
     ObjectsSearchFilters,
@@ -31,6 +29,8 @@ type ObjectsSearchFormProps = {
     specialOfferOptions?: Option[]
     /** Показывать фильтр «От инвестора» (список объектов + шахматка) */
     showFromInvestorFilter?: boolean
+    showTypeFilter?: boolean
+    commercialFilters?: boolean
     onCollapsedChange?: (collapsed: boolean) => void
     onChange: (filters: ObjectsSearchFilters) => void
     onSearch: () => void
@@ -91,12 +91,13 @@ const ObjectsSearchForm = ({
     desktopActionsInGrid = false,
     specialOfferOptions,
     showFromInvestorFilter = true,
+    showTypeFilter = true,
+    commercialFilters = false,
     onCollapsedChange,
     onChange,
     onSearch,
     onReset,
 }: ObjectsSearchFormProps) => {
-    const navigate = useNavigate()
     const canUseSpecialOffers = useHasUserBonus(USER_BONUS.SPECIAL_OFFERS)
     const showInvestorFilter = showFromInvestorFilter && canUseSpecialOffers
     const [internalCollapsed, setInternalCollapsed] = useState(false)
@@ -111,7 +112,6 @@ const ObjectsSearchForm = ({
     const [filterOptions, setFilterOptions] = useState<
         RealtyPropertiesFilters | undefined
     >()
-    const [lockedOfferLabel, setLockedOfferLabel] = useState('')
 
     useEffect(() => {
         let cancelled = false
@@ -124,45 +124,6 @@ const ObjectsSearchForm = ({
             cancelled = true
         }
     }, [])
-
-    useEffect(() => {
-        const offerId = filters.specialOfferId?.trim()
-        if (!offerId) {
-            setLockedOfferLabel('')
-            return
-        }
-
-        let cancelled = false
-        const fromOptions = specialOfferOptions?.find(
-            (item) => item.value === offerId,
-        )
-        if (fromOptions?.label) {
-            setLockedOfferLabel(fromOptions.label)
-            return
-        }
-
-        setLockedOfferLabel(`Акция #${offerId}`)
-        void apiGetSpecialOffer(offerId)
-            .then((offer) => {
-                if (!cancelled && offer.name?.trim()) {
-                    setLockedOfferLabel(offer.name.trim())
-                }
-            })
-            .catch(() => {
-                /* оставляем fallback */
-            })
-
-        return () => {
-            cancelled = true
-        }
-    }, [filters.specialOfferId, specialOfferOptions])
-
-    const lockedOfferOption: Option | null = filters.specialOfferId
-        ? {
-              value: filters.specialOfferId,
-              label: lockedOfferLabel || `Акция #${filters.specialOfferId}`,
-          }
-        : null
 
     const projectOptions: Option[] = (filterOptions?.projects ?? []).map(
         (item) => ({
@@ -283,7 +244,7 @@ const ObjectsSearchForm = ({
                                         />
                                     </FormItem>
                                 ) : null}
-                                <FormItem label="Тип помещения">
+                                {showTypeFilter ? (<FormItem label="Тип помещения">
                                     <Select<Option, true>
                                         {...selectMenuProps}
                                         isMulti
@@ -304,8 +265,8 @@ const ObjectsSearchForm = ({
                                             })
                                         }
                                     />
-                                </FormItem>
-                                <FormItem label="Комнатность">
+                                </FormItem>) : null}
+                                {commercialFilters ? null : (<FormItem label="Комнатность">
                                     <Select<Option, true>
                                         {...selectMenuProps}
                                         isMulti
@@ -327,8 +288,8 @@ const ObjectsSearchForm = ({
                                             })
                                         }}
                                     />
-                                </FormItem>
-                                <FormItem label="Этаж">
+                                </FormItem>)}
+                                {commercialFilters ? null : (<FormItem label="Этаж">
                                     <RangeInputGroup
                                         fromValue={filters.floorFrom}
                                         toValue={filters.floorTo}
@@ -341,7 +302,7 @@ const ObjectsSearchForm = ({
                                             patch({ floorTo })
                                         }
                                     />
-                                </FormItem>
+                                </FormItem>)}
                                 <FormItem label="Площадь, м²">
                                     <RangeInputGroup
                                         fromValue={filters.areaFrom}
@@ -397,52 +358,7 @@ const ObjectsSearchForm = ({
                                         />
                                     </FormItem>
                                 ) : null}
-                                {canUseSpecialOffers ? (
-                                    <FormItem label="Акция">
-                                        <div className="relative">
-                                            <Select<Option, false>
-                                                {...selectMenuProps}
-                                                isDisabled={!lockedOfferOption}
-                                                isClearable={Boolean(
-                                                    lockedOfferOption,
-                                                )}
-                                                isSearchable={false}
-                                                openMenuOnClick={false}
-                                                openMenuOnFocus={false}
-                                                menuIsOpen={false}
-                                                options={
-                                                    lockedOfferOption
-                                                        ? [lockedOfferOption]
-                                                        : []
-                                                }
-                                                value={lockedOfferOption}
-                                                placeholder="Не выбрана"
-                                                components={{
-                                                    DropdownIndicator: () =>
-                                                        null,
-                                                }}
-                                                onChange={(option) => {
-                                                    if (!option) {
-                                                        patch({
-                                                            specialOfferId: '',
-                                                        })
-                                                    }
-                                                }}
-                                            />
-                                            {!lockedOfferOption ? (
-                                                <button
-                                                    type="button"
-                                                    className="absolute inset-0 z-10 cursor-pointer rounded-xl"
-                                                    aria-label="Перейти к списку акций"
-                                                    onClick={() =>
-                                                        navigate('/offers')
-                                                    }
-                                                />
-                                            ) : null}
-                                        </div>
-                                    </FormItem>
-                                ) : null}
-                                {canUseSpecialOffers &&
+                                {!commercialFilters && canUseSpecialOffers &&
                                 specialOfferOptions &&
                                 specialOfferOptions.length > 0 ? (
                                     <FormItem label="Акции">

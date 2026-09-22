@@ -46,7 +46,7 @@ const ComplexCard = ({
                 pathname: `/objects/${complex.id}`,
                 search: params.toString() ? `?${params.toString()}` : '',
             }}
-            className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-700 hover:bg-gray-900 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-900"
+            className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50 hover:shadow-lg dark:hover:border-gray-600 dark:hover:bg-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-900"
         >
             <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-700">
                 <img
@@ -81,7 +81,7 @@ const ComplexCard = ({
                             <p className="text-xs text-gray-500 transition-colors group-hover:text-gray-400">
                                 Доступно помещений
                             </p>
-                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-100 dark:text-gray-100">
+                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-900 dark:text-gray-100">
                                 {apartmentsCount}
                             </p>
                         </div>
@@ -92,7 +92,7 @@ const ComplexCard = ({
                             <p className="text-xs text-gray-500 transition-colors group-hover:text-gray-400">
                                 Цена от
                             </p>
-                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-100 dark:text-gray-100">
+                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-900 dark:text-gray-100">
                                 {priceFrom}
                             </p>
                         </div>
@@ -103,7 +103,7 @@ const ComplexCard = ({
                             <p className="text-xs text-gray-500 transition-colors group-hover:text-gray-400">
                                 За м²
                             </p>
-                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-100 dark:text-gray-100">
+                            <p className="font-semibold text-gray-900 transition-colors group-hover:text-gray-900 dark:text-gray-100">
                                 {pricePerSqm}
                             </p>
                         </div>
@@ -114,7 +114,7 @@ const ComplexCard = ({
                             <p className="text-xs text-gray-500 transition-colors group-hover:text-gray-400">
                                 Окончание строительства
                             </p>
-                            <p className="font-semibold capitalize text-gray-900 transition-colors group-hover:text-gray-100 dark:text-gray-100">
+                            <p className="font-semibold capitalize text-gray-900 transition-colors group-hover:text-gray-900 dark:text-gray-100">
                                 {completionDate}
                             </p>
                         </div>

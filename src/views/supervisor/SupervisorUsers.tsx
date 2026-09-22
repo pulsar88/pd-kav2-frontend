@@ -3,23 +3,42 @@ import Container from '@/components/shared/Container'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import DataTable from '@/components/shared/DataTable'
 import DebouceInput from '@/components/shared/DebouceInput'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import Avatar from '@/components/ui/Avatar'
 import Button from '@/components/ui/Button'
 import Tag from '@/components/ui/Tag'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import type { ColumnDef } from '@/components/shared/DataTable'
-import { apiGetUsers } from '@/services/UsersService'
+import {
+    apiGetUsers,
+    apiMakeUserAgencySupervisor,
+} from '@/services/UsersService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
-import { getUserRoleLabel } from '@/constants/roles.constant'
+import {
+    AGENCY_SUPERVISOR,
+    getUserRoleLabel,
+} from '@/constants/roles.constant'
 import { formatRuPhone } from '@/views/fixations/utils'
 import type { AdminUserListItem } from '@/@types/users'
 import ChangeUserAgencyDialog from './components/ChangeUserAgencyDialog'
 import { HiOutlineUser } from 'react-icons/hi'
-import { TbBuilding, TbRefresh, TbSearch, TbUsers } from 'react-icons/tb'
+import {
+    TbBuilding,
+    TbRefresh,
+    TbSearch,
+    TbUserCheck,
+    TbUsers,
+} from 'react-icons/tb'
 import type { ChangeEvent } from 'react'
+import { Tooltip } from '@/components/ui'
 
 const PAGE_SIZE = 20
+
+const canMakeAgencySupervisor = (user: AdminUserListItem) => {
+    if (!user.agency?.id) return false
+    return !(user.roles ?? []).includes(AGENCY_SUPERVISOR)
+}
 
 const SupervisorUsers = () => {
     const [users, setUsers] = useState<AdminUserListItem[]>([])
@@ -30,6 +49,9 @@ const SupervisorUsers = () => {
     const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(
         null,
     )
+    const [supervisorTarget, setSupervisorTarget] =
+        useState<AdminUserListItem | null>(null)
+    const [isMakingSupervisor, setIsMakingSupervisor] = useState(false)
 
     const loadUsers = useCallback(async () => {
         setIsLoading(true)
@@ -65,6 +87,36 @@ const SupervisorUsers = () => {
     const handleSearchChange = (value: string) => {
         setPageIndex(1)
         setSearch(value.trim())
+    }
+
+    const handleConfirmMakeSupervisor = async () => {
+        if (!supervisorTarget) return
+
+        setIsMakingSupervisor(true)
+        try {
+            await apiMakeUserAgencySupervisor(supervisorTarget.id)
+            toast.push(
+                <Notification type="success">
+                    «{supervisorTarget.name}» назначен руководителем агентства
+                    «{supervisorTarget.agency?.name || ''}»
+                </Notification>,
+                { placement: 'top-center' },
+            )
+            setSupervisorTarget(null)
+            void loadUsers()
+        } catch (err: unknown) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось назначить руководителя агентства',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
+        } finally {
+            setIsMakingSupervisor(false)
+        }
     }
 
     const columns: ColumnDef<AdminUserListItem>[] = useMemo(
@@ -148,16 +200,36 @@ const SupervisorUsers = () => {
             {
                 header: 'Действия',
                 id: 'actions',
-                cell: ({ row }) => (
-                    <Button
-                        size="xs"
-                        variant="solid"
-                        icon={<TbBuilding />}
-                        onClick={() => setSelectedUser(row.original)}
-                    >
-                        Сменить агентство
-                    </Button>
-                ),
+                cell: ({ row }) => {
+                    const user = row.original
+                    return (
+                        <div className="flex items-center gap-1">
+                            <Tooltip title="Сменить агентство">
+                                <Button
+                                    size="xs"
+                                    variant="solid"
+                                    shape="circle"
+                                    icon={<TbBuilding />}
+                                    aria-label="Сменить агентство"
+                                    onClick={() => setSelectedUser(user)}
+                                />
+                            </Tooltip>
+
+                            {canMakeAgencySupervisor(user) ? (
+                                <Tooltip title="Назначить руководителем агентства">
+                                    <Button
+                                        size="xs"
+                                        variant="solid"
+                                        shape="circle"
+                                        icon={<TbUserCheck />}
+                                        aria-label="Назначить руководителем агентства"
+                                        onClick={() => setSupervisorTarget(user)}
+                                    />
+                                </Tooltip>
+                            ) : null}
+                        </div>
+                    )
+                },
             },
         ],
         [],
@@ -177,15 +249,6 @@ const SupervisorUsers = () => {
                                 Список пользователей системы
                             </p>
                         </div>
-                        <Button
-                            size="sm"
-                            icon={<TbRefresh />}
-                            className="shrink-0"
-                            loading={isLoading}
-                            onClick={() => void loadUsers()}
-                        >
-                            Обновить
-                        </Button>
                     </div>
 
                     <div className="max-w-md">
@@ -223,6 +286,35 @@ const SupervisorUsers = () => {
                     void loadUsers()
                 }}
             />
+
+            <ConfirmDialog
+                isOpen={Boolean(supervisorTarget)}
+                type="warning"
+                title="Назначить руководителем?"
+                confirmText="Назначить"
+                cancelText="Отмена"
+                confirmButtonProps={{
+                    loading: isMakingSupervisor,
+                    disabled: isMakingSupervisor,
+                }}
+                onCancel={() => {
+                    if (!isMakingSupervisor) setSupervisorTarget(null)
+                }}
+                onClose={() => {
+                    if (!isMakingSupervisor) setSupervisorTarget(null)
+                }}
+                onConfirm={() => {
+                    void handleConfirmMakeSupervisor()
+                }}
+            >
+                <p>
+                    Назначить «{supervisorTarget?.name}» руководителем агентства
+                    «{supervisorTarget?.agency?.name}»?
+                </p>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Текущий руководитель этого агентства станет агентом.
+                </p>
+            </ConfirmDialog>
         </Container>
     )
 }

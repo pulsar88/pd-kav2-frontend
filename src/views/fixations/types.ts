@@ -66,6 +66,8 @@ export type FixationObject = {
 
 export type Fixation = {
     id: string
+    dealExternalId?: string
+    clientExternalId?: string
     fullName: string
     phone: string
     status: FixationStatus

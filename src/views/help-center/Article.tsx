@@ -104,7 +104,7 @@ const Article = () => {
             )}
         >
             <div className="min-w-0 gap-4 lg:flex">
-                <Card className="min-w-0 w-full flex-1">
+                <Card className="min-w-0 w-full flex-1 !bg-white dark:!bg-gray-800">
                     <Loading
                         loading={isLoading}
                         customLoader={

@@ -68,3 +68,19 @@ export async function apiChangeUserAgency(
     })
     return unwrapApiData(response)
 }
+
+/** Назначить пользователя руководителем его агентства */
+export async function apiMakeUserAgencySupervisor(
+    userId: string | number,
+): Promise<AdminUserListItem | void> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<AdminUserListItem> | AdminUserListItem | null | undefined
+    >({
+        url: endpointConfig.userMakeSupervisor(userId),
+        method: 'get',
+    })
+
+    if (response == null) return
+
+    return unwrapApiData(response)
+}

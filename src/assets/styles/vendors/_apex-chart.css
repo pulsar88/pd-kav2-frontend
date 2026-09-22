@@ -47,3 +47,16 @@
 .apexcharts-legend-text {
   @apply !text-gray-500 dark:!text-gray-400 !text-sm !font-normal;
 }
+
+/* Только итоговое число на дашборде; остальные donut-графики не меняются. */
+.dashboard-fixations-donut .apexcharts-datalabel-value {
+  font-size: 36px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-fixations-donut .apexcharts-datalabel-value {
+    font-size: 48px;
+  }
+}

@@ -61,3 +61,14 @@
     }
   }
 }
+
+html.light .menu-item.menu-item-active,
+html.light .menu-collapse-item.menu-collapse-item-active {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+html.light .menu-item.menu-item-active:hover,
+html.light .menu-collapse-item.menu-collapse-item-active:hover {
+  background-color: #d1d5db;
+  color: #111827;
+}

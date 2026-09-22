@@ -127,8 +127,8 @@ const Detail = ({
     value: ReactNode
 }) => (
     <div>
-        <p className="text-xs text-gray-400">{label}</p>
-        <p className="text-sm font-medium text-gray-100">{value || '—'}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{value || '—'}</p>
     </div>
 )
 
@@ -136,7 +136,7 @@ const collapsedPlanClass = (open: boolean) =>
     classNames(
         'relative overflow-hidden rounded-xl border',
         open
-            ? 'border-gray-700 bg-gray-800'
+            ? 'border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800'
             : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700',
         'aspect-[4/3] w-full max-h-52 sm:aspect-auto sm:h-20 sm:w-20 sm:max-h-none sm:shrink-0',
     )
@@ -361,7 +361,7 @@ const PremiseResultItem = ({
                     <p
                         className={classNames(
                             'font-bold leading-snug text-emerald-600 dark:text-emerald-400',
-                            open && '!text-emerald-300',
+                            open && '!text-emerald-600 dark:!text-emerald-400',
                         )}
                     >
                         {formatPrice(premise.discountPrice)}
@@ -371,7 +371,7 @@ const PremiseResultItem = ({
                             className={classNames(
                                 'text-xs leading-snug line-through',
                                 open
-                                    ? 'text-gray-400'
+                                    ? 'text-gray-600 dark:text-gray-400'
                                     : 'text-gray-400 dark:text-gray-500',
                             )}
                         >
@@ -384,7 +384,7 @@ const PremiseResultItem = ({
                     className={classNames(
                         'font-semibold leading-snug',
                         open
-                            ? 'text-gray-100'
+                            ? 'text-gray-900 dark:text-gray-100'
                             : 'text-gray-900 dark:text-gray-100',
                     )}
                 >
@@ -552,7 +552,7 @@ const PremiseResultItem = ({
                 pendingRemoval
                     ? 'border-rose-300 dark:border-rose-800/70'
                     : open
-                      ? 'border-gray-700 bg-gray-900'
+                      ? 'border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900'
                       : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800',
                 pendingRemoval && !open && 'bg-rose-50/40 dark:bg-rose-950/10',
             )}
@@ -630,7 +630,7 @@ const PremiseResultItem = ({
                             className={classNames(
                                 'text-sm font-semibold leading-snug sm:text-base',
                                 open
-                                    ? 'text-gray-100'
+                                    ? 'text-gray-900 dark:text-gray-100'
                                     : 'text-gray-900 dark:text-gray-100',
                             )}
                         >
@@ -646,7 +646,7 @@ const PremiseResultItem = ({
                             className={classNames(
                                 'mt-1 text-sm leading-snug sm:truncate',
                                 open
-                                    ? 'text-gray-400'
+                                    ? 'text-gray-600 dark:text-gray-400'
                                     : 'text-gray-500 dark:text-gray-400',
                             )}
                         >
@@ -704,11 +704,11 @@ const PremiseResultItem = ({
                         transition={{ duration: 0.22, ease: 'easeInOut' }}
                         className="overflow-hidden"
                     >
-                        <div className="border-t border-gray-700 px-4 py-4">
+                        <div className="border-t border-gray-200 px-4 py-4 dark:border-gray-700">
                             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-stretch">
                                 {coverImage ? (
-                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
-                                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-700 px-3 py-2.5">
+                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 lg:h-full dark:border-gray-700 dark:bg-gray-800">
+                                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
                                             <div className="min-w-0 flex-1">
                                                 {offerBadges}
                                             </div>
@@ -723,7 +723,7 @@ const PremiseResultItem = ({
                                         </div>
                                         <button
                                             type="button"
-                                            className="group flex flex-1 items-center justify-center p-3 bg-white"
+                                            className="group flex flex-1 items-center justify-center bg-gray-50 p-3 dark:bg-gray-800"
                                             onClick={onPreviewLayout}
                                         >
                                             <img
@@ -734,7 +734,7 @@ const PremiseResultItem = ({
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 lg:h-full">
+                                    <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 lg:h-full dark:border-gray-700 dark:bg-gray-800">
                                         <div className="flex flex-1 items-center justify-center p-3">
                                             <div className="flex min-h-[220px] w-full max-w-full items-center justify-center rounded-xl border border-dashed border-gray-600 bg-gray-900/40">
                                                 <LayoutImagePlaceholder />

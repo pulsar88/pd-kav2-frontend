@@ -143,6 +143,9 @@ type RealtyPropertyApi = {
 export const REALTY_PROPERTY_WITH =
     'preset.image,object,realtyFloor.plan.image,project,object.image,status,specialOffers'
 
+export const REALTY_PROPERTY_LIST_WITH =
+    'preset.image,object,project,status,specialOffers'
+
 const REALTY_OBJECT_WITH = 'image,project'
 
 type PaginatedApiMeta = {
@@ -536,7 +539,7 @@ export async function apiGetRealtyProperties(
         params: toAxiosParams({
             page: params.page ?? 1,
             per_page: params.per_page ?? 20,
-            with: REALTY_PROPERTY_WITH,
+            with: REALTY_PROPERTY_LIST_WITH,
             ...sortParams,
             ...filterParams,
         }),

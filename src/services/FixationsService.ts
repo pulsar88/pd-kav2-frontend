@@ -106,6 +106,11 @@ export async function apiGetFixationsStats(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<FixationGigalogItem[]> {
+    // Пустое агентство не должно превращаться в запрос без фильтра agent_id[].
+    if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
+        return []
+    }
+
     const perPage = 100
     const maxPages = 50
     let page = 1
@@ -147,6 +152,10 @@ export async function apiGetFixationsStatsStatuses(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<FixationsStatsStatusApiItem[]> {
+    if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
+        return []
+    }
+
     const response = await ApiService.fetchDataWithAxios<
         | {
               data?: FixationsStatsStatusApiItem[]

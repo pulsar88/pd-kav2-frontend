@@ -22,7 +22,7 @@ const LayoutPreviewDialog = ({
     >
         <div className="p-4 sm:p-5">
             <h4 className="mb-3 text-base font-semibold">{title}</h4>
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-white">
                 {imageSrc ? (
                     <img
                         src={imageSrc}

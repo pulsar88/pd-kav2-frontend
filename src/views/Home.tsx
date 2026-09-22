@@ -54,6 +54,7 @@ import UserLogAvatar from '@/views/notifications/components/UserLogAvatar'
 import type { UserLog } from '@/@types/notification'
 import DashboardAnalyticsFilters, {
     getDashboardAnalyticsScope,
+    type DashboardAgencyAgentsState,
 } from '@/views/Home/DashboardAnalyticsFilters'
 
 type FixationsTransitionStats = Awaited<
@@ -79,13 +80,14 @@ const Home = () => {
         useState<DatePickerRangeValue>(() =>
             getDefaultFixationsStatsDateRange(),
         )
-    const [selectedAgencyId, setSelectedAgencyId] = useState<number | null>(
-        () =>
-            analyticsScope.isAgencySupervisor
-                ? (user.agency?.id ?? null)
-                : null,
-    )
+    const [selectedAgencyId, setSelectedAgencyId] = useState<number | null>(null)
     const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null)
+    const [agencyAgents, setAgencyAgents] =
+        useState<DashboardAgencyAgentsState | null>(null)
+    // Руководитель всегда ограничен своим агентством, в том числе после /current.
+    const agencyId = analyticsScope.isAgencySupervisor
+        ? (user.agency?.id ?? null)
+        : selectedAgencyId
     const [notifications, setNotifications] = useState<UserLog[]>([])
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(true)
     const [statusCounts, setStatusCounts] =
@@ -101,22 +103,53 @@ const Home = () => {
     const transitionsLoadedRef = useRef(false)
 
     useEffect(() => {
-        if (
-            analyticsScope.isAgencySupervisor &&
-            user.agency?.id &&
-            selectedAgencyId == null
-        ) {
-            setSelectedAgencyId(user.agency.id)
-        }
-    }, [analyticsScope.isAgencySupervisor, selectedAgencyId, user.agency?.id])
+        setSelectedAgentId(null)
+    }, [agencyId, user.userId])
 
     const agentIdParam = useMemo(() => {
-        if (!analyticsScope.canSelectAgent) return undefined
-        return selectedAgentId ?? undefined
-    }, [analyticsScope.canSelectAgent, selectedAgentId])
+        if (
+            !analyticsScope.canSelectAgent ||
+            agencyAgents?.status !== 'ready' ||
+            agencyAgents.agencyId !== agencyId
+        ) {
+            return undefined
+        }
+
+        // API уже поддерживает agent_id[]: null в фильтре означает всех агентов
+        // выбранного агентства, а не запрос статистики без ограничений.
+        return selectedAgentId ?? agencyAgents.agentIds
+    }, [agencyAgents, agencyId, analyticsScope.canSelectAgent, selectedAgentId])
 
     const canLoadAnalytics =
-        !analyticsScope.canSelectAgent || selectedAgentId != null
+        !analyticsScope.canSelectAgent ||
+        (agencyId != null &&
+            agencyAgents != null &&
+            agencyAgents.agencyId === agencyId &&
+            agencyAgents.status === 'ready' &&
+            (selectedAgentId == null ||
+                agencyAgents.agentIds.includes(selectedAgentId)))
+
+    const isAgencyAgentsLoading =
+        analyticsScope.canSelectAgent &&
+        agencyId != null &&
+        (agencyAgents?.agencyId !== agencyId || agencyAgents?.status === 'loading')
+    const agencyAgentsLoadFailed =
+        agencyAgents?.agencyId === agencyId && agencyAgents?.status === 'error'
+
+    const analyticsUnavailableTitle = agencyId == null
+        ? analyticsScope.canSelectAgency
+            ? 'Выберите агентство'
+            : 'Агентство не указано'
+        : agencyAgentsLoadFailed
+          ? 'Не удалось загрузить агентов'
+          : 'Загрузка агентов агентства'
+    const analyticsUnavailableDescription = agencyId == null
+        ? analyticsScope.canSelectAgency
+            ? 'Выберите агентство для просмотра общей статистики или данных конкретного агента'
+            : 'Для просмотра статистики необходимо быть участником агентства'
+        : agencyAgentsLoadFailed
+          ? 'Повторите загрузку с помощью кнопки под фильтром «Агент»'
+          : 'Подготавливаем статистику выбранного агентства'
 
     const statusesRange = useMemo(() => {
         if (!canLoadAnalytics) return null
@@ -291,6 +324,16 @@ const Home = () => {
                 pie: {
                     donut: {
                         size: '72%',
+                        labels: {
+                            name: {
+                                offsetY: isDesktop ? -22 : -16,
+                            },
+                            value: {
+                                fontSize: isDesktop ? '48px' : '36px',
+                                fontWeight: 700,
+                                offsetY: isDesktop ? 32 : 24,
+                            },
+                        },
                     },
                 },
             },
@@ -310,7 +353,7 @@ const Home = () => {
                 },
             },
         }),
-        [navigate, statusSummary],
+        [isDesktop, navigate, statusSummary],
     )
 
     const statusTimeline = useMemo(
@@ -691,22 +734,29 @@ const Home = () => {
                             </p>
                         </div>
                         <DashboardAnalyticsFilters
-                            selectedAgencyId={selectedAgencyId}
+                            selectedAgencyId={agencyId}
                             selectedAgentId={selectedAgentId}
                             onAgencyChange={setSelectedAgencyId}
                             onAgentChange={setSelectedAgentId}
+                            onAgencyAgentsChange={setAgencyAgents}
                         />
                     </div>
                 </AdaptiveCard>
 
                 {!canLoadAnalytics ? (
                     <AdaptiveCard>
-                        <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                        <div
+                            className="flex min-h-48 flex-col items-center justify-center text-center"
+                            role="status"
+                        >
+                            {isAgencyAgentsLoading ? (
+                                <Spinner size={28} className="mb-3" />
+                            ) : null}
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                Выберите агента
+                                {analyticsUnavailableTitle}
                             </p>
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Аналитика доступна только по конкретному агенту
+                                {analyticsUnavailableDescription}
                             </p>
                         </div>
                     </AdaptiveCard>
@@ -803,6 +853,7 @@ const Home = () => {
                                             )}
                                         >
                                             <Chart
+                                                className="dashboard-fixations-donut"
                                                 type="donut"
                                                 series={donutSeries}
                                                 height={isDesktop ? 420 : 300}

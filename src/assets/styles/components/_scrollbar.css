@@ -207,11 +207,11 @@
 	/* Unified scrollbar styles (native scroll areas) */
 	* {
 			scrollbar-width: thin;
-			scrollbar-color: #6b7280 #171717;
+			scrollbar-color: #9ca3af #f3f4f6;
 	}
 
 	.dark * {
-			scrollbar-color: #6b7280 #171717;
+			scrollbar-color: #9ca3af #f3f4f6;
 	}
 
 	*::-webkit-scrollbar {
@@ -247,6 +247,13 @@
 	/* Alias for existing usages */
 	.checkboard-scroll {
 			scrollbar-width: thin;
-			scrollbar-color: #6b7280 #171717;
+			scrollbar-color: #9ca3af #f3f4f6;
 	}
+}
+
+html.dark {
+  scrollbar-color: #6b7280 #171717;
+}
+html.dark *::-webkit-scrollbar-track {
+  background: #171717;
 }

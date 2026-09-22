@@ -19,7 +19,7 @@ const _SideNavToggle = ({ className }: CommonProps) => {
         <>
             {larger.md && (
                 <div className={className} role="button" onClick={onCollapse}>
-                    <NavToggle className="text-2xl" toggled={sideNavCollapse} />
+                    <NavToggle className="text-2xl" toggled={!sideNavCollapse} />
                 </div>
             )}
         </>

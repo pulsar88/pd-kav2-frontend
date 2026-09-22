@@ -45,6 +45,7 @@ export type FixationApiClientPhone = {
 
 export type FixationApiClient = {
     id: number
+    external_id?: number | string | null
     name?: string | null
     second_name?: string | null
     last_name?: string | null
@@ -119,6 +120,7 @@ export type FixationApiExtendRequest = {
 
 export type FixationApiItem = {
     id: number
+    external_id?: number | string | null
     status: FixationApiStatusRelation
     max_fix_days?: number
     fixed_till?: string

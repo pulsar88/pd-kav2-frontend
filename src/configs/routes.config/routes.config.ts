@@ -40,6 +40,18 @@ export const protectedRoutes: Routes = [
         authority: agentCabinetAuthority,
     },
     {
+        key: 'commercialPremises',
+        path: '/commercial-premises',
+        component: lazy(() => import('@/views/objects/CommercialPremises')),
+        authority: objectsAuthority,
+    },
+    {
+        key: 'commercialPremises',
+        path: '/commercial-premises/:id',
+        component: lazy(() => import('@/views/objects/CommercialPremiseDetails')),
+        authority: objectsAuthority,
+    },
+    {
         key: 'objects',
         path: '/objects',
         component: lazy(() => import('@/views/objects')),

@@ -61,6 +61,16 @@ const navigationConfig: NavigationTree[] = [
                 subMenu: [],
             },
             {
+                key: 'commercialPremises',
+                path: '/commercial-premises',
+                title: 'Коммерческие помещения',
+                translateKey: 'nav.commercialPremises',
+                icon: 'objects',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: objectsAuthority,
+                subMenu: [],
+            },
+            {
                 key: 'favoritePremises',
                 path: '/favorite-premises',
                 title: 'Избранное',

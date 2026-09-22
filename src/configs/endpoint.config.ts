@@ -17,6 +17,8 @@ const endpointConfig = {
     usersUpdate: (userId: string | number) => `/v2/users/${userId}`,
     userChangeAgency: (userId: string | number) =>
         `/v2/users/${userId}/change_agency`,
+    userMakeSupervisor: (userId: string | number) =>
+        `/v2/users/${userId}/supervisor`,
     userLogs: '/v2/user/logs',
     userLogsRead: '/v2/user/logs/read',
     logsUnreadCount: '/v2/user/logs/unread-count',
