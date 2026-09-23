@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { TbBuildingSkyscraper, TbZoomIn, TbHeart, TbHeartFilled, TbScale } from 'react-icons/tb'
+import { TbBuildingSkyscraper, TbZoomIn, TbHeart, TbHeartFilled, TbScale, TbHelpCircle } from 'react-icons/tb'
+import Tooltip from '@/components/ui/Tooltip'
 import Button from '@/components/ui/Button'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
@@ -50,7 +51,17 @@ const CommercialCard = ({ item }: CommercialCardProps) => {
     }
 
     return (
-        <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-900">
+        <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-900">
+            <Tooltip title="Подробнее о вознаграждении в разделе помощи">
+                <button
+                    type="button"
+                    className="absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-full bg-white/90 p-1.5 text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-200 dark:hover:bg-gray-700"
+                    onClick={() => navigate('/help/58-rabota-s-kommercheskimi-pomescheniyami')}
+                    aria-label="Подробнее о вознаграждении"
+                >
+                    <TbHelpCircle className="text-lg" />
+                </button>
+            </Tooltip>
             <button
                 type="button"
                 className="block w-full text-left"
@@ -93,7 +104,7 @@ const CommercialCard = ({ item }: CommercialCardProps) => {
             </button>
 
             <div className="space-y-3 p-4">
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                     {item.complexName ? (
                         <span className="inline-flex max-w-full items-center gap-1 truncate rounded-lg bg-primary px-2 py-1 text-xs font-bold text-neutral">
                             <TbBuildingSkyscraper className="shrink-0" />
@@ -270,7 +281,7 @@ const CommercialPremises = () => {
                             <Pagination
                                 className="mt-6"
                                 currentPage={page}
-                                total={data?.meta?.total || 0}
+                                total={data?.meta?.total ?? 0}
                                 pageSize={PAGE_SIZE}
                                 onChange={setPage}
                             />

@@ -12,8 +12,12 @@ import Loading from '@/components/shared/Loading'
 import {
     apiGetFixation,
     apiGetFixationGigalogs,
+    apiApproveFixation,
+    apiRejectFixation,
     type FixationGigalogItem,
 } from '@/services/FixationsService'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { TbCheck } from 'react-icons/tb'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
     TbAlertTriangle,
@@ -399,6 +403,8 @@ const FixationDetails = () => {
     const [gigalogs, setGigalogs] = useState<FixationGigalogItem[]>([])
     const [isGigalogsLoading, setIsGigalogsLoading] = useState(false)
     const [isGigalogsLoadingMore, setIsGigalogsLoadingMore] = useState(false)
+    const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
+    const [isActionSubmitting, setIsActionSubmitting] = useState(false)
     const [gigalogsPage, setGigalogsPage] = useState(1)
     const [gigalogsHasMore, setGigalogsHasMore] = useState(false)
     const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -517,6 +523,49 @@ const FixationDetails = () => {
         fetchGigalogs,
     ])
 
+    const handleConfirmAction = async () => {
+        if (!id || !actionType) return
+        setIsActionSubmitting(true)
+        try {
+            if (actionType === 'approve') {
+                await apiApproveFixation(id)
+                toast.push(
+                    <Notification title="Успешно" type="success">
+                        Фиксация одобрена
+                    </Notification>,
+                )
+            } else {
+                await apiRejectFixation(id)
+                toast.push(
+                    <Notification title="Успешно" type="success">
+                        Фиксация отклонена
+                    </Notification>,
+                )
+            }
+            setActionType(null)
+            const updated = await apiGetFixation(id)
+            if (updated) setData(updated)
+            void fetchGigalogs(1)
+        } catch (err: unknown) {
+            toast.push(
+                <Notification title="Ошибка" type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        actionType === 'approve'
+                            ? 'Не удалось одобрить фиксацию'
+                            : 'Не удалось отклонить фиксацию',
+                    )}
+                </Notification>,
+            )
+        } finally {
+            setIsActionSubmitting(false)
+        }
+    }
+
+    const canModerate =
+        isSupervisor &&
+        (data?.status === 'moderation' || data?.status === 'clinch')
+
     const status = data ? getFixationStatusDisplay(data) : null
 
     return (
@@ -546,15 +595,40 @@ const FixationDetails = () => {
                     <div className="grid items-start gap-4 xl:grid-cols-5 w-full min-w-0">
                         <div className="flex flex-col gap-4 xl:col-span-3 w-full min-w-0">
                             <AdaptiveCard className="w-full min-w-0 overflow-hidden">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    className="mb-3"
-                                    icon={<TbArrowLeft />}
-                                    onClick={() => navigate('/fixations')}
-                                >
-                                    К списку фиксаций
-                                </Button>
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        icon={<TbArrowLeft />}
+                                        onClick={() => navigate('/fixations')}
+                                    >
+                                        К списку фиксаций
+                                    </Button>
+                                    {canModerate ? (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="solid"
+                                                className="bg-emerald-600 hover:bg-emerald-700"
+                                                icon={<TbCheck />}
+                                                onClick={() => setActionType('approve')}
+                                            >
+                                                Одобрить
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="default"
+                                                className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
+                                                icon={<TbX />}
+                                                onClick={() => setActionType('reject')}
+                                            >
+                                                Отклонить
+                                            </Button>
+                                        </div>
+                                    ) : null}
+                                </div>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <h2 className="mb-0 text-2xl font-bold text-gray-900 dark:text-gray-100">
                                         Фиксация #{data.id}
@@ -929,6 +1003,24 @@ const FixationDetails = () => {
                     </div>
                 )}
             </Loading>
+            <ConfirmDialog
+                isOpen={Boolean(actionType)}
+                type={actionType === 'approve' ? 'info' : 'danger'}
+                title={actionType === 'approve' ? 'Одобрить фиксацию' : 'Отклонить фиксацию'}
+                confirmButtonColor={actionType === 'approve' ? 'emerald-600' : 'red-600'}
+                confirmText={actionType === 'approve' ? 'Одобрить' : 'Отклонить'}
+                cancelText="Отмена"
+                isLoading={isActionSubmitting}
+                onClose={() => !isActionSubmitting && setActionType(null)}
+                onCancel={() => !isActionSubmitting && setActionType(null)}
+                onConfirm={handleConfirmAction}
+            >
+                <p>
+                    {actionType === 'approve'
+                        ? `Вы уверены, что хотите одобрить фиксацию #${data?.id}?`
+                        : `Вы уверены, что хотите отклонить фиксацию #${data?.id}?`}
+                </p>
+            </ConfirmDialog>
         </Container>
     )
 }

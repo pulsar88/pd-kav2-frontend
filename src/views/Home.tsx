@@ -80,6 +80,7 @@ const Home = () => {
         useState<DatePickerRangeValue>(() =>
             getDefaultFixationsStatsDateRange(),
         )
+    const [selectedObjectId, setSelectedObjectId] = useState<number | null>(null)
     const [selectedAgencyId, setSelectedAgencyId] = useState<number | null>(null)
     const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null)
     const [agencyAgents, setAgencyAgents] =
@@ -159,8 +160,9 @@ const Home = () => {
             date_from: formatStatsApiDate(from),
             date_to: formatStatsApiDate(to),
             agent_id: agentIdParam,
+            ...(selectedObjectId != null ? { object_id: selectedObjectId } : {}),
         }
-    }, [agentIdParam, canLoadAnalytics, statusesDateRange])
+    }, [agentIdParam, canLoadAnalytics, selectedObjectId, statusesDateRange])
 
     const transitionsRange = useMemo(() => {
         if (!canLoadAnalytics) return null
@@ -170,8 +172,9 @@ const Home = () => {
             date_from: formatStatsApiDate(from),
             date_to: formatStatsApiDate(to),
             agent_id: agentIdParam,
+            ...(selectedObjectId != null ? { object_id: selectedObjectId } : {}),
         }
-    }, [agentIdParam, canLoadAnalytics, transitionsDateRange])
+    }, [agentIdParam, canLoadAnalytics, selectedObjectId, transitionsDateRange])
 
     useEffect(() => {
         if (!statusesRange) {
@@ -736,8 +739,10 @@ const Home = () => {
                         <DashboardAnalyticsFilters
                             selectedAgencyId={agencyId}
                             selectedAgentId={selectedAgentId}
+                            selectedObjectId={selectedObjectId}
                             onAgencyChange={setSelectedAgencyId}
                             onAgentChange={setSelectedAgentId}
+                            onObjectChange={setSelectedObjectId}
                             onAgencyAgentsChange={setAgencyAgents}
                         />
                     </div>
@@ -869,7 +874,7 @@ const Home = () => {
                             )}
                         </AdaptiveCard>
 
-                        <AdaptiveCard>
+                        {/* <AdaptiveCard>
                             <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                                 <div className="min-w-0">
                                     <h4 className="mb-1">
@@ -962,7 +967,7 @@ const Home = () => {
                                     </div>
                                 </div>
                             )}
-                        </AdaptiveCard>
+                        </AdaptiveCard> */}
                     </>
                 )}
             </div>

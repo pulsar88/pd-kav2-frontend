@@ -101,10 +101,29 @@ const toStatsAgentIdParams = (
     return { 'agent_id[]': ids }
 }
 
+const toStatsObjectIdParams = (
+    objectId?: number | number[],
+): ApiFilterParams => {
+    if (objectId == null) {
+        return {}
+    }
+
+    const ids = (Array.isArray(objectId) ? objectId : [objectId]).filter(
+        (id) => Number.isFinite(id),
+    )
+
+    if (ids.length === 0) {
+        return {}
+    }
+
+    return { 'object_id[]': ids }
+}
+
 export async function apiGetFixationsStats(params: {
     date_from: string
     date_to: string
     agent_id?: number | number[]
+    object_id?: number | number[]
 }): Promise<FixationGigalogItem[]> {
     // Пустое агентство не должно превращаться в запрос без фильтра agent_id[].
     if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
@@ -128,6 +147,7 @@ export async function apiGetFixationsStats(params: {
                 date_to: params.date_to,
                 page,
                 per_page: perPage,
+                ...toStatsObjectIdParams(params.object_id),
                 ...toStatsAgentIdParams(params.agent_id),
             }),
         })
@@ -151,6 +171,7 @@ export async function apiGetFixationsStatsStatuses(params: {
     date_from: string
     date_to: string
     agent_id?: number | number[]
+    object_id?: number | number[]
 }): Promise<FixationsStatsStatusApiItem[]> {
     if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
         return []
@@ -167,6 +188,7 @@ export async function apiGetFixationsStatsStatuses(params: {
         params: toAxiosParams({
             date_from: params.date_from,
             date_to: params.date_to,
+            ...toStatsObjectIdParams(params.object_id),
             ...toStatsAgentIdParams(params.agent_id),
         }),
     })
@@ -182,6 +204,7 @@ export async function apiGetFixationsStatusCounts(params: {
     date_from: string
     date_to: string
     agent_id?: number | number[]
+    object_id?: number | number[]
 }): Promise<FixationsStatusCounts> {
     const defaults = getDefaultFixationsStatsDateRange()
     const fromDate = parseStatsApiDate(params.date_from) ?? defaults[0]
@@ -192,6 +215,7 @@ export async function apiGetFixationsStatusCounts(params: {
             date_from: formatStatsApiDate(fromDate),
             date_to: formatStatsApiDate(toDate),
             agent_id: params.agent_id,
+            object_id: params.object_id,
         })
         return mapFixationsStatsStatusesToCounts(items)
     } catch {
@@ -203,6 +227,7 @@ export async function apiGetFixationsTransitionStats(params: {
     date_from: string
     date_to: string
     agent_id?: number | number[]
+    object_id?: number | number[]
 }): Promise<
     Pick<FixationsDashboardStats, 'dateFrom' | 'dateTo' | 'statusTimeline'>
 > {
@@ -217,6 +242,7 @@ export async function apiGetFixationsTransitionStats(params: {
             date_from: dateFrom,
             date_to: dateTo,
             agent_id: params.agent_id,
+            object_id: params.object_id,
         })
         const statusTimeline = mapFixationsStatsToFinalStatusTimeline(
             events,
@@ -268,6 +294,20 @@ export async function apiGetFixations(
         total: response.meta.total,
         meta: response.meta,
     }
+}
+
+export async function apiApproveFixation(id: string | number): Promise<void> {
+    await ApiService.fetchDataWithAxios<void>({
+        url: endpointConfig.fixationApprove(id),
+        method: 'get',
+    })
+}
+
+export async function apiRejectFixation(id: string | number): Promise<void> {
+    await ApiService.fetchDataWithAxios<void>({
+        url: endpointConfig.fixationReject(id),
+        method: 'get',
+    })
 }
 
 export async function apiGetFixation(id: string): Promise<Fixation | null> {
@@ -377,6 +417,7 @@ export async function apiGetFixationHouses(
         params: toAxiosParams({
             page,
             per_page: perPage,
+            ...(params.search ? { search: params.search } : {}),
         }),
     })
 
@@ -838,4 +879,140 @@ export async function apiRestoreFixation(
             fixed_till: fixedTillString,
         },
     })
+}
+
+export type FixationExportStatus = {
+    value: string
+    code: string
+    name: string
+}
+
+export type FixationExportFile = {
+    id: number
+    uuid?: string
+    name?: string
+    file_name?: string
+    mime_type?: string
+    size?: number
+    src?: string
+    upload_date?: string
+    base_url?: string
+    url_path?: string
+}
+
+export type FixationExportItem = {
+    id: number
+    status?: FixationExportStatus
+    params?: string
+    failed_at?: string | null
+    generated_at?: string | null
+    file?: FixationExportFile | null
+}
+
+export type GetFixationExportsParams = {
+    page?: number
+    per_page?: number
+    status?: string
+    sort_by?: string
+    order?: 'asc' | 'desc'
+}
+
+export type GetFixationExportsResponse = {
+    data: FixationExportItem[]
+    meta?: FixationsApiMeta
+}
+
+export type CreateFixationExportPayload = {
+    agency_id?: number[]
+    realty_object_id?: number[]
+    status?: string[]
+    date_from?: string
+    date_to?: string
+}
+
+export async function apiGetFixationExports(
+    params: GetFixationExportsParams = {},
+): Promise<GetFixationExportsResponse> {
+    const page = Math.max(1, params.page ?? 1)
+    const perPage = Math.max(1, params.per_page ?? 20)
+
+    const response = await ApiService.fetchDataWithAxios<
+        GetFixationExportsResponse | FixationExportItem[]
+    >({
+        url: endpointConfig.fixationExportList,
+        method: 'get',
+        params: toAxiosParams({
+            page,
+            per_page: perPage,
+            ...(params.status ? { status: params.status } : {}),
+            ...(params.sort_by ? { sort_by: params.sort_by } : {}),
+            ...(params.order ? { order: params.order } : {}),
+        }),
+    })
+
+    if (Array.isArray(response)) {
+        return { data: response }
+    }
+    return {
+        data: response.data ?? [],
+        meta: response.meta,
+    }
+}
+
+export async function apiCreateFixationExport(
+    payload: CreateFixationExportPayload,
+): Promise<FixationExportItem> {
+    const response = await ApiService.fetchDataWithAxios<{
+        data: FixationExportItem
+    }>({
+        url: endpointConfig.fixationExportCreate,
+        method: 'post',
+        data: payload,
+    })
+    return response.data
+}
+
+export async function apiGetFixationExport(
+    exportId: number | string,
+): Promise<FixationExportItem> {
+    const response = await ApiService.fetchDataWithAxios<{
+        data: FixationExportItem
+    }>({
+        url: endpointConfig.fixationExportItem(exportId),
+        method: 'get',
+    })
+    return response.data
+}
+
+export async function apiDeleteFixationExport(
+    exportId: number | string,
+): Promise<void> {
+    await ApiService.fetchDataWithAxios<void>({
+        url: endpointConfig.fixationExportItem(exportId),
+        method: 'delete',
+    })
+}
+
+export function getFixationExportDownloadUrl(exportId: number | string): string {
+    return endpointConfig.fixationExportDownload(exportId)
+}
+
+export async function apiDownloadFixationExport(
+    exportId: number | string,
+    fileName = 'fixations_export.xlsx',
+): Promise<void> {
+    const data = await ApiService.fetchDataWithAxios<Blob>({
+        url: endpointConfig.fixationExportDownload(exportId),
+        method: 'get',
+        responseType: 'blob',
+    })
+    const blob = new Blob([data])
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', fileName)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
 }

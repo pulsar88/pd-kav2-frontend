@@ -252,7 +252,7 @@ const MortgageCalculator = () => {
                                     </Tooltip>
                                 </span>
                             </Segment.Item>
-                            <Segment.Item
+                            {/* <Segment.Item
                                 value="differentiated"
                                 className="w-full !px-3 !text-sm sm:w-auto sm:flex-1 sm:!px-5"
                             >
@@ -270,7 +270,7 @@ const MortgageCalculator = () => {
                                         </span>
                                     </Tooltip>
                                 </span>
-                            </Segment.Item>
+                            </Segment.Item> */}
                         </Segment>
                     </FormItem>
 

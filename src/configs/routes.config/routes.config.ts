@@ -35,6 +35,12 @@ export const protectedRoutes: Routes = [
     },
     {
         key: 'fixations',
+        path: '/fixations/export/:id',
+        component: lazy(() => import('@/views/fixations/FixationExportDownload')),
+        authority: agentCabinetAuthority,
+    },
+    {
+        key: 'fixations',
         path: '/fixations/:id',
         component: lazy(() => import('@/views/fixations/FixationDetails')),
         authority: agentCabinetAuthority,

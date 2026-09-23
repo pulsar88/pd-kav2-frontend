@@ -16,6 +16,9 @@ export const buildFixationsListParams = (params: GetFixationsParams = {}) => {
         order: 'desc',
     }
 
+    if (params.agency_id != null) query.agency_id = params.agency_id
+    if (params.agent_id != null) query.agent_id = params.agent_id
+
     if (params.status) {
         query.status = params.status
     }

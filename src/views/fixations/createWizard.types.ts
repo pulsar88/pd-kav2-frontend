@@ -62,6 +62,7 @@ export type FixationComplex = {
 export type GetFixationHousesParams = {
     page?: number
     per_page?: number
+    search?: string
 }
 
 export type GetFixationHousesResponse = {

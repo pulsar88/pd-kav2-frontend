@@ -39,8 +39,18 @@ const endpointConfig = {
     fixationsStats: '/v2/fixations/stats',
     fixationsStatsStatuses: '/v2/fixations/stats/statuses',
     fixation: (fixationId: string | number) => `/v2/fixations/${fixationId}`,
+    fixationExportList: '/v2/fixations/export',
+    fixationExportCreate: '/v2/fixations/export',
+    fixationExportItem: (exportId: string | number) =>
+        `/v2/fixations/export/${exportId}`,
+    fixationExportDownload: (exportId: string | number) =>
+        `/v2/fixations/export/${exportId}/download`,
     fixationRelatedClients: (fixationId: string | number) =>
         `/v2/fixations/${fixationId}/related_clients`,
+    fixationApprove: (fixationId: string | number) =>
+        `/v2/fixations/${fixationId}/approve`,
+    fixationReject: (fixationId: string | number) =>
+        `/v2/fixations/${fixationId}/reject`,
     fixationExtendRequests: '/v2/fixations/extend_requests',
     fixationExtendRequestApprove: (requestId: string | number) =>
         `/v2/fixations/extend_requests/${requestId}/approve`,

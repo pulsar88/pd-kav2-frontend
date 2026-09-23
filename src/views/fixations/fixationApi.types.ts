@@ -165,4 +165,6 @@ export type GetFixationsParams = {
     page_size?: number
     status?: FixationApiStatus | FixationApiStatus[]
     search?: string
+    agency_id?: number
+    agent_id?: number
 }

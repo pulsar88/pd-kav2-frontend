@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import Button from '@/components/ui/Button'
 import Tooltip from '@/components/ui/Tooltip'
@@ -8,9 +8,16 @@ import DataTable from '@/components/shared/DataTable'
 import {
     apiGetFixations,
     apiCreateFixationExtendRequest,
+    apiApproveFixation,
+    apiRejectFixation,
 } from '@/services/FixationsService'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { TbCheck, TbX } from 'react-icons/tb'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { useSessionUser } from '@/store/authStore'
+import { SUPERVISOR, AGENCY_SUPERVISOR } from '@/constants/roles.constant'
+import { apiGetAgencies, apiGetAgency } from '@/services/AgencyService'
+import type { AgencyAgent } from '@/@types/agency'
 import { TbCalendarPlus, TbCalendarTime, TbEye } from 'react-icons/tb'
 import type { ColumnDef } from '@/components/shared/DataTable'
 import type { Fixation, FixationStatus, GetFixationsResponse } from '../types'
@@ -45,6 +52,10 @@ const FixationsTable = ({
 }: FixationsTableProps) => {
     const navigate = useNavigate()
     const user = useSessionUser((state) => state.user)
+    const isSupervisor = (user.authority ?? []).includes(SUPERVISOR)
+    const isAgencySupervisor = (user.authority ?? []).includes(AGENCY_SUPERVISOR)
+    const canFilterAgents = isSupervisor || isAgencySupervisor
+
     const columnsScope = useMemo(
         () => getFixationColumnsScope(user.authority ?? []),
         [user.authority],
@@ -52,16 +63,67 @@ const FixationsTable = ({
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
     const [search, setSearch] = useState('')
+    const [agencyId, setAgencyId] = useState<number>()
+    const [agentId, setAgentId] = useState<number>()
+    const [agencyOptions, setAgencyOptions] = useState<{ value: number; label: string }[]>([])
+    const [selectedAgencyOption, setSelectedAgencyOption] = useState<{ value: number; label: string } | null>(null)
+    const [agencyPage, setAgencyPage] = useState(1)
+    const [hasMoreAgencies, setHasMoreAgencies] = useState(true)
+    const [isLoadingMoreAgencies, setIsLoadingMoreAgencies] = useState(false)
+    const [debouncedAgencySearch, setDebouncedAgencySearch] = useState('')
+    const [searchReloadKey, setSearchReloadKey] = useState(0)
+    const agencySearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const [agentOptions, setAgentOptions] = useState<{ value: number; label: string }[]>([])
+    const effectiveAgencyId = isAgencySupervisor
+        ? user.agency?.id
+        : agencyId
     const [columnVisibility, setColumnVisibility] =
         useState<FixationColumnVisibility>(() => loadFixationColumnVisibility())
     const [extendFixation, setExtendFixation] = useState<Fixation | null>(null)
     const [isExtendOpen, setIsExtendOpen] = useState(false)
     const [isExtendSubmitting, setIsExtendSubmitting] = useState(false)
+    const [actionFixation, setActionFixation] = useState<Fixation | null>(null)
+    const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
+    const [isActionSubmitting, setIsActionSubmitting] = useState(false)
     const [data, setData] = useState<GetFixationsResponse | undefined>(
         undefined,
     )
     const [isLoading, setIsLoading] = useState(true)
     const [refreshCount, setRefreshCount] = useState(0)
+
+    useEffect(() => {
+        if (!isSupervisor) return
+        setAgencyPage(1)
+        setHasMoreAgencies(true)
+        void apiGetAgencies({ page: 1, per_page: 20, search: debouncedAgencySearch || undefined }).then((result) => {
+            const list = result.data.map((agency) => ({ value: agency.id, label: agency.name }))
+            setAgencyOptions((prev) => {
+                const combined = selectedAgencyOption && !list.some((item) => item.value === selectedAgencyOption.value)
+                    ? [selectedAgencyOption, ...list]
+                    : list
+                return combined
+            })
+            setHasMoreAgencies((result.meta?.last_page ?? 1) > 1)
+        })
+    }, [isSupervisor, debouncedAgencySearch, selectedAgencyOption, searchReloadKey])
+
+    useEffect(() => {
+        setAgentId(undefined)
+        if (effectiveAgencyId == null) { setAgentOptions([]); return }
+        void apiGetAgency(effectiveAgencyId, { with: 'agents' }).then((agency) => {
+            setAgentOptions((agency?.agents ?? []).map((agent: AgencyAgent) => ({ value: agent.id, label: agent.name })))
+        })
+    }, [effectiveAgencyId])
+
+
+
+    useEffect(() => {
+        return () => {
+            if (agencySearchTimerRef.current) {
+                clearTimeout(agencySearchTimerRef.current)
+            }
+        }
+    }, [])
 
     useEffect(() => {
         setPageIndex(1)
@@ -76,6 +138,8 @@ const FixationsTable = ({
             page_size: pageSize,
             search: search || undefined,
             status: statusFilter,
+            agency_id: effectiveAgencyId,
+            agent_id: canFilterAgents ? agentId : undefined,
         })
             .then((response) => {
                 if (!cancelled) setData(response)
@@ -90,7 +154,7 @@ const FixationsTable = ({
         return () => {
             cancelled = true
         }
-    }, [pageIndex, pageSize, refreshCount, refreshKey, search, statusFilter])
+    }, [pageIndex, pageSize, refreshCount, refreshKey, search, statusFilter, agencyId, agentId])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
@@ -98,6 +162,24 @@ const FixationsTable = ({
     useEffect(() => {
         saveFixationColumnVisibility(columnVisibility)
     }, [columnVisibility])
+
+    const loadMoreAgencies = () => {
+        if (!isSupervisor || isLoadingMoreAgencies || !hasMoreAgencies) return
+        const nextPage = agencyPage + 1
+        setIsLoadingMoreAgencies(true)
+        void apiGetAgencies({ page: nextPage, per_page: 20, search: debouncedAgencySearch || undefined })
+            .then((result) => {
+                setAgencyOptions((current) => [
+                    ...current,
+                    ...result.data
+                        .filter((agency) => !current.some((item) => item.value === agency.id))
+                        .map((agency) => ({ value: agency.id, label: agency.name })),
+                ])
+                setAgencyPage(nextPage)
+                setHasMoreAgencies((result.meta?.last_page ?? nextPage) > nextPage)
+            })
+            .finally(() => setIsLoadingMoreAgencies(false))
+    }
 
     const handleSearchChange = (value: string) => {
         setSearch(value)
@@ -114,6 +196,44 @@ const FixationsTable = ({
             if (visibleCount === 0) return prev
             return next
         })
+    }
+
+    const handleConfirmAction = async () => {
+        if (!actionFixation || !actionType) return
+        setIsActionSubmitting(true)
+        try {
+            if (actionType === 'approve') {
+                await apiApproveFixation(actionFixation.id)
+                toast.push(
+                    <Notification title="Успешно" type="success">
+                        Фиксация #{actionFixation.id} одобрена
+                    </Notification>,
+                )
+            } else {
+                await apiRejectFixation(actionFixation.id)
+                toast.push(
+                    <Notification title="Успешно" type="success">
+                        Фиксация #{actionFixation.id} отклонена
+                    </Notification>,
+                )
+            }
+            setActionFixation(null)
+            setActionType(null)
+            setRefreshCount((prev) => prev + 1)
+        } catch (err: unknown) {
+            toast.push(
+                <Notification title="Ошибка" type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        actionType === 'approve'
+                            ? 'Не удалось одобрить фиксацию'
+                            : 'Не удалось отклонить фиксацию',
+                    )}
+                </Notification>,
+            )
+        } finally {
+            setIsActionSubmitting(false)
+        }
     }
 
     const handleOpenExtend = (fixation: Fixation) => {
@@ -397,6 +517,36 @@ const FixationsTable = ({
                                     </span>
                                 </Tooltip>
                             )}
+                            {isSupervisor &&
+                            (fixation.status === 'moderation' ||
+                                fixation.status === 'clinch') ? (
+                                <>
+                                    <Tooltip title="Одобрить фиксацию">
+                                        <Button
+                                            size="xs"
+                                            variant="plain"
+                                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-500/20"
+                                            icon={<TbCheck className="text-base" />}
+                                            onClick={() => {
+                                                setActionFixation(fixation)
+                                                setActionType('approve')
+                                            }}
+                                        />
+                                    </Tooltip>
+                                    <Tooltip title="Отклонить фиксацию">
+                                        <Button
+                                            size="xs"
+                                            variant="plain"
+                                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-500/20"
+                                            icon={<TbX className="text-base" />}
+                                            onClick={() => {
+                                                setActionFixation(fixation)
+                                                setActionType('reject')
+                                            }}
+                                        />
+                                    </Tooltip>
+                                </>
+                            ) : null}
                         </div>
                     )
                 },
@@ -420,6 +570,40 @@ const FixationsTable = ({
                 columnVisibility={columnVisibility}
                 columnOptionsAuthority={user.authority ?? []}
                 statusFilter={statusFilter}
+                showAgencyFilter={isSupervisor}
+                showAgentFilter={canFilterAgents}
+                agencyOptions={agencyOptions}
+                agentOptions={agentOptions}
+                agencyId={agencyId}
+                agentId={agentId}
+                onAgencyChange={(option) => {
+                    setSelectedAgencyOption(option ?? null)
+                    setAgencyId(option?.value)
+                    setPageIndex(1)
+                }}
+                onAgentChange={(value) => {
+                    setAgentId(value)
+                    setPageIndex(1)
+                }}
+                onAgencySearchChange={(value) => {
+                    const trimmed = value.trim()
+                    setAgencyPage(1)
+                    if (agencySearchTimerRef.current) {
+                        clearTimeout(agencySearchTimerRef.current)
+                        agencySearchTimerRef.current = null
+                    }
+                    if (!trimmed) {
+                        setDebouncedAgencySearch('')
+                        setSearchReloadKey((prev) => prev + 1)
+                        return
+                    }
+                    agencySearchTimerRef.current = setTimeout(() => {
+                        agencySearchTimerRef.current = null
+                        setDebouncedAgencySearch(trimmed)
+                    }, 400)
+                }}
+                onAgencyMenuScrollToBottom={loadMoreAgencies}
+                isLoadingMoreAgencies={isLoadingMoreAgencies}
                 onSearchChange={handleSearchChange}
                 onStatusFilterChange={(status) =>
                     onStatusFilterChange?.(status)
@@ -446,6 +630,24 @@ const FixationsTable = ({
                 onClose={handleCloseExtend}
                 onSubmit={handleSubmitExtend}
             />
+            <ConfirmDialog
+                isOpen={Boolean(actionType && actionFixation)}
+                type={actionType === 'approve' ? 'info' : 'danger'}
+                title={actionType === 'approve' ? 'Одобрить фиксацию' : 'Отклонить фиксацию'}
+                confirmButtonColor={actionType === 'approve' ? 'emerald-600' : 'red-600'}
+                confirmText={actionType === 'approve' ? 'Одобрить' : 'Отклонить'}
+                cancelText="Отмена"
+                isLoading={isActionSubmitting}
+                onClose={() => !isActionSubmitting && (setActionFixation(null), setActionType(null))}
+                onCancel={() => !isActionSubmitting && (setActionFixation(null), setActionType(null))}
+                onConfirm={handleConfirmAction}
+            >
+                <p>
+                    {actionType === 'approve'
+                        ? `Вы уверены, что хотите одобрить фиксацию #${actionFixation?.id}?`
+                        : `Вы уверены, что хотите отклонить фиксацию #${actionFixation?.id}?`}
+                </p>
+            </ConfirmDialog>
         </div>
     )
 }

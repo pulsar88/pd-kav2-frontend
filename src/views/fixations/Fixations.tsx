@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import Button from '@/components/ui/Button'
+import Tabs from '@/components/ui/Tabs'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
 import { TbPlus } from 'react-icons/tb'
+import { useSessionUser } from '@/store/authStore'
+import { SUPERVISOR } from '@/constants/roles.constant'
+import FixationExportsView from './components/FixationExportsView'
 import FixationsTable from './components/FixationsTable'
 import FixationsCreateWizardDialog from './components/FixationsCreateWizardDialog'
 import type { FixationCreateInitialSelection } from './createWizard.types'
@@ -16,6 +20,19 @@ const Fixations = () => {
     const [searchParams, setSearchParams] = useSearchParams()
     const [isCreateOpen, setIsCreateOpen] = useState(false)
     const [tableRefreshKey, setTableRefreshKey] = useState(0)
+    const authority = useSessionUser((state) => state.user.authority) ?? []
+    const isSupervisor = authority.includes(SUPERVISOR)
+    const currentTab = searchParams.get('tab') || 'list'
+
+    const handleTabChange = (val: string) => {
+        const next = new URLSearchParams(searchParams)
+        if (val === 'list') {
+            next.delete('tab')
+        } else {
+            next.set('tab', val)
+        }
+        setSearchParams(next, { replace: true })
+    }
 
     const statusFilter = useMemo(() => {
         const raw = searchParams.get('status')?.toLowerCase()
@@ -98,19 +115,43 @@ const Fixations = () => {
                                 Список фиксаций клиентов и управление сроками
                             </p>
                         </div>
-                        <Button
-                            variant="solid"
-                            icon={<TbPlus />}
-                            onClick={() => setIsCreateOpen(true)}
-                        >
-                            Создать фиксацию
-                        </Button>
+                        {currentTab === 'list' ? (
+                            <Button
+                                variant="solid"
+                                icon={<TbPlus />}
+                                onClick={() => setIsCreateOpen(true)}
+                            >
+                                Создать фиксацию
+                            </Button>
+                        ) : null}
                     </div>
-                    <FixationsTable
-                        refreshKey={tableRefreshKey}
-                        statusFilter={statusFilter}
-                        onStatusFilterChange={handleStatusFilterChange}
-                    />
+
+                    {isSupervisor ? (
+                        <Tabs value={currentTab} onChange={handleTabChange}>
+                            <Tabs.TabList>
+                                <Tabs.TabNav value="list">Список фиксаций</Tabs.TabNav>
+                                <Tabs.TabNav value="export">Экспорт фиксаций</Tabs.TabNav>
+                            </Tabs.TabList>
+                            <div className="mt-4">
+                                <Tabs.TabContent value="list">
+                                    <FixationsTable
+                                        refreshKey={tableRefreshKey}
+                                        statusFilter={statusFilter}
+                                        onStatusFilterChange={handleStatusFilterChange}
+                                    />
+                                </Tabs.TabContent>
+                                <Tabs.TabContent value="export">
+                                    <FixationExportsView />
+                                </Tabs.TabContent>
+                            </div>
+                        </Tabs>
+                    ) : (
+                        <FixationsTable
+                            refreshKey={tableRefreshKey}
+                            statusFilter={statusFilter}
+                            onStatusFilterChange={handleStatusFilterChange}
+                        />
+                    )}
                 </div>
             </AdaptiveCard>
             <FixationsCreateWizardDialog

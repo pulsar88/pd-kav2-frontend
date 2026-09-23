@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { TbBuildingSkyscraper, TbHeart, TbScale, TbPlus, TbHeartFilled } from 'react-icons/tb'
+import { TbBuildingSkyscraper, TbHeart, TbScale, TbPlus, TbHeartFilled, TbHelpCircle } from 'react-icons/tb'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
@@ -11,14 +11,16 @@ import LayoutPreviewDialog from './components/LayoutPreviewDialog'
 import SpecialOfferBadges from './components/SpecialOfferBadges'
 import type { Premise } from './types'
 import { formatArea, formatPrice, getPremiseCoverImage } from './utils'
+import { Tooltip } from '@/components/ui'
 
 type DetailRowProps = {
     label: string
     value?: string | number | null
+    className?: string
 }
 
-const DetailRow = ({ label, value }: DetailRowProps) => (
-    <div className="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-700/50">
+const DetailRow = ({ label, value, className = '' }: DetailRowProps) => (
+    <div className={`rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-700/50 ${className}`}>
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
             {label}
         </p>
@@ -132,28 +134,38 @@ const CommercialPremiseDetails = () => {
                                 max={3}
                                 interactiveDetails
                             />
+                            <Tooltip title="Подробнее о вознаграждении в разделе помощи">
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center rounded-full bg-white/90 p-1.5 text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-200 dark:hover:bg-gray-700"
+                                    onClick={() => navigate('/help/58-rabota-s-kommercheskimi-pomescheniyami')}
+                                    aria-label="Подробнее о вознаграждении"
+                                >
+                                    <TbHelpCircle className="text-lg" />
+                                </button>
+                            </Tooltip>
                         </div>
                     </div>
 
                     <div className="grid gap-5 lg:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
-                        <div className="order-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white">
+                        <div className="order-2 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-white flex">
                             {layoutImage ? (
                                 <button
                                     type="button"
-                                    className="block w-full cursor-zoom-in rounded-xl bg-white p-3 dark:bg-white"
+                                    className="flex min-h-[360px] w-full cursor-zoom-in items-center justify-center rounded-xl bg-white p-3 dark:bg-white"
                                     onClick={() => setIsPreviewOpen(true)}
                                 >
                                     <img
                                         src={layoutImage}
                                         alt={title}
-                                        className="max-h-[620px] w-full object-contain"
+                                        className="max-h-[560px] max-w-[92%] object-contain"
                                     />
                                 </button>
                             ) : coverImage ? (
                                 <img
                                     src={coverImage}
                                     alt="Коммерческое помещение"
-                                    className="max-h-[620px] w-full object-contain"
+                                    className="max-h-[560px] max-w-[92%] object-contain"
                                 />
                             ) : (
                                 <div className="flex min-h-[320px] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
@@ -188,7 +200,7 @@ const CommercialPremiseDetails = () => {
                                 label="Цена"
                                 value={
                                     premise.price != null
-                                        ? `${formatPrice(premise.price)} ₽`
+                                        ? `${formatPrice(premise.price)}`
                                         : undefined
                                 }
                             />
@@ -196,7 +208,7 @@ const CommercialPremiseDetails = () => {
                                 label="Цена за м²"
                                 value={
                                     (premise.pricePerSqm != null || (premise.price != null && premise.area > 0))
-                                        ? `${formatPrice(premise.pricePerSqm ?? premise.price! / premise.area)} ₽`
+                                        ? `${formatPrice(premise.pricePerSqm ?? premise.price! / premise.area)}`
                                         : undefined
                                 }
                             />
@@ -213,6 +225,11 @@ const CommercialPremiseDetails = () => {
                                 value={
                                     premise.statusName || premise.status?.name
                                 }
+                            />
+                            <DetailRow
+                                label="Менеджер"
+                                value="Алиса Зайкина · +7 917 419 61 51"
+                                className="bg-primary/10 dark:bg-primary/20"
                             />
                         </div>
                     </div>

@@ -9,6 +9,7 @@ import {
     ADMIN,
 } from '@/constants/roles.constant'
 import { apiGetAgencies, apiGetAgency } from '@/services/AgencyService'
+import { apiGetFixationHouses } from '@/services/FixationsService'
 import { useSessionUser } from '@/store/authStore'
 import type { AgencyAgent, AgencyItem } from '@/@types/agency'
 
@@ -35,8 +36,10 @@ export type DashboardAgencyAgentsState = {
 type DashboardAnalyticsFiltersProps = {
     selectedAgencyId: number | null
     selectedAgentId: number | null
+    selectedObjectId?: number | null
     onAgencyChange: (agencyId: number | null) => void
     onAgentChange: (agentId: number | null) => void
+    onObjectChange?: (objectId: number | null) => void
     onAgencyAgentsChange: (state: DashboardAgencyAgentsState | null) => void
 }
 
@@ -96,8 +99,10 @@ export const getDashboardAnalyticsScope = (authority: string[] = []) => {
 const DashboardAnalyticsFilters = ({
     selectedAgencyId,
     selectedAgentId,
+    selectedObjectId = null,
     onAgencyChange,
     onAgentChange,
+    onObjectChange,
     onAgencyAgentsChange,
 }: DashboardAnalyticsFiltersProps) => {
     const user = useSessionUser((state) => state.user)
@@ -107,6 +112,12 @@ const DashboardAnalyticsFilters = ({
         [authority],
     )
 
+    const [objects, setObjects] = useState<{ id: number; name: string }[]>([])
+    const [isObjectsLoading, setIsObjectsLoading] = useState(false)
+    const [objectSearchInput, setObjectSearchInput] = useState('')
+    const [objectSearchQuery, setObjectSearchQuery] = useState('')
+    const [lastSelectedObjectOption, setLastSelectedObjectOption] = useState<Option | null>(null)
+    const objectSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [agencies, setAgencies] = useState<AgencyItem[]>([])
     const [selectedAgency, setSelectedAgency] = useState<AgencyItem | null>(
         null,
@@ -207,6 +218,51 @@ const DashboardAnalyticsFilters = ({
         agentsReloadKey,
         onAgencyAgentsChange,
     ])
+
+    useEffect(() => {
+        if (!scope.isSupervisor) return
+        let cancelled = false
+        setIsObjectsLoading(true)
+        void apiGetFixationHouses({
+            per_page: 100,
+            search: objectSearchQuery || undefined,
+        })
+            .then((res) => {
+                if (cancelled) return
+                setObjects(
+                    (res.list ?? []).map((item) => ({
+                        id: Number(item.id),
+                        name: item.name,
+                    })),
+                )
+            })
+            .catch(() => {
+                if (!cancelled) setObjects([])
+            })
+            .finally(() => {
+                if (!cancelled) setIsObjectsLoading(false)
+            })
+
+        return () => {
+            cancelled = true
+        }
+    }, [scope.isSupervisor, objectSearchQuery])
+
+    const handleObjectSearchChange = (value: string) => {
+        setObjectSearchInput(value)
+        const trimmed = value.trim()
+        if (objectSearchTimerRef.current) {
+            clearTimeout(objectSearchTimerRef.current)
+            objectSearchTimerRef.current = null
+        }
+        if (!trimmed) {
+            setObjectSearchQuery('')
+            return
+        }
+        objectSearchTimerRef.current = setTimeout(() => {
+            setObjectSearchQuery(trimmed)
+        }, 400)
+    }
 
     useEffect(() => {
         if (!scope.isSupervisor) return
@@ -363,6 +419,9 @@ const DashboardAnalyticsFilters = ({
             if (searchTimerRef.current) {
                 clearTimeout(searchTimerRef.current)
             }
+            if (objectSearchTimerRef.current) {
+                clearTimeout(objectSearchTimerRef.current)
+            }
         }
     }, [])
 
@@ -411,10 +470,68 @@ const DashboardAnalyticsFilters = ({
         <div
             className={
                 scope.canSelectAgency
-                    ? 'grid w-full grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2'
+                    ? 'grid w-full grid-cols-1 gap-3 sm:max-w-3xl sm:grid-cols-3'
                     : 'w-full sm:ml-auto sm:w-80'
             }
         >
+            {scope.canSelectAgency ? (
+                <div>
+                    <label
+                        htmlFor="dashboard-object-filter"
+                        className="mb-1.5 block text-sm font-medium"
+                    >
+                        Объект
+                    </label>
+                    <Select<Option>
+                        inputId="dashboard-object-filter"
+                        isSearchable
+                        isClearable
+                        isLoading={isObjectsLoading}
+                        options={(() => {
+                            const list = objects.map((obj) => ({
+                                value: obj.id,
+                                label: obj.name,
+                            }))
+                            if (
+                                lastSelectedObjectOption &&
+                                !list.some((item) => item.value === lastSelectedObjectOption.value)
+                            ) {
+                                return [lastSelectedObjectOption, ...list]
+                            }
+                            return list
+                        })()}
+                        value={
+                            selectedObjectId != null
+                                ? objects
+                                      .map((obj) => ({
+                                          value: obj.id,
+                                          label: obj.name,
+                                      }))
+                                      .find((opt) => opt.value === selectedObjectId) ??
+                                  lastSelectedObjectOption
+                                : null
+                        }
+                        inputValue={objectSearchInput}
+                        filterOption={() => true}
+                        placeholder="Все объекты"
+                        noOptionsMessage={() => 'Объекты не найдены'}
+                        onInputChange={(value, meta) => {
+                            if (meta.action === 'input-change' || value === '') {
+                                handleObjectSearchChange(value)
+                            } else if (meta.action === 'menu-close' || meta.action === 'input-blur') {
+                                handleObjectSearchChange('')
+                            }
+                        }}
+                        onChange={(opt) => {
+                            setLastSelectedObjectOption(opt ?? null)
+                            onObjectChange?.(opt?.value ?? null)
+                            if (!opt) {
+                                handleObjectSearchChange('')
+                            }
+                        }}
+                    />
+                </div>
+            ) : null}
             {scope.canSelectAgency ? (
                 <div>
                     <label

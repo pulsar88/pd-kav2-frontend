@@ -14,6 +14,8 @@ import { FIXATION_STATUS_ORDER } from '../dashboard.constants'
 import type { FixationStatus } from '../types'
 import { fixationStatusMap } from '../utils'
 
+type FilterOption = { value: number; label: string }
+
 type StatusOption = {
     value: FixationStatus
     label: string
@@ -28,6 +30,17 @@ type FixationsTableToolsProps = {
     columnVisibility: FixationColumnVisibility
     columnOptionsAuthority?: string[]
     statusFilter?: FixationStatus
+    showAgencyFilter?: boolean
+    showAgentFilter?: boolean
+    agencyOptions?: FilterOption[]
+    agentOptions?: FilterOption[]
+    agencyId?: number
+    agentId?: number
+    onAgencyChange?: (option?: FilterOption | null) => void
+    onAgentChange?: (value?: number) => void
+    onAgencySearchChange?: (value: string) => void
+    onAgencyMenuScrollToBottom?: () => void
+    isLoadingMoreAgencies?: boolean
     onSearchChange: (value: string) => void
     onStatusFilterChange: (status?: FixationStatus) => void
     onColumnVisibilityChange: (
@@ -40,6 +53,17 @@ const FixationsTableTools = ({
     columnVisibility,
     columnOptionsAuthority = [],
     statusFilter,
+    showAgencyFilter = false,
+    showAgentFilter = false,
+    agencyOptions = [],
+    agentOptions = [],
+    agencyId,
+    agentId,
+    onAgencyChange,
+    onAgentChange,
+    onAgencySearchChange,
+    onAgencyMenuScrollToBottom,
+    isLoadingMoreAgencies = false,
     onSearchChange,
     onStatusFilterChange,
     onColumnVisibilityChange,
@@ -54,8 +78,8 @@ const FixationsTableTools = ({
         STATUS_OPTIONS.find((item) => item.value === statusFilter) ?? null
 
     return (
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-            <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+            <div className="min-w-[260px] flex-1">
                 <DebouceInput
                     placeholder="Поиск по фиксациям..."
                     suffix={<TbSearch className="text-lg" />}
@@ -64,6 +88,19 @@ const FixationsTableTools = ({
                     }
                 />
             </div>
+            {showAgencyFilter ? <div className="w-full shrink-0 lg:w-[19.5rem]">
+                <Select<FilterOption, false> isClearable isSearchable placeholder="Все агентства" options={agencyOptions} value={agencyOptions.find((item) => item.value === agencyId) ?? null} onChange={(option) => onAgencyChange?.(option ?? null)} onInputChange={(value, actionMeta) => {
+                    if (actionMeta.action === 'input-change') {
+                        onAgencySearchChange?.(value)
+                    } else if (actionMeta.action === 'menu-close' || actionMeta.action === 'input-blur') {
+                        onAgencySearchChange?.('')
+                    }
+                    return value
+                }} filterOption={() => true} onMenuScrollToBottom={onAgencyMenuScrollToBottom} isLoading={isLoadingMoreAgencies} />
+            </div> : null}
+            {showAgentFilter ? <div className="w-full shrink-0 lg:w-[19.5rem]">
+                <Select<FilterOption, false> isClearable isSearchable placeholder="Все агенты" options={agentOptions} value={agentOptions.find((item) => item.value === agentId) ?? null} onChange={(option) => onAgentChange?.(option?.value)} isDisabled={!agencyId && !agentOptions.length} />
+            </div> : null}
             <div className="w-full shrink-0 lg:w-56">
                 <Select<StatusOption, false>
                     isClearable
@@ -76,18 +113,19 @@ const FixationsTableTools = ({
                     }
                 />
             </div>
-            <Dropdown
-                placement="bottom-end"
-                renderTitle={
-                    <Button
-                        type="button"
-                        icon={<TbColumns />}
-                        className="shrink-0"
-                    >
-                        Столбцы
-                    </Button>
-                }
-            >
+            <div className="flex shrink-0 lg:ml-auto">
+                <Dropdown
+                    placement="bottom-end"
+                    renderTitle={
+                        <Button
+                            type="button"
+                            icon={<TbColumns />}
+                            className="shrink-0"
+                        >
+                            Столбцы
+                        </Button>
+                    }
+                >
                 <Dropdown.Item variant="header">
                     <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                         Отображаемые столбцы
@@ -125,7 +163,8 @@ const FixationsTableTools = ({
                         </Dropdown.Item>
                     )
                 })}
-            </Dropdown>
+                </Dropdown>
+            </div>
         </div>
     )
 }
