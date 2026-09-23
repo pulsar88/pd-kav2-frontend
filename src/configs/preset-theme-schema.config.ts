@@ -43,10 +43,10 @@ const darkTheme: ThemeVariables = {
 
 const grayTheme: ThemeVariables = {
     light: {
-        primary: '#f4f6f8',
-        primaryDeep: '#dfe3e8',
-        primaryMild: '#e8ecf0',
-        primarySubtle: '#f4f6f81a',
+        primary: '#6b7280',
+        primaryDeep: '#4b5563',
+        primaryMild: '#9ca3af',
+        primarySubtle: '#6b72801a',
         neutral: '#1f2937',
     },
     dark: {

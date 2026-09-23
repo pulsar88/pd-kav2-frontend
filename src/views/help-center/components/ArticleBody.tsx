@@ -74,7 +74,7 @@ const ArticleBody = ({ data }: ArticleBodyProps) => {
 
             <div
                 role="presentation"
-                className={`prose dark:prose-invert max-w-full min-w-0 overflow-x-hidden prose-headings:font-bold prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-p:mt-2 [&_h1]:!text-gray-900 [&_h2]:!text-gray-900 [&_h3]:!text-gray-900 [&_h4]:!text-gray-900 [&_h5]:!text-gray-900 [&_h6]:!text-gray-900 dark:[&_h1]:!text-gray-100 dark:[&_h2]:!text-gray-100 dark:[&_h3]:!text-gray-100 dark:[&_h4]:!text-gray-100 dark:[&_h5]:!text-gray-100 dark:[&_h6]:!text-gray-100 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:border [&_img]:border-gray-200 dark:[&_img]:border-gray-600 [&_img]:cursor-zoom-in [&_img]:transition-[filter,box-shadow] [&_img:hover]:brightness-[0.98] [&_img:hover]:ring-2 [&_img:hover]:ring-primary/30 ${richTextTableClass}`}
+                className={`article-content prose dark:prose-invert max-w-full min-w-0 overflow-visible rounded-xl bg-white p-6 text-gray-800 prose-headings:text-gray-900 dark:bg-gray-800 dark:text-gray-100 dark:prose-headings:text-gray-100 prose-p:mt-2 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:block [&_img]:border [&_img]:border-gray-600 [&_img]:cursor-zoom-in [&_img]:transition-[filter,box-shadow] [&_img:hover]:brightness-[0.98] [&_img:hover]:ring-2 [&_img:hover]:ring-primary/30 ${richTextTableClass}`}
                 onClick={handleContentClick}
             >
                 {ReactHtmlParser(contentHtml)}

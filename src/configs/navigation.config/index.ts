@@ -11,6 +11,7 @@ import {
     AGENT_CABINET_ROLES,
     CONTENT_MANAGER_ALLOWED_ROLES,
 } from '@/constants/roles.constant'
+import { USER_BONUS } from '@/constants/bonuses.constant'
 
 import type { NavigationTree } from '@/@types/navigation'
 
@@ -60,6 +61,16 @@ const navigationConfig: NavigationTree[] = [
                 subMenu: [],
             },
             {
+                key: 'commercialPremises',
+                path: '/commercial-premises',
+                title: 'Коммерческие помещения',
+                translateKey: 'nav.commercialPremises',
+                icon: 'objects',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: objectsAuthority,
+                subMenu: [],
+            },
+            {
                 key: 'favoritePremises',
                 path: '/favorite-premises',
                 title: 'Избранное',
@@ -87,6 +98,7 @@ const navigationConfig: NavigationTree[] = [
                 icon: 'calculator',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: agentCabinetAuthority,
+                bonuses: [USER_BONUS.CALCULATOR],
                 subMenu: [],
             },
             {
@@ -125,6 +137,16 @@ const navigationConfig: NavigationTree[] = [
                 title: 'Управление фиксациями',
                 translateKey: 'nav.supervisorFixations',
                 icon: 'supervisor',
+                type: NAV_ITEM_TYPE_ITEM,
+                authority: supervisorOnlyAuthority,
+                subMenu: [],
+            },
+            {
+                key: 'supervisorUsers',
+                path: '/supervisor/users',
+                title: 'Пользователи',
+                translateKey: 'nav.supervisorUsers',
+                icon: 'users',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: supervisorOnlyAuthority,
                 subMenu: [],
@@ -189,6 +211,7 @@ const navigationConfig: NavigationTree[] = [
                 icon: 'offers',
                 type: NAV_ITEM_TYPE_ITEM,
                 authority: agentCabinetAuthority,
+                bonuses: [USER_BONUS.SPECIAL_OFFERS],
                 subMenu: [],
             },
         ],

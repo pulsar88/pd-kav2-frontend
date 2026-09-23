@@ -118,6 +118,7 @@ const StackedSideNavMini = (props: StackedSideNavMiniProps) => {
                         <AuthorityCheck
                             key={nav.key}
                             authority={nav.authority}
+                            bonuses={nav.bonuses}
                             userAuthority={userAuthority}
                         >
                             <div title={t(nav.translateKey, nav.title)}>

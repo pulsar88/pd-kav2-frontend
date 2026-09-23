@@ -36,7 +36,7 @@ const ArticleCard = ({
             <div className="mb-4 flex items-center justify-between gap-2">
                 <button
                     type="button"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm outline-hidden transition-colors group-hover:bg-primary/10 dark:bg-gray-800"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white shadow-sm outline-hidden transition-colors group-hover:bg-gray-200 dark:bg-gray-800"
                     onClick={() => navigate(`${kind.basePath}/${itemSlug}`)}
                 >
                     <Icon className="text-2xl text-primary" />
@@ -80,7 +80,7 @@ const ArticleCard = ({
                 className="flex min-h-0 flex-1 flex-col text-left outline-hidden"
                 onClick={() => navigate(`${kind.basePath}/${itemSlug}`)}
             >
-                <h4 className="mb-2 line-clamp-2 font-bold heading-text group-hover:text-primary">
+                <h4 className="mb-2 line-clamp-2 font-bold heading-text group-hover:text-gray-800 dark:group-hover:text-gray-100">
                     {title}
                 </h4>
                 {previewText ? (

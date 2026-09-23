@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
+import { useSessionUser } from '@/store/authStore'
+import { SUPERVISOR } from '@/constants/roles.constant'
 import Button from '@/components/ui/Button'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
@@ -385,6 +387,12 @@ const FixationDetails = () => {
     const { id } = useParams()
     const navigate = useNavigate()
     const [data, setData] = useState<Fixation | null>(null)
+    const authority = useSessionUser((state) => state.user.authority) ?? []
+    const isSupervisor = authority.includes(SUPERVISOR)
+    const crmBaseUrl = import.meta.env.VITE_CRM_BASE_URL?.trim().replace(/\/+$/, '') || ''
+    const openCrmLink = (path: string) => {
+        window.open(`${crmBaseUrl}${path}`, '_blank', 'noopener,noreferrer')
+    }
     const [error, setError] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(Boolean(id))
 
@@ -559,6 +567,32 @@ const FixationDetails = () => {
                                         </span>
                                     ) : null}
                                 </div>
+                                {isSupervisor && (data.clientExternalId || data.dealExternalId) ? (
+                                    <div className="mt-3 flex flex-wrap justify-end gap-2">
+                                        {data.clientExternalId ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() =>
+                                                    openCrmLink(`/contacts/${data.clientExternalId}`)
+                                                }
+                                            >
+                                                Клиент
+                                            </Button>
+                                        ) : null}
+                                        {data.dealExternalId ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={() =>
+                                                    openCrmLink(`/leads/detail/${data.dealExternalId}`)
+                                                }
+                                            >
+                                                Сделка
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                ) : null}
                                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                                     <SummaryStat
                                         label="Клиент"

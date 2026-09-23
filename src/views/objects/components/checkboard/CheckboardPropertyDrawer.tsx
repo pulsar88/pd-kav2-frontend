@@ -510,7 +510,6 @@ const CheckboardPropertyDrawer = ({
                                             offers={display.specialOffers}
                                             max={3}
                                             interactiveDetails
-                                            showPremisesAction
                                         />
                                     </div>
                                 ) : null}

@@ -13,6 +13,7 @@ import {
     PiScalesDuotone,
     PiPercentDuotone,
     PiCurrencyCircleDollarDuotone,
+    PiUsersDuotone,
 } from 'react-icons/pi'
 import type { JSX } from 'react'
 import { TbMailForward, TbUserCheck } from 'react-icons/tb'
@@ -36,6 +37,7 @@ const navigationIcon: NavigationIcons = {
     agencyRequests: <TbUserCheck />,
     agencyInvitations: <TbMailForward />,
     supervisor: <PiShieldCheckDuotone />,
+    users: <PiUsersDuotone />,
 }
 
 export default navigationIcon

@@ -17,8 +17,19 @@ type Option = {
     label: string
 }
 
+type AgentOption = {
+    value: number | null
+    label: string
+}
+
 type AgencySelectProps = {
     isLoadingMore?: boolean
+}
+
+export type DashboardAgencyAgentsState = {
+    agencyId: number
+    agentIds: number[]
+    status: 'loading' | 'ready' | 'error'
 }
 
 type DashboardAnalyticsFiltersProps = {
@@ -26,9 +37,14 @@ type DashboardAnalyticsFiltersProps = {
     selectedAgentId: number | null
     onAgencyChange: (agencyId: number | null) => void
     onAgentChange: (agentId: number | null) => void
+    onAgencyAgentsChange: (state: DashboardAgencyAgentsState | null) => void
 }
 
 const AGENCIES_PER_PAGE = 20
+const ALL_AGENTS_OPTION: AgentOption = {
+    value: null,
+    label: 'Все агенты',
+}
 
 const formatAgentLabel = (agent: AgencyAgent) => {
     const name = agent.name?.trim() || 'Без имени'
@@ -82,6 +98,7 @@ const DashboardAnalyticsFilters = ({
     selectedAgentId,
     onAgencyChange,
     onAgentChange,
+    onAgencyAgentsChange,
 }: DashboardAnalyticsFiltersProps) => {
     const user = useSessionUser((state) => state.user)
     const authority = user.authority ?? []
@@ -97,43 +114,85 @@ const DashboardAnalyticsFilters = ({
     const [agents, setAgents] = useState<AgencyAgent[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingMore, setIsLoadingMore] = useState(false)
+    const [isAgentsLoading, setIsAgentsLoading] = useState(false)
+    const [agentsLoadFailed, setAgentsLoadFailed] = useState(false)
+    const [agentsReloadKey, setAgentsReloadKey] = useState(0)
     const [searchQuery, setSearchQuery] = useState('')
+    const [searchInput, setSearchInput] = useState('')
+    const [searchReloadKey, setSearchReloadKey] = useState(0)
+    const [lastSelectedAgencyOption, setLastSelectedAgencyOption] =
+        useState<Option | null>(null)
 
     const pageRef = useRef(1)
     const hasMoreRef = useRef(false)
     const loadingMoreRef = useRef(false)
     const searchRef = useRef('')
+    const searchVersionRef = useRef(0)
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     useEffect(() => {
-        if (!scope.canSelectAgent || scope.isSupervisor) return
+        setSelectedAgency(null)
+        setAgents([])
+        setAgentsLoadFailed(false)
+
+        if (!scope.canSelectAgent || selectedAgencyId == null) {
+            setIsAgentsLoading(false)
+            onAgencyAgentsChange(null)
+            return
+        }
 
         let cancelled = false
+        setIsAgentsLoading(true)
+        onAgencyAgentsChange({
+            agencyId: selectedAgencyId,
+            agentIds: [],
+            status: 'loading',
+        })
 
         const load = async () => {
-            setIsLoading(true)
             try {
-                const agencyId = user.agency?.id
-                if (!agencyId) {
-                    if (!cancelled) {
-                        setSelectedAgency(null)
-                        setAgents([])
-                    }
-                    return
-                }
-
-                const agency = await apiGetAgency(agencyId, { with: 'agents' })
+                const agency = await apiGetAgency(selectedAgencyId, {
+                    with: 'agents',
+                })
                 if (cancelled) return
 
+                // Не подменяем ошибку загрузки пустым списком или общей статистикой.
+                if (
+                    !agency ||
+                    agency.id !== selectedAgencyId ||
+                    !Array.isArray(agency.agents)
+                ) {
+                    throw new Error('Agency agents are unavailable')
+                }
+
+                const agencyAgents = Array.from(
+                    new Map(
+                        agency.agents
+                            .filter(
+                                (agent) =>
+                                    Number.isFinite(agent.id) && agent.id > 0,
+                            )
+                            .map((agent) => [agent.id, agent] as const),
+                    ).values(),
+                )
                 setSelectedAgency(agency)
-                setAgents(agency?.agents ?? [])
+                setAgents(agencyAgents)
+                onAgencyAgentsChange({
+                    agencyId: selectedAgencyId,
+                    agentIds: [...new Set(agencyAgents.map((agent) => agent.id))],
+                    status: 'ready',
+                })
             } catch {
                 if (!cancelled) {
-                    setSelectedAgency(null)
-                    setAgents([])
+                    setAgentsLoadFailed(true)
+                    onAgencyAgentsChange({
+                        agencyId: selectedAgencyId,
+                        agentIds: [],
+                        status: 'error',
+                    })
                 }
             } finally {
-                if (!cancelled) setIsLoading(false)
+                if (!cancelled) setIsAgentsLoading(false)
             }
         }
 
@@ -142,13 +201,23 @@ const DashboardAnalyticsFilters = ({
         return () => {
             cancelled = true
         }
-    }, [scope.canSelectAgent, scope.isSupervisor, user.agency?.id])
+    }, [
+        scope.canSelectAgent,
+        selectedAgencyId,
+        agentsReloadKey,
+        onAgencyAgentsChange,
+    ])
 
     useEffect(() => {
         if (!scope.isSupervisor) return
 
         let cancelled = false
-        searchRef.current = searchQuery
+        const requestVersion = searchVersionRef.current
+        const isCurrentRequest = () =>
+            !cancelled && requestVersion === searchVersionRef.current
+
+        pageRef.current = 1
+        hasMoreRef.current = false
 
         const fetchFirstPage = async () => {
             setIsLoading(true)
@@ -156,10 +225,9 @@ const DashboardAnalyticsFilters = ({
                 const response = await apiGetAgencies({
                     page: 1,
                     per_page: AGENCIES_PER_PAGE,
-                    with: 'agents',
                     search: searchQuery || undefined,
                 })
-                if (cancelled) return
+                if (!isCurrentRequest()) return
 
                 const list = response.data ?? []
                 const currentPage = response.meta?.current_page ?? 1
@@ -170,12 +238,12 @@ const DashboardAnalyticsFilters = ({
                 pageRef.current = currentPage
                 hasMoreRef.current = more
             } catch {
-                if (!cancelled) {
+                if (isCurrentRequest()) {
                     setAgencies([])
                     hasMoreRef.current = false
                 }
             } finally {
-                if (!cancelled) setIsLoading(false)
+                if (isCurrentRequest()) setIsLoading(false)
             }
         }
 
@@ -184,54 +252,65 @@ const DashboardAnalyticsFilters = ({
         return () => {
             cancelled = true
         }
-    }, [scope.isSupervisor, searchQuery])
+    }, [scope.isSupervisor, searchQuery, searchReloadKey])
 
     useEffect(() => {
-        if (!scope.isSupervisor) return
-
-        if (selectedAgencyId == null) {
-            setSelectedAgency(null)
-            setAgents([])
+        if (
+            !scope.canSelectAgent ||
+            isAgentsLoading ||
+            selectedAgency?.id !== selectedAgencyId ||
+            selectedAgentId == null
+        ) {
             return
         }
 
-        const fromList = agencies.find((item) => item.id === selectedAgencyId)
-        if (fromList) {
-            setSelectedAgency(fromList)
-            setAgents(fromList.agents ?? [])
-            return
+        // null означает всё агентство. Первый агент больше не выбирается автоматически.
+        if (!agents.some((agent) => agent.id === selectedAgentId)) {
+            onAgentChange(null)
         }
+    }, [
+        agents,
+        isAgentsLoading,
+        onAgentChange,
+        scope.canSelectAgent,
+        selectedAgency,
+        selectedAgencyId,
+        selectedAgentId,
+    ])
 
-        if (selectedAgency?.id === selectedAgencyId) {
-            setAgents(selectedAgency.agents ?? [])
-        }
-    }, [agencies, scope.isSupervisor, selectedAgency, selectedAgencyId])
+    const handleSearchInputChange = (value: string, forceReload = false) => {
+        setSearchInput(value)
+        const trimmed = value.trim()
+        if (trimmed === searchRef.current && !forceReload) return
 
-    useEffect(() => {
-        if (!scope.canSelectAgent) return
-        if (agents.length === 0) {
-            if (selectedAgentId != null) onAgentChange(null)
-            return
-        }
-
-        const hasSelected = agents.some((agent) => agent.id === selectedAgentId)
-        if (!hasSelected) {
-            onAgentChange(agents[0].id)
-        }
-    }, [agents, onAgentChange, scope.canSelectAgent, selectedAgentId])
-
-    const handleSearchInputChange = (value: string) => {
         if (searchTimerRef.current) {
             clearTimeout(searchTimerRef.current)
-        }
-        searchTimerRef.current = setTimeout(() => {
             searchTimerRef.current = null
-            const trimmed = value.trim()
-            if (trimmed !== searchRef.current) {
-                searchRef.current = trimmed
-                setSearchQuery(trimmed)
-            }
-        }, 500)
+        }
+
+        searchRef.current = trimmed
+        // Ответы прежнего поиска и его пагинации больше не должны менять список.
+        searchVersionRef.current += 1
+        pageRef.current = 1
+        hasMoreRef.current = false
+        loadingMoreRef.current = false
+        setIsLoadingMore(false)
+        setIsLoading(true)
+
+        const applySearch = () => {
+            searchTimerRef.current = null
+            setSearchQuery(trimmed)
+            setSearchReloadKey((key) => key + 1)
+        }
+
+        if (!trimmed) {
+            // Очистка (в том числе после выбора) сразу возвращает первую страницу
+            // без search; debounce нужен только при вводе непустого названия.
+            applySearch()
+            return
+        }
+
+        searchTimerRef.current = setTimeout(applySearch, 500)
     }
 
     const handleMenuScrollToBottom = useCallback(async () => {
@@ -248,17 +327,17 @@ const DashboardAnalyticsFilters = ({
         setIsLoadingMore(true)
 
         const queryAtStart = searchRef.current
+        const requestVersion = searchVersionRef.current
         const nextPage = pageRef.current + 1
 
         try {
             const response = await apiGetAgencies({
                 page: nextPage,
                 per_page: AGENCIES_PER_PAGE,
-                with: 'agents',
                 search: queryAtStart || undefined,
             })
 
-            if (searchRef.current !== queryAtStart) return
+            if (requestVersion !== searchVersionRef.current) return
 
             const list = response.data ?? []
             const currentPage = response.meta?.current_page ?? nextPage
@@ -268,14 +347,19 @@ const DashboardAnalyticsFilters = ({
             setAgencies((prev) => mergeAgencies(prev, list))
             pageRef.current = currentPage
             hasMoreRef.current = more
+        } catch {
+            // Сохраняем уже загруженные варианты; прокрутка позволяет повторить запрос.
         } finally {
-            loadingMoreRef.current = false
-            setIsLoadingMore(false)
+            if (requestVersion === searchVersionRef.current) {
+                loadingMoreRef.current = false
+                setIsLoadingMore(false)
+            }
         }
     }, [isLoading, scope.isSupervisor])
 
     useEffect(() => {
         return () => {
+            searchVersionRef.current += 1
             if (searchTimerRef.current) {
                 clearTimeout(searchTimerRef.current)
             }
@@ -291,10 +375,16 @@ const DashboardAnalyticsFilters = ({
         label: agency.name,
     }))
 
-    const selectedAgencyOption =
-        selectedAgency != null
-            ? { value: selectedAgency.id, label: selectedAgency.name }
-            : null
+    const currentAgency =
+        selectedAgency?.id === selectedAgencyId
+            ? selectedAgency
+            : agencies.find((agency) => agency.id === selectedAgencyId)
+
+    const selectedAgencyOption = currentAgency
+        ? { value: currentAgency.id, label: currentAgency.name }
+        : lastSelectedAgencyOption?.value === selectedAgencyId
+          ? lastSelectedAgencyOption
+          : null
 
     const agencyOptionsWithSelected =
         selectedAgencyOption &&
@@ -302,13 +392,20 @@ const DashboardAnalyticsFilters = ({
             ? [selectedAgencyOption, ...agencyOptions]
             : agencyOptions
 
-    const agentOptions: Option[] = agents.map((agent) => ({
-        value: agent.id,
-        label: formatAgentLabel(agent),
-    }))
+    const agentOptions: AgentOption[] = [
+        ALL_AGENTS_OPTION,
+        ...agents.map((agent) => ({
+            value: agent.id,
+            label: formatAgentLabel(agent),
+        })),
+    ]
 
-    const selectedAgentOption =
-        agentOptions.find((item) => item.value === selectedAgentId) ?? null
+    const hasLoadedAgency =
+        selectedAgencyId != null && selectedAgency?.id === selectedAgencyId
+    const selectedAgentOption = hasLoadedAgency
+        ? (agentOptions.find((item) => item.value === selectedAgentId) ??
+          ALL_AGENTS_OPTION)
+        : null
 
     return (
         <div
@@ -320,21 +417,26 @@ const DashboardAnalyticsFilters = ({
         >
             {scope.canSelectAgency ? (
                 <div>
-                    <label className="mb-1.5 block text-sm font-medium">
+                    <label
+                        htmlFor="dashboard-agency-filter"
+                        className="mb-1.5 block text-sm font-medium"
+                    >
                         Агентство
                     </label>
-                    <Select
+                    <Select<Option>
+                        inputId="dashboard-agency-filter"
                         isSearchable
                         isClearable
                         isLoading={isLoading || isLoadingMore}
                         options={agencyOptionsWithSelected}
                         value={selectedAgencyOption}
+                        inputValue={searchInput}
                         placeholder="Выберите агентство"
                         filterOption={() => true}
                         noOptionsMessage={() => 'Агентства не найдены'}
                         components={{ MenuList: AgencyMenuList }}
                         onInputChange={(value, meta) => {
-                            if (meta.action === 'input-change') {
+                            if (meta.action === 'input-change' || value === '') {
                                 handleSearchInputChange(value)
                             }
                         }}
@@ -342,39 +444,54 @@ const DashboardAnalyticsFilters = ({
                             void handleMenuScrollToBottom()
                         }}
                         onChange={(option) => {
-                            const nextId = option?.value
-                                ? Number(option.value)
-                                : null
-                            const agency =
-                                agencies.find((item) => item.id === nextId) ??
-                                null
-                            setSelectedAgency(agency)
-                            setAgents(agency?.agents ?? [])
-                            onAgencyChange(nextId)
+                            setLastSelectedAgencyOption(option ?? null)
+                            onAgencyChange(option?.value ?? null)
                             onAgentChange(null)
+                            if (!option) {
+                                // Крестик, Delete и Backspace могут сбросить выбор
+                                // без события input-change.
+                                handleSearchInputChange('', true)
+                            }
                         }}
                         {...({ isLoadingMore } satisfies AgencySelectProps)}
                     />
                 </div>
             ) : null}
             <div>
-                <label className="mb-1.5 block text-sm font-medium">
+                <label
+                    htmlFor="dashboard-agent-filter"
+                    className="mb-1.5 block text-sm font-medium"
+                >
                     Агент
                 </label>
-                <Select
+                <Select<AgentOption>
+                    inputId="dashboard-agent-filter"
                     isSearchable
-                    isLoading={isLoading}
-                    isDisabled={scope.canSelectAgency && !selectedAgencyId}
+                    isClearable
+                    isLoading={isAgentsLoading}
+                    isDisabled={!hasLoadedAgency || isAgentsLoading}
                     options={agentOptions}
                     value={selectedAgentOption}
-                    placeholder="Выберите агента"
+                    getOptionValue={(option) =>
+                        option.value == null ? 'all-agents' : String(option.value)
+                    }
+                    placeholder={
+                        isAgentsLoading ? 'Загрузка агентов...' : 'Все агенты'
+                    }
+                    noOptionsMessage={() => 'Агенты не найдены'}
                     onChange={(option) => {
-                        const nextId = option?.value
-                            ? Number(option.value)
-                            : null
-                        onAgentChange(nextId)
+                        onAgentChange(option?.value ?? null)
                     }}
                 />
+                {agentsLoadFailed ? (
+                    <button
+                        type="button"
+                        className="mt-1.5 text-sm text-primary hover:underline"
+                        onClick={() => setAgentsReloadKey((key) => key + 1)}
+                    >
+                        Повторить загрузку агентов
+                    </button>
+                ) : null}
             </div>
         </div>
     )

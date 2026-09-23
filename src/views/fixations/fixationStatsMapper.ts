@@ -2,10 +2,13 @@ import dayjs from 'dayjs'
 import type { FixationStatus } from './types'
 import type {
     FixationsStatusCounts,
+    FixationsStatusTimelinePoint,
     FixationsStatusTransition,
-    FixationsTransitionTimelinePoint,
 } from './dashboard.constants'
-import { createEmptyFixationsStatusCounts } from './dashboard.constants'
+import {
+    FIXATION_STATUS_ORDER,
+    createEmptyFixationsStatusCounts,
+} from './dashboard.constants'
 import { fixationStatusMap } from './utils'
 
 type FixationStatsEvent = {
@@ -72,12 +75,6 @@ const extractStatusChange = (
     return { from: oldStatus, to: newStatus }
 }
 
-const getTransitionKey = (from: StatusRef, to: StatusRef) => {
-    const fromValue = (from.value || from.name || 'unknown').toLowerCase()
-    const toValue = (to.value || to.name || 'unknown').toLowerCase()
-    return `${fromValue}→${toValue}`
-}
-
 export const formatStatsApiDate = (date: Date) =>
     dayjs(date).format('DD.MM.YYYY')
 
@@ -107,6 +104,7 @@ export const parseStatsApiDate = (value: string) => {
     return date
 }
 
+/** @deprecated transition pairs chart removed; kept for rare callers */
 export const mapFixationsStatsToTransitions = (
     items: FixationStatsEvent[],
 ): FixationsStatusTransition[] => {
@@ -168,20 +166,23 @@ const buildDateKeys = (dateFrom: Date, dateTo: Date) => {
     return keys
 }
 
-export const mapFixationsStatsToTransitionTimeline = (
+const isKnownFixationStatus = (value: string): value is FixationStatus =>
+    value in fixationStatusMap
+
+/**
+ * По дням суммирует конечный статус перехода (to) накопительным итогом:
+ * значение на дату = сумма за все дни с начала периода по эту дату включительно.
+ */
+export const mapFixationsStatsToFinalStatusTimeline = (
     items: FixationStatsEvent[],
     dateFrom: Date,
     dateTo: Date,
-): {
-    timeline: FixationsTransitionTimelinePoint[]
-    seriesKeys: FixationsStatusTransition[]
-} => {
+): FixationsStatusTimelinePoint[] => {
     const dateKeys = buildDateKeys(dateFrom, dateTo)
-    const dayCounts = new Map<string, Record<string, number>>()
-    const seriesMeta = new Map<string, FixationsStatusTransition>()
+    const dayCounts = new Map<string, FixationsStatusCounts>()
 
     dateKeys.forEach((key) => {
-        dayCounts.set(key, {})
+        dayCounts.set(key, createEmptyFixationsStatusCounts())
     })
 
     items.forEach((item) => {
@@ -189,42 +190,35 @@ export const mapFixationsStatsToTransitionTimeline = (
         if (!change || !item.created_at) return
 
         const dayKey = dayjs(item.created_at).format('YYYY-MM-DD')
-        if (!dayCounts.has(dayKey)) return
+        const day = dayCounts.get(dayKey)
+        if (!day) return
 
-        const key = getTransitionKey(change.from, change.to)
-        const day = dayCounts.get(dayKey)!
-        day[key] = (day[key] ?? 0) + 1
+        const toKey = (change.to.value || change.to.name || '').toLowerCase()
+        if (!isKnownFixationStatus(toKey)) return
 
-        const existing = seriesMeta.get(key)
-        if (existing) {
-            existing.count += 1
-            return
-        }
-
-        seriesMeta.set(key, {
-            from: (
-                change.from.value ||
-                change.from.name ||
-                'unknown'
-            ).toLowerCase(),
-            to: (change.to.value || change.to.name || 'unknown').toLowerCase(),
-            fromLabel: resolveStatusLabel(change.from),
-            toLabel: resolveStatusLabel(change.to),
-            count: 1,
-        })
+        day[toKey] += 1
     })
 
-    const seriesKeys = Array.from(seriesMeta.values()).sort(
-        (a, b) => b.count - a.count,
-    )
+    const running = createEmptyFixationsStatusCounts()
 
-    const timeline = dateKeys.map((date) => ({
-        date,
-        counts: dayCounts.get(date) ?? {},
-    }))
-
-    return { timeline, seriesKeys }
+    return dateKeys.map((date) => {
+        const day = dayCounts.get(date) ?? createEmptyFixationsStatusCounts()
+        FIXATION_STATUS_ORDER.forEach((status) => {
+            running[status] += day[status]
+        })
+        return {
+            date,
+            counts: { ...running },
+        }
+    })
 }
+
+export const getActiveStatusesFromTimeline = (
+    timeline: FixationsStatusTimelinePoint[],
+): FixationStatus[] =>
+    FIXATION_STATUS_ORDER.filter((status) =>
+        timeline.some((point) => (point.counts[status] ?? 0) > 0),
+    )
 
 export type FixationsStatsStatusApiItem = {
     status?: {
@@ -242,9 +236,6 @@ export type FixationsStatsStatusApiItem = {
         total?: number
     }
 }
-
-const isKnownFixationStatus = (value: string): value is FixationStatus =>
-    value in fixationStatusMap
 
 export const mapFixationsStatsStatusesToCounts = (
     items: FixationsStatsStatusApiItem[],

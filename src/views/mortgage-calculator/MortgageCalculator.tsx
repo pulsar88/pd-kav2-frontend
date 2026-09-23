@@ -309,6 +309,9 @@ const MortgageCalculator = () => {
                         </FormItem>
                         <FormItem label="Начало выплат — месяц">
                             <Select<MonthOption>
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{ menuPortal: (base) => ({ ...base, zIndex: 1000 }) }}
                                 options={MONTH_OPTIONS}
                                 value={selectedMonth}
                                 placeholder="Месяц"
@@ -319,6 +322,9 @@ const MortgageCalculator = () => {
                         </FormItem>
                         <FormItem label="Начало выплат — год">
                             <Select<YearOption>
+                                menuPortalTarget={document.body}
+                                menuPosition="fixed"
+                                styles={{ menuPortal: (base) => ({ ...base, zIndex: 1000 }) }}
                                 options={yearOptions}
                                 value={selectedYear}
                                 placeholder="Год"

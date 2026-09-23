@@ -1,6 +1,7 @@
 import Card from '@/components/ui/Card'
 import classNames from '@/utils/classNames'
 import { TbCheck, TbPalette } from 'react-icons/tb'
+import ModeSwitcher from '@/components/template/ThemeConfigurator/ModeSwitcher'
 import { useThemeStore } from '@/store/themeStore'
 import presetThemeSchemaConfig from '@/configs/preset-theme-schema.config'
 
@@ -39,6 +40,15 @@ const PrimaryColor = () => {
                 bordered: true,
             }}
         >
+            <div className="mb-6 flex items-center justify-between gap-4 border-b border-gray-200 pb-5 dark:border-gray-700">
+                <div>
+                    <h5 className="mb-1">Тема оформления</h5>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Выберите светлую или тёмную тему интерфейса
+                    </p>
+                </div>
+                <ModeSwitcher />
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 {primaryColorOptions.map((option) => {
                     const color =

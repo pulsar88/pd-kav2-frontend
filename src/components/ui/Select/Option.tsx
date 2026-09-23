@@ -20,7 +20,7 @@ const Option = <T,>(
                 !isDisabled &&
                     !isSelected &&
                     'hover:text-gray-800 dark:hover:text-gray-100',
-                isSelected && 'text-primary bg-primary-subtle',
+                isSelected && 'text-gray-900 bg-gray-200 dark:text-gray-100 dark:bg-gray-700',
                 isDisabled && 'opacity-50 cursor-not-allowed',
             )}
             {...innerProps}

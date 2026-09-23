@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import useDarkMode from '@/utils/hooks/useDarkMode'
 import Switcher from '@/components/ui/Switcher'
+import { TbMoon, TbSun } from 'react-icons/tb'
 
 const ModeSwitcher = () => {
     const [isDark, setIsDark] = useDarkMode()
@@ -16,6 +17,8 @@ const ModeSwitcher = () => {
         <div>
             <Switcher
                 defaultChecked={isDark}
+                checkedContent={<TbMoon className="text-base text-gray-900" />}
+                unCheckedContent={<TbSun className="text-base text-gray-700" />}
                 onChange={(checked) => onSwitchChange(checked)}
             />
         </div>

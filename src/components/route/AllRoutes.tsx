@@ -56,6 +56,8 @@ const AllRoutes = (props: AllRoutesProps) => {
                             <AuthorityGuard
                                 userAuthority={user.authority}
                                 authority={route.authority}
+                                userBonuses={user.bonuses}
+                                bonuses={route.bonuses}
                             >
                                 <PageContainer {...props} {...route.meta}>
                                     <AppRoute

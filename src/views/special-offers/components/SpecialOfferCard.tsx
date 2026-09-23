@@ -94,13 +94,13 @@ const SpecialOfferCard = ({ offer }: SpecialOfferCardProps) => {
                             <TbHome className="shrink-0 text-base" />
                             <span>{offer.properties_count}</span>
                             <span className="font-semibold opacity-90">
-                                объект
+                                помещени
                                 {offer.properties_count === 1
-                                    ? ''
+                                    ? 'е'
                                     : offer.properties_count >= 2 &&
                                         offer.properties_count <= 4
-                                      ? 'а'
-                                      : 'ов'}
+                                      ? 'я'
+                                      : 'й'}
                             </span>
                         </div>
                     ) : null}

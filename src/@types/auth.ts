@@ -123,6 +123,8 @@ export type SendOtpResult = Promise<{
     uniquePart?: string
 }>
 
+export type UserBonus = AuthEnumValue
+
 export type User = {
     userId?: string | null
     avatar?: string | null
@@ -134,6 +136,7 @@ export type User = {
     agency?: AgencyBrief | null
     agencyName?: string | null
     accessLevel?: AccessLevel | null
+    bonuses?: UserBonus[]
 }
 
 export type ProfilePicture = {
@@ -174,6 +177,7 @@ export type CurrentUserResponse = {
     profile_picture: ProfilePicture | null
     agency?: AgencyBrief | null
     access_level?: AccessLevel | null
+    bonuses?: UserBonus[] | null
 }
 
 export type UpdateUserPayload = {

@@ -51,7 +51,11 @@ const CollapsedItem = ({
     currentKey,
 }: CollapsedItemProps) => {
     return (
-        <AuthorityCheck userAuthority={userAuthority} authority={nav.authority}>
+        <AuthorityCheck
+            userAuthority={userAuthority}
+            authority={nav.authority}
+            bonuses={nav.bonuses}
+        >
             {renderAsIcon ? (
                 <Tooltip
                     title={t(nav.translateKey, nav.title)}
@@ -97,7 +101,11 @@ const DefaultItem = (props: DefaultItemProps) => {
     } = props
 
     return (
-        <AuthorityCheck userAuthority={userAuthority} authority={nav.authority}>
+        <AuthorityCheck
+            userAuthority={userAuthority}
+            authority={nav.authority}
+            bonuses={nav.bonuses}
+        >
             <MenuItem key={nav.key} eventKey={nav.key} dotIndent={indent}>
                 <Link
                     to={nav.path}

@@ -50,8 +50,7 @@ const resolveClientPhone = (client?: FixationApiClient) =>
     formatFixationPhone(client?.phones?.[0]?.phone)
 
 const resolveManagerPhone = (item: FixationApiItem) => {
-    const raw =
-        item.manager?.phone?.trim() || item.agent?.phone?.trim() || undefined
+    const raw = item.manager?.phone?.trim()
 
     if (!raw) {
         return undefined
@@ -247,6 +246,11 @@ export const mapFixationApiItemToFixation = (
 
     return {
         id: String(item.id),
+        dealExternalId: item.external_id != null ? String(item.external_id) : undefined,
+        clientExternalId:
+            item.client?.external_id != null
+                ? String(item.client.external_id)
+                : undefined,
         fullName: resolveClientName(item.client),
         phone: resolveClientPhone(item.client),
         status: resolveApiStatus(item),

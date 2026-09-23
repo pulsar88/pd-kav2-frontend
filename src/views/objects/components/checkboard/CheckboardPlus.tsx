@@ -16,6 +16,8 @@ import {
     getSectionFloors,
 } from '../../checkboardUtils'
 import { propertyHasSpecialOffer } from '../../specialOfferUtils'
+import { USER_BONUS } from '@/constants/bonuses.constant'
+import { useHasUserBonus } from '@/utils/hooks/useUserBonus'
 import DualHorizontalScroll from './DualHorizontalScroll'
 import CheckboardSharedPropertyTooltip from './CheckboardSharedPropertyTooltip'
 import {
@@ -77,6 +79,7 @@ const PlusBlock = ({
     isPropertySelectable,
     onPropertySelect,
 }: BlockProps) => {
+    const canUseSpecialOffers = useHasUserBonus(USER_BONUS.SPECIAL_OFFERS)
     if (columns.length === 0) return null
 
     const renderLabels = (position: 'top' | 'bottom') =>
@@ -170,7 +173,9 @@ const PlusBlock = ({
                                     ? property.discount_price
                                     : undefined
                             const hasDiscount = discountPrice != null
-                            const hasOffers = propertyHasSpecialOffer(property)
+                            const hasOffers =
+                                canUseSpecialOffers &&
+                                propertyHasSpecialOffer(property)
                             const hasPrice =
                                 hasDiscount || property.price > 0
                             const displayPrice = hasDiscount

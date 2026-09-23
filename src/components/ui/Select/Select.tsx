@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import cn from '../utils/classNames'
+import { useEffect, useRef, useState } from 'react'
 import ReactSelect from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import AsyncSelect from 'react-select/async'
@@ -94,10 +95,32 @@ function Select<
         loadingMessage,
         compactMulti,
         hideSelectedOptions,
+        onMenuOpen,
+        onMenuClose,
         ...rest
     } = props
 
     const isCompact = Boolean(compactMulti && rest.isMulti)
+    const selectRootRef = useRef<HTMLDivElement>(null)
+    const selectRef = useRef<{ blur?: () => void }>(null)
+    const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+    useEffect(() => {
+        if (!isMenuOpen) return
+
+        const handlePointerDown = (event: PointerEvent) => {
+            const target = event.target
+            if (!(target instanceof Node)) return
+            if (selectRootRef.current?.contains(target)) return
+            if ((target as Element).closest?.('.select-menu')) return
+            selectRef.current?.blur?.()
+            setIsMenuOpen(false)
+        }
+
+        document.addEventListener('pointerdown', handlePointerDown, true)
+        return () =>
+            document.removeEventListener('pointerdown', handlePointerDown, true)
+    }, [isMenuOpen])
 
     const { controlSize } = useConfig()
     const formControlSize = useForm()?.size
@@ -114,7 +137,18 @@ function Select<
     const selectClass = cn(`select select-${selectSize}`, className)
 
     return (
-        <Component<Option, IsMulti, Group>
+        <div ref={selectRootRef}>
+            <Component<Option, IsMulti, Group>
+            ref={selectRef}
+            menuIsOpen={isMenuOpen}
+            onMenuOpen={() => {
+                setIsMenuOpen(true)
+                onMenuOpen?.()
+            }}
+            onMenuClose={() => {
+                setIsMenuOpen(false)
+                onMenuClose?.()
+            }}
             className={selectClass}
             classNames={
                 {
@@ -250,7 +284,8 @@ function Select<
             }
             {...field}
             {...rest}
-        />
+            />
+        </div>
     )
 }
 

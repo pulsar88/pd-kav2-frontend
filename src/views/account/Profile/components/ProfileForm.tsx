@@ -20,7 +20,11 @@ import {
     apiGetLatestAgencyRequest,
 } from '@/services/AgencyService'
 import { useSessionUser } from '@/store/authStore'
-import { isContentManagerOnly } from '@/constants/roles.constant'
+import {
+    AGENT,
+    SUPERVISOR,
+    isContentManagerOnly,
+} from '@/constants/roles.constant'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -104,8 +108,12 @@ const ProfileForm = () => {
     const [isCancelling, setIsCancelling] = useState(false)
 
     const userId = user.userId
-    const showAgency = !isContentManagerOnly(user.authority ?? [])
+    const authority = user.authority ?? []
+    const showAgency = !isContentManagerOnly(authority)
     const hasAgency = Boolean(data?.agency)
+    const canChangeAgency = authority.some(
+        (role) => role === AGENT || role === SUPERVISOR,
+    )
 
     const loadProfile = useCallback(async () => {
         const profile = mapUserToProfileForm(await apiGetCurrentUser())
@@ -146,7 +154,7 @@ const ProfileForm = () => {
     }, [userId, loadProfile])
 
     useEffect(() => {
-        if (!showAgency || !data || data.agency) {
+        if (!showAgency || !data) {
             setLatestAgencyRequest(null)
             setIsAgencyRequestLoading(false)
             return
@@ -186,13 +194,23 @@ const ProfileForm = () => {
         return () => {
             cancelled = true
         }
-    }, [showAgency, data?.id, data?.agency])
+    }, [showAgency, data?.id])
 
     const latestRequestStatus = latestAgencyRequest?.status
     const latestRequestConfig = latestRequestStatus
         ? agencyRequestStatusConfig[latestRequestStatus]
         : undefined
     const isPendingRequest = latestRequestStatus === 'pending'
+    const currentAgencyId = user.agency?.id ?? null
+    const currentAgencyName = data?.agency || user.agencyName || ''
+    const pendingTargetAgencyName = latestAgencyRequest?.agency?.name || ''
+    const isTransferPending =
+        isPendingRequest &&
+        Boolean(hasAgency) &&
+        latestAgencyRequest?.agency?.id != null &&
+        currentAgencyId != null &&
+        latestAgencyRequest.agency.id !== currentAgencyId
+
 
     const beforeUpload = (files: FileList | null) => {
         let valid: string | boolean = true
@@ -328,6 +346,12 @@ const ProfileForm = () => {
 
     const handleJoinAgencySuccess = async () => {
         await loadProfile()
+        try {
+            const request = await apiGetLatestAgencyRequest()
+            setLatestAgencyRequest(request)
+        } catch {
+            setLatestAgencyRequest(null)
+        }
     }
 
     const onSubmit = async (values: ProfileSchema) => {
@@ -377,7 +401,9 @@ const ProfileForm = () => {
     }
 
     const agencyBorderClass = hasAgency
-        ? 'bg-primary'
+        ? canChangeAgency && isPendingRequest
+            ? getAgencyBorderClass('pending')
+            : 'bg-primary'
         : getAgencyBorderClass(latestRequestStatus)
 
     return (
@@ -449,8 +475,73 @@ const ProfileForm = () => {
                                     </div>
 
                                     {hasAgency ? (
-                                        <div className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">
-                                            {data?.agency}
+                                        <div className="flex flex-col gap-2 pt-1">
+                                            <div className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">
+                                                {data?.agency}
+                                            </div>
+                                            {canChangeAgency ? (
+                                                isAgencyRequestLoading ? (
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                        Загрузка статуса
+                                                        заявки...
+                                                    </p>
+                                                ) : isPendingRequest ? (
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                                {isTransferPending
+                                                                    ? 'Заявка в другое агентство'
+                                                                    : latestRequestConfig?.label ||
+                                                                      'Заявка на рассмотрении'}
+                                                            </p>
+                                                            {pendingTargetAgencyName ? (
+                                                                <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug">
+                                                                    {
+                                                                        pendingTargetAgencyName
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
+                                                        <Button
+                                                            size="xs"
+                                                            type="button"
+                                                            className="w-full shrink-0 sm:w-auto"
+                                                            customColorClass={() =>
+                                                                'border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10'
+                                                            }
+                                                            icon={<TbX />}
+                                                            onClick={() =>
+                                                                setIsCancelDialogOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                        >
+                                                            Отменить заявку
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                            Можно подать заявку
+                                                            в другое агентство
+                                                        </p>
+                                                        <Button
+                                                            size="xs"
+                                                            variant="solid"
+                                                            type="button"
+                                                            className="w-full shrink-0 sm:w-auto"
+                                                            icon={<TbSend />}
+                                                            onClick={() =>
+                                                                setIsJoinAgencyOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                        >
+                                                            Сменить агентство
+                                                        </Button>
+                                                    </div>
+                                                )
+                                            ) : null}
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -637,6 +728,8 @@ const ProfileForm = () => {
                     <>
                         <JoinAgencyDialog
                             isOpen={isJoinAgencyOpen}
+                            currentAgencyId={currentAgencyId}
+                            currentAgencyName={currentAgencyName || undefined}
                             onClose={() => setIsJoinAgencyOpen(false)}
                             onSuccess={() => {
                                 void handleJoinAgencySuccess()

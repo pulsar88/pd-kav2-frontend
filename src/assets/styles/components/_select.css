@@ -69,3 +69,14 @@
     }
   }
 }
+
+@layer components {
+  .select-option.bg-gray-200 {
+    background-color: #e5e7eb !important;
+    color: #111827 !important;
+  }
+  .dark .select-option.dark\:bg-gray-700 {
+    background-color: #374151 !important;
+    color: #f3f4f6 !important;
+  }
+}

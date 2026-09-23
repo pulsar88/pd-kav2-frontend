@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router'
 import Theme from '@/components/template/Theme'
 import Layout from '@/components/layouts'
@@ -11,36 +12,63 @@ import useAppVersionCheck from '@/utils/hooks/useAppVersionCheck'
 import Views from '@/views'
 
 function App() {
+    useEffect(() => {
+        const handleCopy = (event: ClipboardEvent) => {
+            const selection = window.getSelection()?.toString() || ''
+            const trimmed = selection.trim()
+            const digits = trimmed.replace(/\D/g, '')
+
+            // Меняем только явно отформатированный российский номер,
+            // не затрагивая обычный текст и копирование из полей ввода.
+            if (
+                !/^\+?7(?:[\s().-]*\d){10}$/.test(trimmed) ||
+                digits.length !== 11 ||
+                !/[\s().-]/.test(trimmed)
+            ) {
+                return
+            }
+
+            const normalized = `+${digits}`
+            event.preventDefault()
+            event.clipboardData?.setData('text/plain', normalized)
+            event.clipboardData?.setData('text/html', normalized)
+        }
+
+        document.addEventListener('copy', handleCopy)
+        return () => document.removeEventListener('copy', handleCopy)
+    }, [])
+
     const {
         hasNewVersion,
-        isPreloadBlocked,
         isUpdateBannerDismissed,
         dismissUpdateBanner,
     } = useAppVersionCheck()
 
-    const showUpdateBanner =
-        (hasNewVersion || isPreloadBlocked) && !isUpdateBannerDismissed
+    const showUpdateBanner = hasNewVersion && !isUpdateBannerDismissed
 
     return (
-        <Theme>
-            <BrowserRouter>
-                <AuthProvider>
-                    <UserLogsBroadcastListener />
-                    <Layout>
-                        <Views />
-                    </Layout>
-                    <CookieBanner />
-                    <PwaInstallBanner />
-                    <ServerUnavailableGate />
-                    {showUpdateBanner ? (
-                        <UpdateWindowBanner
-                            allowDismiss={!isPreloadBlocked}
-                            onDismiss={dismissUpdateBanner}
-                        />
-                    ) : null}
-                </AuthProvider>
-            </BrowserRouter>
-        </Theme>
+        <>
+            {showUpdateBanner ? (
+                <UpdateWindowBanner
+                    allowDismiss
+                    onDismiss={dismissUpdateBanner}
+                />
+            ) : null}
+
+            <Theme>
+                <BrowserRouter>
+                    <AuthProvider>
+                        <UserLogsBroadcastListener />
+                        <Layout>
+                            <Views />
+                        </Layout>
+                        <CookieBanner />
+                        <PwaInstallBanner />
+                        <ServerUnavailableGate />
+                    </AuthProvider>
+                </BrowserRouter>
+            </Theme>
+        </>
     )
 }
 

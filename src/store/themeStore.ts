@@ -51,7 +51,9 @@ export const useThemeStore = create<ThemeState & ThemeAction>()(
 
                 return {
                     ...state,
-                    mode: THEME_ENUM.MODE_DARK,
+                    mode: state.mode === THEME_ENUM.MODE_DARK
+                        ? THEME_ENUM.MODE_DARK
+                        : THEME_ENUM.MODE_LIGHT,
                     themeSchema: nextSchema,
                 }
             },

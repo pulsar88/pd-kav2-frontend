@@ -14,8 +14,8 @@ const ThemeConfigurator = ({ callBackClose }: ThemeConfiguratorProps) => {
             <div className="flex flex-col gap-y-10 mb-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h6>Dark Mode</h6>
-                        <span>Switch theme to dark mode</span>
+                        <h6>Тема оформления</h6>
+                        <span>Переключить светлую и тёмную тему</span>
                     </div>
                     <ModeSwitcher />
                 </div>

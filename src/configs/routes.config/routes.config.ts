@@ -11,6 +11,7 @@ import {
     AGENT_CABINET_ROLES,
     CONTENT_MANAGER_ALLOWED_ROLES,
 } from '@/constants/roles.constant'
+import { USER_BONUS } from '@/constants/bonuses.constant'
 
 const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
@@ -37,6 +38,18 @@ export const protectedRoutes: Routes = [
         path: '/fixations/:id',
         component: lazy(() => import('@/views/fixations/FixationDetails')),
         authority: agentCabinetAuthority,
+    },
+    {
+        key: 'commercialPremises',
+        path: '/commercial-premises',
+        component: lazy(() => import('@/views/objects/CommercialPremises')),
+        authority: objectsAuthority,
+    },
+    {
+        key: 'commercialPremises',
+        path: '/commercial-premises/:id',
+        component: lazy(() => import('@/views/objects/CommercialPremiseDetails')),
+        authority: objectsAuthority,
     },
     {
         key: 'objects',
@@ -85,6 +98,7 @@ export const protectedRoutes: Routes = [
         path: '/mortgage-calculator',
         component: lazy(() => import('@/views/mortgage-calculator')),
         authority: agentCabinetAuthority,
+        bonuses: [USER_BONUS.CALCULATOR],
         meta: {
             pageContainerType: 'gutterless',
             pageBackgroundType: 'plain',
@@ -137,6 +151,7 @@ export const protectedRoutes: Routes = [
             () => import('@/views/special-offers/SpecialOfferDetail'),
         ),
         authority: agentCabinetAuthority,
+        bonuses: [USER_BONUS.SPECIAL_OFFERS],
         meta: {
             pageContainerType: 'gutterless',
             pageBackgroundType: 'plain',
@@ -147,6 +162,7 @@ export const protectedRoutes: Routes = [
         path: '/offers',
         component: lazy(() => import('@/views/special-offers')),
         authority: agentCabinetAuthority,
+        bonuses: [USER_BONUS.SPECIAL_OFFERS],
         meta: {
             pageContainerType: 'gutterless',
             pageBackgroundType: 'plain',
@@ -255,6 +271,12 @@ export const protectedRoutes: Routes = [
         key: 'supervisorFixations',
         path: '/supervisor/fixations',
         component: lazy(() => import('@/views/supervisor')),
+        authority: supervisorOnlyAuthority,
+    },
+    {
+        key: 'supervisorUsers',
+        path: '/supervisor/users',
+        component: lazy(() => import('@/views/supervisor/users')),
         authority: supervisorOnlyAuthority,
     },
     ...othersRoute,

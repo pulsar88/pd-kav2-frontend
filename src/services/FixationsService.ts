@@ -10,8 +10,7 @@ import {
     formatStatsApiDate,
     getDefaultFixationsStatsDateRange,
     mapFixationsStatsStatusesToCounts,
-    mapFixationsStatsToTransitionTimeline,
-    mapFixationsStatsToTransitions,
+    mapFixationsStatsToFinalStatusTimeline,
     parseStatsApiDate,
     type FixationsStatsStatusApiItem,
 } from '@/views/fixations/fixationStatsMapper'
@@ -107,6 +106,11 @@ export async function apiGetFixationsStats(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<FixationGigalogItem[]> {
+    // Пустое агентство не должно превращаться в запрос без фильтра agent_id[].
+    if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
+        return []
+    }
+
     const perPage = 100
     const maxPages = 50
     let page = 1
@@ -148,6 +152,10 @@ export async function apiGetFixationsStatsStatuses(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<FixationsStatsStatusApiItem[]> {
+    if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
+        return []
+    }
+
     const response = await ApiService.fetchDataWithAxios<
         | {
               data?: FixationsStatsStatusApiItem[]
@@ -196,10 +204,7 @@ export async function apiGetFixationsTransitionStats(params: {
     date_to: string
     agent_id?: number | number[]
 }): Promise<
-    Pick<
-        FixationsDashboardStats,
-        'dateFrom' | 'dateTo' | 'transitions' | 'transitionTimeline'
-    >
+    Pick<FixationsDashboardStats, 'dateFrom' | 'dateTo' | 'statusTimeline'>
 > {
     const defaults = getDefaultFixationsStatsDateRange()
     const fromDate = parseStatsApiDate(params.date_from) ?? defaults[0]
@@ -213,22 +218,22 @@ export async function apiGetFixationsTransitionStats(params: {
             date_to: dateTo,
             agent_id: params.agent_id,
         })
-        const transitions = mapFixationsStatsToTransitions(events)
-        const { timeline: transitionTimeline } =
-            mapFixationsStatsToTransitionTimeline(events, fromDate, toDate)
+        const statusTimeline = mapFixationsStatsToFinalStatusTimeline(
+            events,
+            fromDate,
+            toDate,
+        )
 
         return {
             dateFrom,
             dateTo,
-            transitions,
-            transitionTimeline,
+            statusTimeline,
         }
     } catch {
         return {
             dateFrom,
             dateTo,
-            transitions: [],
-            transitionTimeline: [],
+            statusTimeline: [],
         }
     }
 }
@@ -575,6 +580,14 @@ export type FixationExtendRequest = {
         roles?: string[]
         agency?: { name?: string } | string
     }
+    reviewer?: {
+        id?: number | string
+        name?: string
+        email?: string | null
+        phone?: string | null
+        country_code?: string
+        roles?: string[]
+    }
     client?: {
         id?: number | string
         name?: string
@@ -602,7 +615,7 @@ export async function apiGetFixationExtendRequests(params?: {
     with?: string
 }): Promise<{ list: FixationExtendRequest[]; total: number }> {
     const queryParams: Record<string, unknown> = {
-        with: 'fixation.object,fixation.client,fixation.client.phones,fixation.agent',
+        with: 'fixation.object,fixation.client,fixation.client.phones,fixation.agent,reviewer',
         ...(params ? toAxiosParams(params) : {}),
     }
 

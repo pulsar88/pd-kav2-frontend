@@ -100,6 +100,7 @@ export const hasPremiseDiscount = (premise: {
 
 export const CHECKBOARD_SPECIAL_OFFER_STATUS_CODE = 'special_offer'
 
+/** Временно скрыт в легенде шахматки — см. ComplexCheckboard */
 export const CHECKBOARD_SPECIAL_OFFER_STATUS = {
     code: CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
     name: 'Акции',
@@ -125,8 +126,9 @@ export const propertyHasSpecialOffer = (property: {
     property.special_offers.length > 0
 
 /**
- * Статус «Акции» — дополнительное условие (AND):
- * при включении показывает только помещения с акциями среди выбранных статусов.
+ * Фильтр статусов шахматки.
+ * Статус «Акции» (special_offer) временно отключён в легенде —
+ * акционные помещения фильтруются через «От инвестора».
  */
 export const matchesCheckboardStatusFilter = (
     property: {
@@ -137,22 +139,24 @@ export const matchesCheckboardStatusFilter = (
 ) => {
     if (activeStatusCodes.length === 0) return true
 
-    const offerSelected = activeStatusCodes.includes(
-        CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
-    )
-    const regularCodes = activeStatusCodes.filter(
-        (code) => code !== CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
-    )
+    // const offerSelected = activeStatusCodes.includes(
+    //     CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
+    // )
+    // const regularCodes = activeStatusCodes.filter(
+    //     (code) => code !== CHECKBOARD_SPECIAL_OFFER_STATUS_CODE,
+    // )
+    //
+    // if (regularCodes.length > 0) {
+    //     if (!regularCodes.includes(property.status.code)) return false
+    // } else if (!offerSelected) {
+    //     return true
+    // }
+    //
+    // if (offerSelected && !propertyHasSpecialOffer(property)) {
+    //     return false
+    // }
+    //
+    // return true
 
-    if (regularCodes.length > 0) {
-        if (!regularCodes.includes(property.status.code)) return false
-    } else if (!offerSelected) {
-        return true
-    }
-
-    if (offerSelected && !propertyHasSpecialOffer(property)) {
-        return false
-    }
-
-    return true
+    return activeStatusCodes.includes(property.status.code)
 }

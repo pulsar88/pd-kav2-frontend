@@ -22,6 +22,8 @@ import {
     stripHtml,
 } from '@/views/special-offers/utils'
 import type { PremiseSpecialOffer } from '../types'
+import { USER_BONUS } from '@/constants/bonuses.constant'
+import { useHasUserBonus } from '@/utils/hooks/useUserBonus'
 
 type SpecialOfferBadgesProps = {
     offers?: PremiseSpecialOffer[] | null
@@ -188,7 +190,8 @@ const SpecialOfferBadges = ({
     interactiveDetails = false,
     showPremisesAction = false,
 }: SpecialOfferBadgesProps) => {
-    if (!offers?.length) return null
+    const canUseSpecialOffers = useHasUserBonus(USER_BONUS.SPECIAL_OFFERS)
+    if (!canUseSpecialOffers || !offers?.length) return null
 
     const visible = offers.slice(0, max)
     const rest = offers.length - visible.length

@@ -9,11 +9,11 @@ import Alert from '@/components/ui/Alert'
 import { Form, FormItem } from '@/components/ui/Form'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
-import {
-    apiGetAgencies,
-    apiCreateAgencyRequest,
-} from '@/services/AgencyService'
-import { TbBuilding } from 'react-icons/tb'
+import { apiGetAgencies } from '@/services/AgencyService'
+import { apiChangeUserAgency } from '@/services/UsersService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
+import type { AdminUserListItem } from '@/@types/users'
+import { TbBuilding, TbUser } from 'react-icons/tb'
 import classNames from '@/utils/classNames'
 
 type AgencyOption = {
@@ -21,13 +21,11 @@ type AgencyOption = {
     label: string
 }
 
-type JoinAgencyDialogProps = {
+type ChangeUserAgencyDialogProps = {
     isOpen: boolean
+    user: AdminUserListItem | null
     onClose: () => void
     onSuccess: () => void
-    /** Текущее агентство пользователя — исключается из списка и показывается предупреждение */
-    currentAgencyId?: number | null
-    currentAgencyName?: string
 }
 
 type AgencySelectProps = {
@@ -66,10 +64,8 @@ const mergeAgencyOptions = (
     next: AgencyOption[],
 ): AgencyOption[] => {
     if (next.length === 0) return prev
-
     const seen = new Set(prev.map((item) => item.value))
     const uniqueNext = next.filter((item) => !seen.has(item.value))
-
     return uniqueNext.length > 0 ? [...prev, ...uniqueNext] : prev
 }
 
@@ -93,13 +89,15 @@ const AgencyMenuList = (
     )
 }
 
-const JoinAgencyDialog = ({
+const ChangeUserAgencyDialog = ({
     isOpen,
+    user,
     onClose,
     onSuccess,
-    currentAgencyId = null,
-    currentAgencyName,
-}: JoinAgencyDialogProps) => {
+}: ChangeUserAgencyDialogProps) => {
+    const currentAgencyId = user?.agency?.id ?? null
+    const currentAgencyName = user?.agency?.name
+
     const [agencies, setAgencies] = useState<AgencyOption[]>([])
     const [selectedAgency, setSelectedAgency] = useState<AgencyOption | null>(
         null,
@@ -115,7 +113,6 @@ const JoinAgencyDialog = ({
     const loadingMoreRef = useRef(false)
     const searchRef = useRef('')
     const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const isTransfer = Boolean(currentAgencyId && currentAgencyName)
 
     const resetListState = useCallback(() => {
         setAgencies([])
@@ -152,10 +149,7 @@ const JoinAgencyDialog = ({
                 })
                 if (cancelled) return
 
-                const options = toAgencyOptions(
-                    response.data,
-                    currentAgencyId,
-                )
+                const options = toAgencyOptions(response.data, currentAgencyId)
                 const currentPage = response.meta?.current_page ?? 1
                 const lastPage = response.meta?.last_page ?? 1
                 const more = currentPage < lastPage
@@ -166,19 +160,17 @@ const JoinAgencyDialog = ({
                 setHasMore(more)
             } catch (err: unknown) {
                 if (cancelled) return
-
-                const message =
-                    err instanceof Error
-                        ? err.message
-                        : 'Не удалось загрузить список агентств'
                 toast.push(
-                    <Notification type="danger">{message}</Notification>,
+                    <Notification type="danger">
+                        {getApiErrorMessage(
+                            err,
+                            'Не удалось загрузить список агентств',
+                        )}
+                    </Notification>,
                     { placement: 'top-center' },
                 )
             } finally {
-                if (!cancelled) {
-                    setIsLoadingAgencies(false)
-                }
+                if (!cancelled) setIsLoadingAgencies(false)
             }
         }
 
@@ -190,9 +182,7 @@ const JoinAgencyDialog = ({
     }, [isOpen, resetListState, searchQuery, currentAgencyId])
 
     const handleSearchInputChange = (value: string) => {
-        if (searchTimerRef.current) {
-            clearTimeout(searchTimerRef.current)
-        }
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
         searchTimerRef.current = setTimeout(() => {
             searchTimerRef.current = null
             const trimmed = value.trim()
@@ -237,13 +227,15 @@ const JoinAgencyDialog = ({
             hasMoreRef.current = more
             setHasMore(more)
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось загрузить список агентств'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось загрузить список агентств',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             loadingMoreRef.current = false
             setIsLoadingMore(false)
@@ -252,8 +244,7 @@ const JoinAgencyDialog = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-
-        if (!selectedAgency) {
+        if (!user || !selectedAgency) {
             toast.push(
                 <Notification type="warning">
                     Пожалуйста, выберите агентство
@@ -265,26 +256,27 @@ const JoinAgencyDialog = ({
 
         setIsSubmitting(true)
         try {
-            await apiCreateAgencyRequest({
+            await apiChangeUserAgency(user.id, {
                 agency_id: selectedAgency.value,
             })
-
             toast.push(
                 <Notification type="success">
-                    Заявка на присоединение к агентству успешно отправлена
+                    Агентство пользователя «{user.name}» изменено
                 </Notification>,
                 { placement: 'top-center' },
             )
             onClose()
             onSuccess()
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось отправить заявку'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось сменить агентство пользователя',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             setIsSubmitting(false)
         }
@@ -311,33 +303,32 @@ const JoinAgencyDialog = ({
             )}
         >
             <div className="min-w-0">
-                <div className="flex items-start sm:items-center gap-3 mb-5 pr-8">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary text-xl shrink-0">
+                <div className="mb-5 flex items-start gap-3 pr-8 sm:items-center">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl text-primary">
                         <TbBuilding />
                     </span>
                     <div className="min-w-0">
-                        <h4 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100">
-                            {isTransfer
-                                ? 'Смена агентства'
-                                : 'Выбор агентства'}
+                        <h4 className="text-base font-bold text-gray-900 dark:text-gray-100 sm:text-lg">
+                            Смена агентства
                         </h4>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {isTransfer
-                                ? 'Выберите другое агентство для отправки заявки'
-                                : 'Выберите агентство из списка для отправки заявки'}
+                        <p className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            <TbUser className="shrink-0" />
+                            <span className="truncate">
+                                {user?.name || 'Пользователь'}
+                            </span>
                         </p>
                     </div>
                 </div>
 
-                {isTransfer ? (
+                {currentAgencyName ? (
                     <Alert showIcon type="warning" className="mb-4">
-                        Если заявку примут, вы будете удалены из текущего
-                        агентства «{currentAgencyName}».
+                        Пользователь будет удалён из текущего агентства «
+                        {currentAgencyName}» и переведён в выбранное.
                     </Alert>
                 ) : null}
 
                 <Form onSubmit={handleSubmit}>
-                    <FormItem label="Агентство" asterisk>
+                    <FormItem label="Новое агентство" asterisk>
                         <Select<AgencyOption>
                             placeholder={
                                 isLoadingAgencies
@@ -365,12 +356,13 @@ const JoinAgencyDialog = ({
                             </p>
                         ) : hasMore ? (
                             <p className="mt-2 text-xs text-gray-400">
-                                Прокрутите список для загрузки следующей страницы
+                                Прокрутите список для загрузки следующей
+                                страницы
                             </p>
                         ) : null}
                     </FormItem>
 
-                    <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-6">
+                    <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
                             variant="plain"
@@ -387,7 +379,7 @@ const JoinAgencyDialog = ({
                             loading={isSubmitting}
                             disabled={!selectedAgency || isLoadingAgencies}
                         >
-                            Отправить заявку
+                            Сменить агентство
                         </Button>
                     </div>
                 </Form>
@@ -396,4 +388,4 @@ const JoinAgencyDialog = ({
     )
 }
 
-export default JoinAgencyDialog
+export default ChangeUserAgencyDialog

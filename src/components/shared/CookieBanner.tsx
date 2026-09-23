@@ -43,7 +43,7 @@ const CookieBanner = () => {
                                 Мы используем файлы cookies
                             </h3>
                             <p className="text-xs leading-snug text-gray-600 dark:text-gray-300">
-                                Сайт agent-cabinet.ru использует файлы cookies и
+                                Сайт mp.pdufa.ru использует файлы cookies и
                                 сервисы сбора технических данных посетителей для
                                 обеспечения работоспособности и улучшения
                                 качества обслуживания. Продолжая использовать
