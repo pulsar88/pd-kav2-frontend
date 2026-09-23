@@ -25,7 +25,10 @@ import {
 import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { useNavigate } from 'react-router'
 import PushSubscriptionPrompt from '@/components/shared/PushSubscriptionPrompt'
-import { preparePushPromptAfterAuth } from '@/utils/webPush'
+import {
+    preparePushPromptAfterAuth,
+    unlinkPushSubscriptionBeforeLogout,
+} from '@/utils/webPush'
 import {
     clearInvitationTokenFromStorage,
     getInvitationTokenFromStorage,
@@ -201,6 +204,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     }, [])
 
     const finishAuth = async (accessToken: string, nextUser?: User) => {
+        // Сначала сохраняем Sanctum-токен — push/subscribe требует auth.
         handleSignIn({ accessToken }, nextUser)
         const currentUser = await loadCurrentUser()
         redirect(
@@ -208,10 +212,11 @@ function AuthProvider({ children }: AuthProviderProps) {
             currentUser ?? nextUser,
         )
 
+        // Привязка существующего browser endpoint к новому user_id
+        // (navigator.serviceWorker.ready → subscription → POST /push/subscribe).
         void preparePushPromptAfterAuth()
             .then(({ shouldPrompt }) => {
                 if (shouldPrompt) {
-                    // Даём завершиться редиректу, затем спрашиваем
                     window.setTimeout(() => setPushPromptOpen(true), 500)
                 }
             })
@@ -355,8 +360,17 @@ function AuthProvider({ children }: AuthProviderProps) {
 
     const signOut = async () => {
         try {
+            // 1) Пока Sanctum-токен ещё валиден — отвязать push endpoint от user.
+            try {
+                await unlinkPushSubscriptionBeforeLogout()
+            } catch (error) {
+                console.error('Failed to unlink push before logout', error)
+            }
+
+            // 2) Инвалидировать Sanctum-токен на бэке.
             await apiSignOut()
         } finally {
+            // 3) Только после этого чистим локальную сессию и токен.
             handleSignOut()
             navigatorRef.current?.navigate('/')
         }

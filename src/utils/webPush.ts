@@ -2,6 +2,7 @@ import {
     apiPushSubscribe,
     apiPushUnsubscribe,
 } from '@/services/PushService'
+import type { PushSubscribePayload } from '@/services/PushService'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY?.trim() || ''
 
@@ -51,23 +52,31 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     }
 }
 
+/**
+ * Ждёт готовности SW и возвращает текущую PushSubscription браузера (если есть).
+ */
 export async function getExistingPushSubscription(): Promise<PushSubscription | null> {
     if (!isWebPushSupported()) {
         return null
     }
 
-    const registration =
-        (await navigator.serviceWorker.getRegistration()) ??
-        (await registerServiceWorker())
+    try {
+        const existingRegistration =
+            await navigator.serviceWorker.getRegistration()
 
-    if (!registration) {
+        if (!existingRegistration) {
+            return null
+        }
+
+        await navigator.serviceWorker.ready
+        return existingRegistration.pushManager.getSubscription()
+    } catch (error) {
+        console.error('Failed to read push subscription', error)
         return null
     }
-
-    return registration.pushManager.getSubscription()
 }
 
-function toSubscribePayload(subscription: PushSubscription) {
+function toSubscribePayload(subscription: PushSubscription): PushSubscribePayload {
     const json = subscription.toJSON()
     const endpoint = json.endpoint
     const p256dh = json.keys?.p256dh
@@ -93,6 +102,41 @@ export async function syncPushSubscription(
 }
 
 /**
+ * После логина: привязать существующий browser endpoint к текущему user_id.
+ * Бэкенд (updatePushSubscription) перенесёт ownership с предыдущего пользователя.
+ */
+export async function bindPushSubscriptionAfterAuth(): Promise<boolean> {
+    if (!isWebPushSupported()) {
+        return false
+    }
+
+    const subscription = await getExistingPushSubscription()
+    if (!subscription) {
+        return false
+    }
+
+    await syncPushSubscription(subscription)
+    return true
+}
+
+/**
+ * Перед логаутом: отвязать endpoint от текущего user на бэке.
+ * Браузерную PushSubscription не трогаем — при следующем логине её снова привяжем.
+ */
+export async function unlinkPushSubscriptionBeforeLogout(): Promise<void> {
+    if (!isWebPushSupported()) {
+        return
+    }
+
+    const subscription = await getExistingPushSubscription()
+    if (!subscription) {
+        return
+    }
+
+    await apiPushUnsubscribe({ endpoint: subscription.endpoint })
+}
+
+/**
  * Нужно ли показывать диалог после логина/регистрации.
  * Если подписка уже есть — тихо синхронизируем с бэком и не спрашиваем.
  * Если permission уже granted — подписываемся без диалога.
@@ -108,14 +152,13 @@ export async function preparePushPromptAfterAuth(): Promise<{
         return { shouldPrompt: false }
     }
 
-    const existing = await getExistingPushSubscription()
-    if (existing) {
-        try {
-            await syncPushSubscription(existing)
-        } catch (error) {
-            console.error('Failed to sync existing push subscription', error)
+    try {
+        const bound = await bindPushSubscriptionAfterAuth()
+        if (bound) {
+            return { shouldPrompt: false }
         }
-        return { shouldPrompt: false }
+    } catch (error) {
+        console.error('Failed to bind push subscription after auth', error)
     }
 
     if (Notification.permission === 'granted') {
@@ -156,6 +199,8 @@ export async function subscribeToWebPush(): Promise<PushSubscribeResult> {
             }
         }
 
+        await navigator.serviceWorker.ready
+
         let subscription = await registration.pushManager.getSubscription()
 
         if (!subscription) {
@@ -181,6 +226,9 @@ export async function subscribeToWebPush(): Promise<PushSubscribeResult> {
     }
 }
 
+/**
+ * Полная отписка (настройки «выключить уведомления»): бэк + браузер.
+ */
 export async function unsubscribeFromWebPush(): Promise<void> {
     const subscription = await getExistingPushSubscription()
     if (!subscription) {
