@@ -4,13 +4,14 @@ export type ServerOutageStatus = 500 | 502
 
 type ServerStatusState = {
     isUnavailable: boolean
-    statusCode: ServerOutageStatus | null
+    statusCode: number | null
+    errorMessage: string | null
     /** Запросы с этим заголовком не открывают заглушку повторно */
     probing: boolean
 }
 
 type ServerStatusAction = {
-    reportServerOutage: (statusCode?: number | null) => void
+    reportServerOutage: (statusCode?: number | null, errorMessage?: string | null) => void
     setProbing: (probing: boolean) => void
     clearServerOutage: () => void
 }
@@ -26,8 +27,9 @@ export const useServerStatusStore = create<
 >((set, get) => ({
     isUnavailable: false,
     statusCode: null,
+    errorMessage: null,
     probing: false,
-    reportServerOutage: (statusCode) => {
+    reportServerOutage: (statusCode, errorMessage) => {
         if (
             statusCode != null &&
             statusCode !== undefined &&
@@ -39,11 +41,28 @@ export const useServerStatusStore = create<
         const nextCode = isServerOutageStatus(statusCode ?? undefined)
             ? statusCode
             : null
+        const nextMessage = errorMessage || null
 
-        if (get().isUnavailable && get().statusCode === nextCode) return
-        set({ isUnavailable: true, statusCode: nextCode })
+        if (
+            get().isUnavailable &&
+            get().statusCode === nextCode &&
+            get().errorMessage === nextMessage
+        ) {
+            return
+        }
+
+        set({
+            isUnavailable: true,
+            statusCode: nextCode,
+            errorMessage: nextMessage,
+        })
     },
     setProbing: (probing) => set({ probing }),
     clearServerOutage: () =>
-        set({ isUnavailable: false, statusCode: null, probing: false }),
+        set({
+            isUnavailable: false,
+            statusCode: null,
+            errorMessage: null,
+            probing: false,
+        }),
 }))

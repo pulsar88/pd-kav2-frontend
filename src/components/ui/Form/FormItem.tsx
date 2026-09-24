@@ -100,7 +100,7 @@ const FormItem = (props: FormItemProps) => {
         if (errorMode === 'reserved') {
             return (
                 <div
-                    className="relative mt-[3px] min-h-5 overflow-hidden"
+                    className="relative mt-[5px] min-h-5 overflow-hidden"
                     aria-live="polite"
                 >
                     <AnimatePresence initial={false}>

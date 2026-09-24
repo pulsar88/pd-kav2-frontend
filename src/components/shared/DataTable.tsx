@@ -337,9 +337,19 @@ function DataTable<T>(props: DataTableProps<T>) {
                                                 onRowClick &&
                                                     'cursor-pointer',
                                             )}
-                                            onClick={() =>
+                                            onClick={(e) => {
+                                                // Если пользователь выделяет текст мышкой (номер телефона, имя и т.д.), не совершаем переход
+                                                const selection = window.getSelection()
+                                                if (selection && selection.toString().trim().length > 0) {
+                                                    return
+                                                }
+                                                // Если клик был по интерактивному элементу (ссылка, кнопка, инпут)
+                                                const target = e.target as HTMLElement | null
+                                                if (target?.closest('button, a, input, select, textarea, [role="button"]')) {
+                                                    return
+                                                }
                                                 onRowClick?.(row.original)
-                                            }
+                                            }}
                                         >
                                             {row
                                                 .getVisibleCells()

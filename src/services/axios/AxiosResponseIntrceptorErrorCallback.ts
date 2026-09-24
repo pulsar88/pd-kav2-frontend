@@ -32,7 +32,9 @@ const AxiosResponseIntrceptorErrorCallback = (error: AxiosError) => {
     }
 
     if (response && isServerOutageStatus(response.status) && !isProbe) {
-        useServerStatusStore.getState().reportServerOutage(response.status)
+        useServerStatusStore
+            .getState()
+            .reportServerOutage(response.status, responseData?.message)
     }
 
     if (response && unauthorizedCode.includes(response.status)) {

@@ -874,7 +874,7 @@ const SignInForm = (props: SignInFormProps) => {
                     )}
                 >
                     <FormItem
-                        className="!mb-6"
+                        className="!mb-3"
                         errorMode="reserved"
                         invalid={Boolean(otpForm.formState.errors.code)}
                         errorMessage={
