@@ -102,11 +102,12 @@ export async function apiGetAgencyRequests(
 /**
  * Последняя заявка пользователя (первая в списке при order=desc).
  */
-export async function apiGetLatestAgencyRequest(): Promise<JoinAgencyRequest | null> {
+export async function apiGetLatestAgencyRequest(userId?: number | string): Promise<JoinAgencyRequest | null> {
     const response = await apiGetAgencyRequests({
         page: 1,
         per_page: 1,
         with: 'agency',
+        ...(userId ? { agent_id: userId } : {}),
     })
 
     return response.data?.[0] ?? null

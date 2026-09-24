@@ -32,6 +32,7 @@ type JoinAgencyDialogProps = {
 
 type AgencySelectProps = {
     isLoadingMore?: boolean
+    onBottomReached?: () => void
 }
 
 const AGENCIES_PER_PAGE = 20
@@ -76,12 +77,20 @@ const mergeAgencyOptions = (
 const AgencyMenuList = (
     props: MenuListProps<AgencyOption, false, GroupBase<AgencyOption>>,
 ) => {
-    const isLoadingMore = Boolean(
-        (props.selectProps as AgencySelectProps).isLoadingMore,
-    )
+    const selectProps = props.selectProps as AgencySelectProps
+    const isLoadingMore = Boolean(selectProps.isLoadingMore)
+    const onBottomReached = selectProps.onBottomReached
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+        // Запас 40px для надёжного срабатывания на мобильных с резиновым скроллом
+        if (scrollHeight - scrollTop - clientHeight <= 40) {
+            onBottomReached?.()
+        }
+    }
 
     return (
-        <>
+        <div onScroll={handleScroll}>
             <components.MenuList {...props} />
             {isLoadingMore ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
@@ -89,7 +98,7 @@ const AgencyMenuList = (
                     Загрузка...
                 </div>
             ) : null}
-        </>
+        </div>
     )
 }
 
@@ -357,7 +366,10 @@ const JoinAgencyDialog = ({
                             }}
                             onChange={(option) => setSelectedAgency(option)}
                             {...selectMenuProps}
-                            {...({ isLoadingMore } satisfies AgencySelectProps)}
+                            {...({
+                                isLoadingMore,
+                                onBottomReached: handleMenuScrollToBottom,
+                            } satisfies AgencySelectProps)}
                         />
                         {isLoadingAgencies ? (
                             <p className="mt-2 flex items-center gap-1 text-xs text-gray-400">

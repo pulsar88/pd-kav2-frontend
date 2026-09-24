@@ -166,7 +166,7 @@ const ProfileForm = () => {
         const fetchLatestRequest = async () => {
             setIsAgencyRequestLoading(true)
             try {
-                const request = await apiGetLatestAgencyRequest()
+                const request = await apiGetLatestAgencyRequest(userId)
                 if (!cancelled) {
                     setLatestAgencyRequest(request)
                 }
@@ -348,7 +348,7 @@ const ProfileForm = () => {
     const handleJoinAgencySuccess = async () => {
         await loadProfile()
         try {
-            const request = await apiGetLatestAgencyRequest()
+            const request = await apiGetLatestAgencyRequest(userId)
             setLatestAgencyRequest(request)
         } catch {
             setLatestAgencyRequest(null)

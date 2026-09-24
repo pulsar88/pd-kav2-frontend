@@ -95,6 +95,7 @@ export type GetAgencyRequestsParams = {
     with?: string
     sort_by?: string
     order?: 'asc' | 'desc'
+    user_id?: number | string
 }
 
 export type AgencyRequestsApiResponse = {
