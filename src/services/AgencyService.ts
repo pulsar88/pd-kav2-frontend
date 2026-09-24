@@ -107,7 +107,7 @@ export async function apiGetLatestAgencyRequest(userId?: number | string): Promi
         page: 1,
         per_page: 1,
         with: 'agency',
-        ...(userId ? { agent_id: userId } : {}),
+        ...(userId ? { user_id: userId } : {}),
     })
 
     return response.data?.[0] ?? null
