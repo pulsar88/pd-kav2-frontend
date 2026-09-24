@@ -573,7 +573,7 @@ const ComplexCheckboard = () => {
                                             value="about"
                                             className="!px-2.5 sm:!px-5 text-center"
                                         >
-                                            О Жилом комплексе
+                                            О комплексе
                                         </TabNav>
                                     </TabList>
 

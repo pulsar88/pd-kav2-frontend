@@ -67,7 +67,7 @@ const ComplexAboutTab = ({
                                     {name}
                                 </h4>
                                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    О жилом комплексе
+                                    О комплексе
                                 </p>
                             </div>
 
