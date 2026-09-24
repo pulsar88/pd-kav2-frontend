@@ -21,6 +21,7 @@ type CheckPhoneResult = {
 
 type Auth = {
     authenticated: boolean
+    isVerifying?: boolean
     user: User
     signIn: (values: SignInCredential) => AuthResult
     signUp: (values: SignUpCredential) => AuthResult
@@ -72,6 +73,7 @@ const defaultOAuthSignInPlaceHolder = (
 
 const AuthContext = createContext<Auth>({
     authenticated: false,
+    isVerifying: false,
     user: {},
     signIn: async () => defaultFunctionPlaceHolder(),
     signUp: async () => defaultFunctionPlaceHolder(),

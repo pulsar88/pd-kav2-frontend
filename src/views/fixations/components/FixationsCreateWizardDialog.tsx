@@ -32,6 +32,7 @@ import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { nameFieldValidation, isValidHumanName, isFakeDuplication } from '../nameValidation'
 import 'dayjs/locale/ru'
 import debounce from 'lodash/debounce'
 import { HiChevronDown } from 'react-icons/hi'
@@ -369,35 +370,85 @@ const paymentFormatOptions: SelectOption[] = [
 const CLIENT_PERSONAL_DATA_CONSENT_TEXT =
     'Подтверждаю, что Персональные данные Клиента получены мной законным способом, я располагаю необходимым законным основанием для их передачи Оператору, предоставленные сведения являются достоверными и актуальными, а в случае обработки на основании согласия Клиента согласие получено до передачи персональных данных Оператору'
 
-const clientCreateSchema = z.object({
-    lastName: z.string().min(1, { message: 'Введите фамилию' }),
-    firstName: z.string().min(1, { message: 'Введите имя' }),
-    middleName: z.string().optional(),
-    phone: z
-        .string()
-        .min(1, { message: 'Введите номер телефона' })
-        .regex(RU_PHONE_REGEX, {
-            message: 'Введите номер телефона',
+
+
+const clientCreateSchema = z
+    .object({
+        lastName: nameFieldValidation,
+        firstName: nameFieldValidation,
+        middleName: z
+            .string()
+            .transform((val) => val.trim())
+            .refine(
+                (val) => !val || isValidHumanName(val),
+                { message: 'Укажите корректное отчество или оставьте пустым' },
+            )
+            .optional(),
+        phone: z
+            .string()
+            .min(1, { message: 'Введите номер телефона' })
+            .regex(RU_PHONE_REGEX, {
+                message: 'Введите номер телефона',
+            }),
+        personalDataConsent: z.boolean().refine((value) => value, {
+            message: 'Необходимо подтверждение',
         }),
-    personalDataConsent: z.boolean().refine((value) => value, {
-        message: 'Необходимо подтверждение',
-    }),
-})
+    })
+    .superRefine((data, ctx) => {
+        const last = data.lastName?.trim()
+        const first = data.firstName?.trim()
+        if (last && first && isFakeDuplication(last, first)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Фамилия и имя не должны дублировать друг друга',
+                path: ['lastName'],
+            })
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Имя не должно дублировать фамилию',
+                path: ['firstName'],
+            })
+        }
+    })
 
 type ClientCreateSchema = z.infer<typeof clientCreateSchema>
 
-const relativeCreateSchema = z.object({
-    lastName: z.string().min(1, { message: 'Введите фамилию' }),
-    firstName: z.string().min(1, { message: 'Введите имя' }),
-    middleName: z.string().optional(),
-    phone: z
-        .string()
-        .min(1, { message: 'Введите номер телефона' })
-        .regex(RU_PHONE_REGEX, {
-            message: 'Введите номер телефона',
-        }),
-    relation: z.string().min(1, { message: 'Выберите степень родства' }),
-})
+const relativeCreateSchema = z
+    .object({
+        lastName: nameFieldValidation,
+        firstName: nameFieldValidation,
+        middleName: z
+            .string()
+            .transform((val) => val.trim())
+            .refine(
+                (val) => !val || isValidHumanName(val),
+                { message: 'Укажите корректное отчество или оставьте пустым' },
+            )
+            .optional(),
+        phone: z
+            .string()
+            .min(1, { message: 'Введите номер телефона' })
+            .regex(RU_PHONE_REGEX, {
+                message: 'Введите номер телефона',
+            }),
+        relation: z.string().min(1, { message: 'Выберите степень родства' }),
+    })
+    .superRefine((data, ctx) => {
+        const last = data.lastName?.trim()
+        const first = data.firstName?.trim()
+        if (last && first && isFakeDuplication(last, first)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Фамилия и имя не должны дублировать друг друга',
+                path: ['lastName'],
+            })
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Имя не должно дублировать фамилию',
+                path: ['firstName'],
+            })
+        }
+    })
 
 type RelativeCreateSchema = z.infer<typeof relativeCreateSchema>
 
@@ -1739,6 +1790,7 @@ const FixationsCreateWizardDialog = ({
                                                     placeholder="Иванов"
                                                     autoComplete="family-name"
                                                     {...field}
+                                                    onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
                                                 />
                                             )}
                                         />
@@ -1759,6 +1811,7 @@ const FixationsCreateWizardDialog = ({
                                                     placeholder="Иван"
                                                     autoComplete="given-name"
                                                     {...field}
+                                                    onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
                                                 />
                                             )}
                                         />
@@ -1780,6 +1833,7 @@ const FixationsCreateWizardDialog = ({
                                                     placeholder="Иванович"
                                                     autoComplete="additional-name"
                                                     {...field}
+                                                    onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
                                                 />
                                             )}
                                         />

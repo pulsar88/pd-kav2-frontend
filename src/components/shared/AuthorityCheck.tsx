@@ -1,6 +1,7 @@
 import useAuthority from '@/utils/hooks/useAuthority'
 import { useSessionUser } from '@/store/authStore'
 import { hasAllUserBonuses } from '@/utils/hasUserBonus'
+import { isContentManagerOnly } from '@/constants/roles.constant'
 import type { CommonProps } from '@/@types/common'
 
 interface AuthorityCheckProps extends CommonProps {
@@ -18,9 +19,18 @@ const AuthorityCheck = (props: AuthorityCheckProps) => {
         children,
     } = props
 
-    const userBonuses = useSessionUser((state) => state.user.bonuses)
+    const user = useSessionUser((state) => state.user)
+    const isSpecialRole = isContentManagerOnly(userAuthority)
+    const hasAgency = Boolean(user.agency || user.agencyName)
+
+    const userBonuses = user.bonuses
     const roleMatched = useAuthority(userAuthority, authority)
     const bonusMatched = hasAllUserBonuses(userBonuses, requiredBonuses)
+
+    // Если нет агентства, скрываем пункты меню ПОСЛЕ вызова хуков
+    if (!hasAgency && !isSpecialRole) {
+        return null
+    }
 
     return <>{roleMatched && bonusMatched ? children : null}</>
 }

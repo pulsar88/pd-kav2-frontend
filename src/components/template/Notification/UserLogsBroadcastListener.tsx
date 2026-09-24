@@ -7,60 +7,53 @@ import { useSessionUser, useToken } from '@/store/authStore'
 
 const UserLogsBroadcastListener = () => {
     const signedIn = useSessionUser((state) => state.session.signedIn)
-    const userId = useSessionUser((state) => state.user.userId)
+    const user = useSessionUser((state) => state.user)
     const setUser = useSessionUser((state) => state.setUser)
     const { token } = useToken()
-    const [resolvedUserId, setResolvedUserId] = useState<string | null>(
-        userId ?? null,
-    )
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+    // При смене токена или выходе сразу глушим старый сокет
+    useEffect(() => {
+        disconnectEcho()
+    }, [token])
 
     useEffect(() => {
-        if (userId) {
-            setResolvedUserId(userId)
-            return undefined
-        }
-
         if (!signedIn || !token) {
-            setResolvedUserId(null)
+            disconnectEcho()
+            setCurrentUserId(null)
             return undefined
         }
 
         let cancelled = false
 
+        // Всегда проверяем актуального пользователя нового токена перед подпиской
         void apiGetCurrentUser().then((currentUser) => {
-            if (cancelled) {
-                return
-            }
+            if (cancelled) return
 
             if (currentUser.userId) {
-                setResolvedUserId(currentUser.userId)
                 setUser(currentUser)
+                setCurrentUserId(currentUser.userId)
             }
+        }).catch(() => {
+            // Ошибка авторизации
         })
 
         return () => {
             cancelled = true
         }
-    }, [signedIn, token, userId, setUser])
+    }, [signedIn, token, setUser])
 
     useEffect(() => {
-        if (!broadcastConfig.enabled || !signedIn || !resolvedUserId || !token) {
+        if (!broadcastConfig.enabled || !signedIn || !currentUserId || !token) {
             return undefined
         }
 
-        disconnectEcho()
-        const unsubscribe = subscribeUserLogsBroadcast(resolvedUserId)
+        const unsubscribe = subscribeUserLogsBroadcast(currentUserId)
 
         return () => {
             unsubscribe?.()
         }
-    }, [signedIn, token, resolvedUserId])
-
-    useEffect(() => {
-        if (!signedIn || !token) {
-            disconnectEcho()
-        }
-    }, [signedIn, token])
+    }, [signedIn, token, currentUserId])
 
     return null
 }

@@ -58,6 +58,7 @@ const AllRoutes = (props: AllRoutesProps) => {
                                 authority={route.authority}
                                 userBonuses={user.bonuses}
                                 bonuses={route.bonuses}
+                                routePath={route.path}
                             >
                                 <PageContainer {...props} {...route.meta}>
                                     <AppRoute

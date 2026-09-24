@@ -3,6 +3,7 @@ import AuthContext from './AuthContext'
 import appConfig from '@/configs/app.config'
 import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
 import { useSessionUser, useToken } from '@/store/authStore'
+import { useSavedAccountsStore } from '@/store/savedAccountsStore'
 import {
     apiAuthCheck,
     apiCheckPhone,
@@ -80,6 +81,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     const { token, setToken } = useToken()
     const [tokenState, setTokenState] = useState(token)
     const [pushPromptOpen, setPushPromptOpen] = useState(false)
+    const [isVerifying, setIsVerifying] = useState(Boolean(token))
 
     const authenticated = Boolean(tokenState && signedIn)
 
@@ -103,14 +105,19 @@ function AuthProvider({ children }: AuthProviderProps) {
             clearInvitationTokenFromStorage()
         }
 
-        navigatorRef.current?.navigate(
-            redirectUrl
-                ? redirectUrl
-                : getAuthenticatedEntryPath(
-                      roles,
-                      appConfig.authenticatedEntryPath,
-                  ),
-        )
+        const targetPath = redirectUrl
+            ? redirectUrl
+            : getAuthenticatedEntryPath(
+                  roles,
+                  appConfig.authenticatedEntryPath,
+              )
+
+        if (!hasAgency && roles.includes('agent')) {
+            navigatorRef.current?.navigate('/account/profile')
+            return
+        }
+
+        navigatorRef.current?.navigate(targetPath)
     }
 
     const handleSignIn = (tokens: Token, nextUser?: User) => {
@@ -132,6 +139,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         setTokenState('')
         setUser({})
         setSessionSignedIn(false)
+        setIsVerifying(false)
     }
 
     const loadCurrentUser = async () => {
@@ -167,7 +175,10 @@ function AuthProvider({ children }: AuthProviderProps) {
 
                 setTokenState(token)
                 setSessionSignedIn(true)
-                await loadCurrentUser()
+                const current = await loadCurrentUser()
+                if (current && token) {
+                    useSavedAccountsStore.getState().syncCurrentAccount(current, token)
+                }
             } catch (error) {
                 if (cancelled) return
 
@@ -185,7 +196,10 @@ function AuthProvider({ children }: AuthProviderProps) {
 
                 setTokenState(token)
                 setSessionSignedIn(true)
-                await loadCurrentUser()
+                const current = await loadCurrentUser()
+                if (current && token) {
+                    useSavedAccountsStore.getState().syncCurrentAccount(current, token)
+                }
 
                 if (isServerOutageStatus(status)) {
                     useServerStatusStore.getState().reportServerOutage(status)
@@ -195,7 +209,11 @@ function AuthProvider({ children }: AuthProviderProps) {
             }
         }
 
-        void verifySession()
+        void verifySession().finally(() => {
+            if (!cancelled) {
+                setIsVerifying(false)
+            }
+        })
 
         return () => {
             cancelled = true
@@ -207,6 +225,9 @@ function AuthProvider({ children }: AuthProviderProps) {
         // Сначала сохраняем Sanctum-токен — push/subscribe требует auth.
         handleSignIn({ accessToken }, nextUser)
         const currentUser = await loadCurrentUser()
+        if (currentUser) {
+            useSavedAccountsStore.getState().syncCurrentAccount(currentUser, accessToken)
+        }
         redirect(
             currentUser?.authority ?? nextUser?.authority,
             currentUser ?? nextUser,
@@ -389,6 +410,7 @@ function AuthProvider({ children }: AuthProviderProps) {
         <AuthContext.Provider
             value={{
                 authenticated,
+                isVerifying,
                 user,
                 signIn,
                 signUp,

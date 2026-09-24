@@ -3,18 +3,27 @@ import { REDIRECT_URL_KEY } from '@/constants/app.constant'
 import { Navigate, Outlet } from 'react-router'
 import { useAuth } from '@/auth'
 import { setInvitationTokenInStorage } from '@/utils/invitationTokenStorage'
+import Loading from '@/components/shared/Loading'
 
 const { unAuthenticatedEntryPath } = appConfig
 
 const INVITATION_PATH_RE = /^\/invitations\/([^/]+)\/?$/
 
 const ProtectedRoute = () => {
-    const { authenticated } = useAuth()
+    const { authenticated, isVerifying } = useAuth()
 
     const pathName = location.pathname
 
     const getPathName =
         pathName === '/' ? '' : `?${REDIRECT_URL_KEY}=${pathName}`
+
+    if (isVerifying) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loading loading={true} />
+            </div>
+        )
+    }
 
     if (!authenticated) {
         const invitationMatch = pathName.match(INVITATION_PATH_RE)

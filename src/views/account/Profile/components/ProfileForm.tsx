@@ -48,6 +48,7 @@ import type { User } from '@/@types/auth'
 import type { AgencyRequestStatus, JoinAgencyRequest } from '@/@types/agency'
 import type { GetSettingsProfileResponse } from '../types'
 import JoinAgencyDialog from './JoinAgencyDialog'
+import AgencyRequiredBanner from '@/components/template/AgencyRequiredBanner'
 import classNames from '@/utils/classNames'
 
 type ProfileSchema = {
@@ -408,6 +409,12 @@ const ProfileForm = () => {
 
     return (
         <Form noValidate onSubmit={handleSubmit(onSubmit)}>
+            <AgencyRequiredBanner
+                latestAgencyRequest={latestAgencyRequest}
+                isAgencyRequestLoading={isAgencyRequestLoading}
+                onActionClick={() => setIsJoinAgencyOpen(true)}
+                onCancelClick={() => setIsCancelDialogOpen(true)}
+            />
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
                 <Card className="xl:col-span-4 h-full" bodyClass="p-0">
                     <div className="px-6 py-6">

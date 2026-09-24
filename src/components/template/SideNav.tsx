@@ -7,7 +7,7 @@ import { useSessionUser } from '@/store/authStore'
 import { useRouteKeyStore } from '@/store/routeKeyStore'
 import navigationConfig from '@/configs/navigation.config'
 import appConfig from '@/configs/app.config'
-import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
+import { getAuthenticatedEntryPath, isContentManagerOnly } from '@/constants/roles.constant'
 import { Link } from 'react-router'
 import {
     SIDE_NAV_WIDTH,
@@ -43,13 +43,17 @@ const SideNav = ({
 }: SideNavProps) => {
     const defaultMode = useThemeStore((state) => state.mode)
     const direction = useThemeStore((state) => state.direction)
-    const sideNavCollapse = useThemeStore(
+    const storedSideNavCollapse = useThemeStore(
         (state) => state.layout.sideNavCollapse,
     )
 
     const currentRouteKey = useRouteKeyStore((state) => state.currentRouteKey)
 
-    const userAuthority = useSessionUser((state) => state.user.authority) ?? []
+    const user = useSessionUser((state) => state.user)
+    const userAuthority = user.authority ?? []
+    const isSpecialRole = isContentManagerOnly(userAuthority)
+    const hasAgency = Boolean(user.agency || user.agencyName)
+    const sideNavCollapse = !hasAgency && !isSpecialRole ? true : storedSideNavCollapse
     const entryPath = getAuthenticatedEntryPath(
         userAuthority,
         appConfig.authenticatedEntryPath,
