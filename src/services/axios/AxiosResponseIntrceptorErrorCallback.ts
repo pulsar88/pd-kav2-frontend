@@ -4,6 +4,7 @@ import {
     useServerStatusStore,
 } from '@/store/serverStatusStore'
 import { useSessionUser, useToken } from '@/store/authStore'
+import { useUserBlockedStore } from '@/store/userBlockedStore'
 import type { AxiosError } from 'axios'
 
 const unauthorizedCode = [401, 419, 440]
@@ -16,6 +17,19 @@ const AxiosResponseIntrceptorErrorCallback = (error: AxiosError) => {
         config?.headers?.[SERVER_PROBE_HEADER] ??
             config?.headers?.common?.[SERVER_PROBE_HEADER],
     )
+
+    const responseData = response?.data as { code?: string; message?: string } | undefined
+    if (
+        response?.status === 403 &&
+        (responseData?.code === 'user_blocked' ||
+            responseData?.message?.toLowerCase().includes('приостановлен'))
+    ) {
+        setToken('')
+        useSessionUser.getState().setUser({})
+        useSessionUser.getState().setSessionSignedIn(false)
+        useUserBlockedStore.getState().setBlocked(true, responseData?.message)
+        return
+    }
 
     if (response && isServerOutageStatus(response.status) && !isProbe) {
         useServerStatusStore.getState().reportServerOutage(response.status)

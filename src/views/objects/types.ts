@@ -25,9 +25,16 @@ export type PremiseSpecialOffer = {
     badge_text?: string | null
 }
 
+export type RealtyProjectType = {
+    value?: string
+    code?: string
+    name?: string
+}
+
 export type RealtyProject = {
     id: string
     name: string
+    type?: RealtyProjectType | null
 }
 
 export type RealtyFilterOption = {
@@ -57,10 +64,12 @@ export type Complex = {
     finishing?: FinishingType
     matchingPremisesCount?: number
     promoText?: string
+    projectType?: RealtyProjectType | null
 }
 
 export type Premise = {
     id: string
+    projectType?: RealtyProjectType | null
     checkboardPropertyId: number
     number: string
     type: PremiseType

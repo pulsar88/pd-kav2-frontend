@@ -279,7 +279,9 @@ const buildComplexFields = (premise: Premise, complex?: Complex | null) => {
 
 const resolveComplexTitle = (premise: Premise, complex?: Complex | null) => {
     const name = complex?.name || premise.complexName
-    return name ? `Жилой комплекс «${name}»` : 'Жилой комплекс'
+    const typeObj = complex?.projectType || premise.projectType
+    const typeLabel = typeObj?.name?.trim() || 'Жилой комплекс'
+    return name ? `${typeLabel} «${name}»` : typeLabel
 }
 
 const buildTwoColumnBlock = (

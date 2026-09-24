@@ -8,6 +8,8 @@ import PwaInstallBanner from '@/components/shared/PwaInstallBanner'
 import UpdateWindowBanner from '@/components/shared/UpdateWindowBanner'
 import UserLogsBroadcastListener from '@/components/template/Notification/UserLogsBroadcastListener'
 import ServerUnavailableGate from '@/components/template/ServerUnavailableGate'
+import UserBlockedGate from '@/components/template/UserBlockedGate'
+import { useUserBlockedStore } from '@/store/userBlockedStore'
 import useAppVersionCheck from '@/utils/hooks/useAppVersionCheck'
 import Views from '@/views'
 
@@ -45,6 +47,7 @@ function App() {
     } = useAppVersionCheck()
 
     const showUpdateBanner = hasNewVersion && !isUpdateBannerDismissed
+    const isUserBlocked = useUserBlockedStore((state) => state.isBlocked)
 
     return (
         <>
@@ -59,12 +62,18 @@ function App() {
                 <BrowserRouter>
                     <AuthProvider>
                         <UserLogsBroadcastListener />
-                        <Layout>
-                            <Views />
-                        </Layout>
-                        <CookieBanner />
-                        <PwaInstallBanner />
-                        <ServerUnavailableGate />
+                        {isUserBlocked ? (
+                            <UserBlockedGate />
+                        ) : (
+                            <>
+                                <Layout>
+                                    <Views />
+                                </Layout>
+                                <CookieBanner />
+                                <PwaInstallBanner />
+                                <ServerUnavailableGate />
+                            </>
+                        )}
                     </AuthProvider>
                 </BrowserRouter>
             </Theme>

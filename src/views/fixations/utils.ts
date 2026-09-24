@@ -245,16 +245,20 @@ export const getFixationExpiryAccentClass = (value: string) => {
 }
 
 export const normalizeRuPhoneDigits = (input: string) => {
-    let digits = input.replace(/\D/g, '')
-    const hasCountryPrefix =
-        /^\s*\+?7/.test(input) ||
-        /^\s*8/.test(input) ||
-        digits.length >= 11
+    const trimmed = input.trim()
+    let digits = trimmed.replace(/\D/g, '')
 
-    if (
-        hasCountryPrefix &&
-        (digits.startsWith('7') || digits.startsWith('8'))
-    ) {
+    if (trimmed.startsWith('+7') || trimmed.startsWith('8')) {
+        digits = digits.slice(1)
+    } else if (digits.length >= 11 && (digits.startsWith('7') || digits.startsWith('8'))) {
+        digits = digits.slice(1)
+    } else if (digits.length >= 11 && digits.startsWith('77')) {
+        digits = digits.slice(2)
+    } else if (digits.length >= 11 && digits.startsWith('78')) {
+        digits = digits.slice(2)
+    }
+
+    if (digits.length > 10 && (digits.startsWith('7') || digits.startsWith('8'))) {
         digits = digits.slice(1)
     }
 

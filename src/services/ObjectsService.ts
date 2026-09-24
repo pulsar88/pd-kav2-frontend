@@ -284,11 +284,18 @@ const mapRealtyFilterOption = (
     label: item.name,
 })
 
+type RealtyProjectTypeApi = {
+    value?: string
+    code?: string
+    name?: string
+}
+
 type RealtyProjectApi = {
     id: number
     name: string
     external_id?: number
     promo_text?: string | null
+    type?: RealtyProjectTypeApi | null
 }
 
 type RealtyProjectsApiResponse =
@@ -300,6 +307,7 @@ type RealtyProjectsApiResponse =
 const mapRealtyProjectApiToProject = (item: RealtyProjectApi): RealtyProject => ({
     id: String(item.id),
     name: item.name,
+    type: item.type ?? null,
 })
 
 const unwrapRealtyProjectsResponse = (
@@ -334,6 +342,7 @@ const mapRealtyObjectToComplex = (item: RealtyObjectApi): Complex => ({
     address: item.address?.trim() || undefined,
     completionDate: item.development_end?.trim() || undefined,
     promoText: item.project?.promo_text?.trim() || undefined,
+    projectType: item.project?.type ?? null,
 })
 
 const mapRealtyPropertySummaryToComplex = (
