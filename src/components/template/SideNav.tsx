@@ -51,9 +51,9 @@ const SideNav = ({
 
     const user = useSessionUser((state) => state.user)
     const userAuthority = user.authority ?? []
-    const isSpecialRole = isContentManagerOnly(userAuthority)
+    const isAgent = userAuthority.includes('agent') && !userAuthority.includes('supervisor') && !userAuthority.includes('admin')
     const hasAgency = Boolean(user.agency || user.agencyName)
-    const sideNavCollapse = !hasAgency && !isSpecialRole ? true : storedSideNavCollapse
+    const sideNavCollapse = isAgent && !hasAgency ? true : storedSideNavCollapse
     const entryPath = getAuthenticatedEntryPath(
         userAuthority,
         appConfig.authenticatedEntryPath,

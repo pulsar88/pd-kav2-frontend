@@ -20,15 +20,15 @@ const AuthorityCheck = (props: AuthorityCheckProps) => {
     } = props
 
     const user = useSessionUser((state) => state.user)
-    const isSpecialRole = isContentManagerOnly(userAuthority)
+    const isAgent = userAuthority.includes('agent') && !userAuthority.includes('supervisor') && !userAuthority.includes('admin')
     const hasAgency = Boolean(user.agency || user.agencyName)
 
     const userBonuses = user.bonuses
     const roleMatched = useAuthority(userAuthority, authority)
     const bonusMatched = hasAllUserBonuses(userBonuses, requiredBonuses)
 
-    // Если нет агентства, скрываем пункты меню ПОСЛЕ вызова хуков
-    if (!hasAgency && !isSpecialRole) {
+    // Если у агента нет агентства, скрываем пункты меню ПОСЛЕ вызова хуков
+    if (isAgent && !hasAgency) {
         return null
     }
 

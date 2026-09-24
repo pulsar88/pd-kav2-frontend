@@ -36,11 +36,11 @@ const AuthorityGuard = (props: AuthorityGuardProps) => {
             </div>
         )
     }
-    const isSpecialRole = isContentManagerOnly(userAuthority)
+    const isAgent = userAuthority.includes('agent') && !userAuthority.includes('supervisor') && !userAuthority.includes('admin')
     const hasAgency = Boolean(user.agency || user.agencyName)
 
-    // Если у пользователя нет агентства, разрешаем доступ ТОЛЬКО к профилю
-    if (!hasAgency && !isSpecialRole) {
+    // Проверка на наличие агентства действует ТОЛЬКО для агентов (agent)
+    if (isAgent && !hasAgency) {
         if (routePath !== '/account/profile') {
             return <Navigate replace to="/account/profile" />
         }

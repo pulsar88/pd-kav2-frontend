@@ -20,7 +20,9 @@ const AgencyRequiredBanner = ({
     const user = useSessionUser((state) => state.user)
     const authority = user.authority ?? []
 
-    if (isContentManagerOnly(authority)) {
+    // Баннер обязательного агентства показывается ТОЛЬКО агентам (agent)
+    const isAgent = authority.includes('agent') && !authority.includes('supervisor') && !authority.includes('admin')
+    if (!isAgent) {
         return null
     }
 
