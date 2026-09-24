@@ -13,7 +13,6 @@ const MANUAL_COOLDOWN_MS = 5_000
 const ServerUnavailableGate = () => {
     const isUnavailable = useServerStatusStore((s) => s.isUnavailable)
     const statusCode = useServerStatusStore((s) => s.statusCode)
-    const errorMessage = useServerStatusStore((s) => s.errorMessage)
     const clearServerOutage = useServerStatusStore((s) => s.clearServerOutage)
 
     const [isChecking, setIsChecking] = useState(false)
@@ -147,13 +146,6 @@ const ServerUnavailableGate = () => {
                         ? 'Сервер снова доступен'
                         : 'Сервер временно недоступен'}
                 </h3>
-
-                {/* Сообщение об ошибке от сервера */}
-                {!isRecovering && errorMessage ? (
-                    <div className="max-h-48 overflow-y-auto whitespace-normal break-words [overflow-wrap:anywhere] text-sm font-medium text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-                        {errorMessage}
-                    </div>
-                ) : null}
 
                 <p className="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                     {isRecovering

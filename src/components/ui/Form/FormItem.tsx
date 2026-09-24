@@ -100,14 +100,14 @@ const FormItem = (props: FormItemProps) => {
         if (errorMode === 'reserved') {
             return (
                 <div
-                    className="relative mt-[5px] min-h-5 overflow-hidden"
+                    className="mt-[3px] min-h-5"
                     aria-live="polite"
                 >
                     <AnimatePresence initial={false}>
                         {invalid && errorMessage ? (
                             <motion.div
                                 key={errorMessage}
-                                className="form-explain absolute inset-x-0 top-0"
+                                className="form-explain whitespace-normal break-words"
                                 initial={{ opacity: 0, y: '-100%' }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: '-100%' }}
