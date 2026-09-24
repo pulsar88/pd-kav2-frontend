@@ -222,12 +222,27 @@ function AuthProvider({ children }: AuthProviderProps) {
     }, [])
 
     const finishAuth = async (accessToken: string, nextUser?: User) => {
-        // Сначала сохраняем Sanctum-токен — push/subscribe требует auth.
-        handleSignIn({ accessToken }, nextUser)
+        setIsVerifying(true)
+        // Сначала сохраняем токен в хранилище и заголовках для авторизованных запросов
+        setToken(accessToken)
+        setTokenState(accessToken)
+
+        // Загружаем полные данные пользователя ДО включения signedIn и перехода,
+        // чтобы роутер и AuthorityGuard сразу видели agency, roles и bonuses
+        // и не редиректили ошибочно на /account/profile
         const currentUser = await loadCurrentUser()
+        const fullUser = currentUser || nextUser || {}
+
+        handleSignIn({ accessToken }, fullUser)
+
         if (currentUser) {
-            useSavedAccountsStore.getState().syncCurrentAccount(currentUser, accessToken)
+            useSavedAccountsStore
+                .getState()
+                .syncCurrentAccount(currentUser, accessToken)
         }
+
+        setIsVerifying(false)
+
         redirect(
             currentUser?.authority ?? nextUser?.authority,
             currentUser ?? nextUser,
