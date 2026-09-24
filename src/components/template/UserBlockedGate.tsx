@@ -29,8 +29,11 @@ const UserBlockedGate = () => {
                     Доступ ограничен
                 </h3>
 
-                <p className="mb-6 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                     {blockedMessage || 'Действие учётной записи приостановлено'}
+                </p>
+                <p className="mb-6 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                    Для уточнения вопроса свяжитесь с менеджером.
                 </p>
 
                 <div className="flex justify-center">
