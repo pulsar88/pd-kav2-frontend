@@ -193,3 +193,31 @@ export async function apiCancelAgencyRequest(
 
     return 'data' in response ? response.data : response
 }
+
+
+/**
+ * Активировать / деактивировать агентство (GET /v2/agencies/{agency_id}/activate)
+ */
+export async function apiToggleAgencyActivate(
+    agencyId: string | number,
+): Promise<AgencyItem | void> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<AgencyItem> | AgencyItem | null | undefined
+    >({
+        url: endpointConfig.agencyActivate(agencyId),
+        method: 'get',
+    })
+
+    if (response == null) return
+    return 'data' in response ? response.data : response
+}
+
+/**
+ * Синхронизировать агентства (GET /v2/agencies/sync)
+ */
+export async function apiSyncAgencies(): Promise<{ message?: string } | void> {
+    return ApiService.fetchDataWithAxios({
+        url: endpointConfig.agenciesSync,
+        method: 'get',
+    })
+}

@@ -25,11 +25,27 @@ export type AgencyAgent = {
     profile_picture?: ProfilePicture | null
 }
 
+export type AgencySupervisor = {
+    id: number
+    name: string
+    email?: string | null
+    phone: string
+    country_code?: string
+    blocked?: number | boolean
+    roles?: string[]
+    access_level?: AgencyAgentAccessLevel | null
+    access_level_expires_at?: string | null
+    bonuses?: AgencyAgentBonus[]
+    profile_picture?: ProfilePicture | null
+}
+
 export type AgencyItem = {
     id: number
     name: string
     fix_days: number
     is_aggregator?: number
+    active?: number | boolean
+    supervisor?: AgencySupervisor | null
     agents?: AgencyAgent[]
 }
 

@@ -84,7 +84,9 @@ const endpointConfig = {
     specialOffers: '/v2/special_offers',
     specialOffer: (offerId: string | number) => `/v2/special_offers/${offerId}`,
     agencies: '/v2/agencies',
+    agenciesSync: '/v2/agencies/sync',
     agency: (agencyId: string | number) => `/v2/agencies/${agencyId}`,
+    agencyActivate: (agencyId: string | number) => `/v2/agencies/${agencyId}/activate`,
     agencyRequests: '/v2/user/agency/requests',
     agencyRequest: (requestId: string | number) =>
         `/v2/user/agency/requests/${requestId}`,

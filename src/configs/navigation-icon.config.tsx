@@ -38,6 +38,7 @@ const navigationIcon: NavigationIcons = {
     agencyInvitations: <TbMailForward />,
     supervisor: <PiShieldCheckDuotone />,
     users: <PiUsersDuotone />,
+    agencies: <PiBuildingsDuotone />,
 }
 
 export default navigationIcon
