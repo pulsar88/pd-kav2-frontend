@@ -5,6 +5,13 @@
 @import './others/index.css';
 @import './vendors/index.css';
 
+@media screen and (max-width: 768px) {
+  .select input,
+  .select-input-container input {
+    font-size: 16px !important;
+  }
+}
+
 /* TipTap ProseMirror Selected Node Styles */
 .ProseMirror-selectednode {
     outline: 2px solid var(--primary, #4f46e5) !important;

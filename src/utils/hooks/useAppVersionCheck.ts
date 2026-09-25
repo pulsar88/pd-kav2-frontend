@@ -77,6 +77,12 @@ const useAppVersionCheck = (): UseAppVersionCheckResult => {
             VERSION_CHECK_INTERVAL_MS,
         )
 
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                checkVersion(); 
+            }
+        });
+
         return () => {
             window.clearTimeout(clearReloadFlagTimer)
             window.clearInterval(interval)
