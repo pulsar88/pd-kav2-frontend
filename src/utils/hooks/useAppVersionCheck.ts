@@ -77,16 +77,19 @@ const useAppVersionCheck = (): UseAppVersionCheckResult => {
             VERSION_CHECK_INTERVAL_MS,
         )
 
-        document.addEventListener('visibilitychange', () => {
+        const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                checkVersion(); 
+                void checkVersion()
             }
-        });
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange)
 
         return () => {
             window.clearTimeout(clearReloadFlagTimer)
             window.clearInterval(interval)
             window.removeEventListener('vite:preloadError', handlePreloadError)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
     }, [])
 
