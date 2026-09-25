@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { components } from 'react-select'
-import type { MenuListProps, GroupBase } from 'react-select'
 import Dialog from '@/components/ui/Dialog'
 import Button from '@/components/ui/Button'
 import Select from '@/components/ui/Select'
@@ -26,10 +24,6 @@ type ChangeUserAgencyDialogProps = {
     user: AdminUserListItem | null
     onClose: () => void
     onSuccess: () => void
-}
-
-type AgencySelectProps = {
-    isLoadingMore?: boolean
 }
 
 const AGENCIES_PER_PAGE = 20
@@ -67,26 +61,6 @@ const mergeAgencyOptions = (
     const seen = new Set(prev.map((item) => item.value))
     const uniqueNext = next.filter((item) => !seen.has(item.value))
     return uniqueNext.length > 0 ? [...prev, ...uniqueNext] : prev
-}
-
-const AgencyMenuList = (
-    props: MenuListProps<AgencyOption, false, GroupBase<AgencyOption>>,
-) => {
-    const isLoadingMore = Boolean(
-        (props.selectProps as AgencySelectProps).isLoadingMore,
-    )
-
-    return (
-        <>
-            <components.MenuList {...props} />
-            {isLoadingMore ? (
-                <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
-                    <Spinner size={14} />
-                    Загрузка...
-                </div>
-            ) : null}
-        </>
-    )
 }
 
 const ChangeUserAgencyDialog = ({
@@ -193,7 +167,7 @@ const ChangeUserAgencyDialog = ({
         }, 500)
     }
 
-    const handleMenuScrollToBottom = useCallback(async () => {
+    const loadMoreAgencies = useCallback(async () => {
         if (
             loadingMoreRef.current ||
             !hasMoreRef.current ||
@@ -241,6 +215,33 @@ const ChangeUserAgencyDialog = ({
             setIsLoadingMore(false)
         }
     }, [isLoadingAgencies, currentAgencyId])
+
+    // Глобальный перехват скролла по menu-list
+    // Это гарантирует работу скролла в любом режиме: мобильные устройства, эмуляция DevTools, тачпад, мышь
+    useEffect(() => {
+        const handleNativeScroll = (e: Event) => {
+            const target = e.target as HTMLElement | null
+            if (!target) return
+
+            const isMenuList =
+                target.classList.contains('select-menu__menu-list') ||
+                target.getAttribute('class')?.includes('MenuList') ||
+                target.getAttribute('class')?.includes('menu-list')
+
+            if (!isMenuList) return
+
+            const { scrollTop, scrollHeight, clientHeight } = target
+            // Порог 50px до низа списка
+            if (scrollHeight - scrollTop - clientHeight <= 50) {
+                void loadMoreAgencies()
+            }
+        }
+
+        window.addEventListener('scroll', handleNativeScroll, true)
+        return () => {
+            window.removeEventListener('scroll', handleNativeScroll, true)
+        }
+    }, [loadMoreAgencies])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -342,22 +343,26 @@ const ChangeUserAgencyDialog = ({
                             filterOption={() => true}
                             onInputChange={handleSearchInputChange}
                             noOptionsMessage={() => 'Агентства не найдены'}
-                            components={{ MenuList: AgencyMenuList }}
                             onMenuScrollToBottom={() => {
-                                void handleMenuScrollToBottom()
+                                void loadMoreAgencies()
                             }}
                             onChange={(option) => setSelectedAgency(option)}
                             {...selectMenuProps}
-                            {...({ isLoadingMore } satisfies AgencySelectProps)}
                         />
                         {isLoadingAgencies ? (
                             <p className="mt-2 flex items-center gap-1 text-xs text-gray-400">
                                 <Spinner size={12} /> Загрузка списка...
                             </p>
+                        ) : isLoadingMore ? (
+                            <p className="mt-2 flex items-center gap-1 text-xs text-primary">
+                                <Spinner size={12} /> Загрузка следующих агентств...
+                            </p>
                         ) : hasMore ? (
-                            <p className="mt-2 text-xs text-gray-400">
-                                Прокрутите список для загрузки следующей
-                                страницы
+                            <p
+                                className="mt-2 text-xs text-primary cursor-pointer hover:underline inline-block"
+                                onClick={() => void loadMoreAgencies()}
+                            >
+                                Загрузить ещё агентства ({agencies.length} загружено)...
                             </p>
                         ) : null}
                     </FormItem>
