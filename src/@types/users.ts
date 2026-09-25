@@ -3,6 +3,7 @@ import type { AccessLevel, AgencyBrief, ProfilePicture, UserBonus } from './auth
 export type AdminUserListItem = {
     id: number
     name: string
+    blocked?: number | boolean
     email: string | null
     phone: string
     country_code?: string
@@ -19,6 +20,7 @@ export type GetUsersParams = {
     per_page?: number
     search?: string
     with?: string
+    agency_id?: number | string
 }
 
 export type GetUsersResponse = {

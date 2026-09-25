@@ -15,8 +15,20 @@ export type SpecialOffer = {
 
 export type SpecialOffersListResponse = {
     data: SpecialOffer[]
+    meta?: {
+        current_page: number
+        last_page: number
+        per_page: number
+        total: number
+    }
 }
 
 export type SpecialOfferDetailResponse = {
     data: SpecialOffer
+}
+
+export type GetSpecialOffersParams = {
+    page?: number
+    per_page?: number
+    [key: string]: unknown
 }

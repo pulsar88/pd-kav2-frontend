@@ -8,6 +8,7 @@ import Tag from '@/components/ui/Tag'
 import Button from '@/components/ui/Button'
 import Avatar from '@/components/ui/Avatar'
 import Select from '@/components/ui/Select'
+import Pagination from '@/components/ui/Pagination'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import {
@@ -25,7 +26,6 @@ import {
     TbUser,
     TbClock,
     TbUsers,
-    TbRefresh,
     TbPhone,
 } from 'react-icons/tb'
 
@@ -117,11 +117,15 @@ const DateTimeCell = ({
 const resolveSupervisor = (item: JoinAgencyRequest) =>
     item.supervisor || item.agency?.supervisor || null
 
+const PAGE_SIZE = 20
+
 const AgencyRequests = () => {
     const [requests, setRequests] = useState<JoinAgencyRequest[]>([])
     const [statusFilter, setStatusFilter] = useState<
         AgencyRequestStatus | undefined
     >(undefined)
+    const [pageIndex, setPageIndex] = useState(1)
+    const [total, setTotal] = useState(0)
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [selectedRequest, setSelectedRequest] =
@@ -134,10 +138,13 @@ const AgencyRequests = () => {
         setIsLoading(true)
         try {
             const response = await apiGetAgencyRequests({
+                page: pageIndex,
+                per_page: PAGE_SIZE,
                 with: 'agent,agent.profilePicture,agency,agency.supervisor,reviewer',
                 ...(statusFilter ? { status: statusFilter } : {}),
             })
             setRequests(response.data || [])
+            setTotal(response.meta?.total ?? response.data?.length ?? 0)
         } catch (err: unknown) {
             const msg =
                 err instanceof Error
@@ -149,11 +156,16 @@ const AgencyRequests = () => {
         } finally {
             setIsLoading(false)
         }
-    }, [statusFilter])
+    }, [pageIndex, statusFilter])
 
     useEffect(() => {
         void loadRequests()
     }, [loadRequests])
+
+    const handleStatusFilterChange = (option: StatusOption | null) => {
+        setStatusFilter(option?.value)
+        setPageIndex(1)
+    }
 
     const selectedStatus = useMemo(
         () =>
@@ -199,177 +211,165 @@ const AgencyRequests = () => {
 
     return (
         <Container>
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
-                    <h3 className="mb-1">Заявки в агентство</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Список заявок агентов на присоединение к агентству
-                    </p>
-                </div>
-                <div className="w-full sm:w-56">
-                    <Select<StatusOption, false>
-                        isClearable
-                        isSearchable={false}
-                        placeholder="Все статусы"
-                        options={STATUS_FILTER_OPTIONS}
-                        value={selectedStatus}
-                        onChange={(option) =>
-                            setStatusFilter(option?.value)
-                        }
-                    />
-                </div>
-            </div>
-
             <AdaptiveCard>
-                <Loading loading={isLoading}>
-                    <div className="overflow-x-auto">
-                        <Table className="w-full min-w-[1100px]">
-                            <THead>
-                                <Tr>
-                                    <Th>Агент</Th>
-                                    <Th>Агентство</Th>
-                                    <Th className="whitespace-nowrap">Подана</Th>
-                                    <Th className="whitespace-nowrap">
-                                        Обновлена
-                                    </Th>
-                                    <Th>Статус</Th>
-                                    <Th>Рассмотрел</Th>
-                                    <Th className="text-right">Действия</Th>
-                                </Tr>
-                            </THead>
-                            <TBody>
-                                {requests.length > 0 ? (
-                                    requests.map((item) => {
-                                        const status = statusConfig[
-                                            item.status
-                                        ] || {
-                                            label: item.status,
-                                            bgClass:
-                                                'bg-gray-100 dark:bg-gray-700',
-                                            textClass:
-                                                'text-gray-600 dark:text-gray-300',
-                                        }
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="min-w-0">
+                            <h3 className="mb-1">Заявки в агентство</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Список заявок агентов на присоединение к агентству
+                            </p>
+                        </div>
+                        <div className="w-full sm:w-56">
+                            <Select<StatusOption, false>
+                                isClearable
+                                isSearchable={false}
+                                placeholder="Все статусы"
+                                options={STATUS_FILTER_OPTIONS}
+                                value={selectedStatus}
+                                onChange={handleStatusFilterChange}
+                            />
+                        </div>
+                    </div>
 
-                                        const avatarSrc =
-                                            item.agent?.profile_picture?.src
-                                        const supervisor =
-                                            resolveSupervisor(item)
-                                        const reviewer = item.reviewer
-                                        const reviewerRole = getUserRoleLabel(
-                                            reviewer?.roles?.[0],
-                                        )
+                    <Loading loading={isLoading}>
+                        <div className="overflow-x-auto">
+                            <Table className="w-full min-w-[1100px]">
+                                <THead>
+                                    <Tr>
+                                        <Th>Агент</Th>
+                                        <Th>Агентство</Th>
+                                        <Th className="whitespace-nowrap">Подана</Th>
+                                        <Th className="whitespace-nowrap">
+                                            Обновлена
+                                        </Th>
+                                        <Th>Статус</Th>
+                                        <Th>Рассмотрел</Th>
+                                        <Th className="text-right">Действия</Th>
+                                    </Tr>
+                                </THead>
+                                <TBody>
+                                    {requests.length > 0 ? (
+                                        requests.map((item) => {
+                                            const status = statusConfig[
+                                                item.status
+                                            ] || {
+                                                label: item.status,
+                                                bgClass:
+                                                    'bg-gray-100 dark:bg-gray-700',
+                                                textClass:
+                                                    'text-gray-600 dark:text-gray-300',
+                                            }
 
-                                        return (
-                                            <Tr key={item.id}>
-                                                <Td>
-                                                    <div className="flex min-w-[200px] items-center gap-3">
-                                                        <Avatar
-                                                            shape="circle"
-                                                            size={40}
-                                                            src={
-                                                                avatarSrc || ''
-                                                            }
-                                                            className="shrink-0 bg-primary/10 text-primary font-semibold border border-gray-100 dark:border-gray-700"
-                                                            icon={<TbUser />}
-                                                        />
-                                                        <div className="min-w-0">
-                                                            <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                            const avatarSrc =
+                                                item.agent?.profile_picture?.src
+                                            const supervisor =
+                                                resolveSupervisor(item)
+                                            const reviewer = item.reviewer
+                                            const reviewerRole = getUserRoleLabel(
+                                                reviewer?.roles?.[0],
+                                            )
+
+                                            return (
+                                                <Tr key={item.id}>
+                                                    <Td>
+                                                        <div className="flex items-center gap-2.5 min-w-[180px]">
+                                                            <Avatar
+                                                                size={36}
+                                                                className="shrink-0"
+                                                                {...(avatarSrc
+                                                                    ? {
+                                                                          src: avatarSrc,
+                                                                      }
+                                                                    : {
+                                                                          icon: (
+                                                                              <TbUser />
+                                                                          ),
+                                                                      })}
+                                                            />
+                                                            <div className="min-w-0">
+                                                                <div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                                    {item.agent
+                                                                        ?.name ||
+                                                                        '—'}
+                                                                </div>
                                                                 {item.agent
-                                                                    ?.name ||
-                                                                    '—'}
+                                                                    ?.phone ? (
+                                                                    <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                                                                        <TbPhone className="shrink-0" />
+                                                                        <span>
+                                                                            {formatRuPhone(
+                                                                                item
+                                                                                    .agent
+                                                                                    .phone,
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : null}
                                                             </div>
-                                                            {item.agent
-                                                                ?.email ? (
-                                                                <div className="text-xs text-gray-400 truncate">
-                                                                    {
-                                                                        item
-                                                                            .agent
-                                                                            .email
-                                                                    }
+                                                        </div>
+                                                    </Td>
+
+                                                    <Td>
+                                                        <div className="min-w-[180px]">
+                                                            <div className="flex items-center gap-1.5 font-medium text-gray-900 dark:text-gray-100">
+                                                                <TbBuilding className="shrink-0 text-gray-400" />
+                                                                <span className="truncate">
+                                                                    {item.agency
+                                                                        ?.name ||
+                                                                        '—'}
+                                                                </span>
+                                                            </div>
+                                                            {supervisor ? (
+                                                                <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                                    Рук-ль:{' '}
+                                                                    {supervisor.name ||
+                                                                        supervisor.phone ||
+                                                                        '—'}
                                                                 </div>
                                                             ) : null}
-                                                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                                                <TbPhone className="shrink-0 text-gray-400" />
-                                                                <span>
-                                                                    {item.agent
-                                                                        ?.phone
-                                                                        ? formatRuPhone(
-                                                                              item
-                                                                                  .agent
-                                                                                  .phone,
-                                                                          )
-                                                                        : '—'}
-                                                                </span>
-                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </Td>
+                                                    </Td>
 
-                                                <Td>
-                                                    <div className="min-w-[180px]">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <TbBuilding className="shrink-0 text-gray-400" />
-                                                            <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                                {item.agency
-                                                                    ?.name ||
-                                                                    '—'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                                            <TbUser className="shrink-0 text-gray-400" />
-                                                            <span className="truncate">
-                                                                {supervisor?.name ||
-                                                                    '—'}
-                                                            </span>
-                                                        </div>
-                                                        {supervisor?.phone ? (
-                                                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                                                <TbPhone className="shrink-0 text-gray-400" />
-                                                                <span>
-                                                                    {formatRuPhone(
-                                                                        supervisor.phone,
-                                                                    )}
-                                                                </span>
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                </Td>
+                                                    <Td className="whitespace-nowrap">
+                                                        <DateTimeCell
+                                                            dateStr={
+                                                                item.created_at
+                                                            }
+                                                            icon={<TbClock />}
+                                                        />
+                                                    </Td>
 
-                                                <Td className="whitespace-nowrap">
-                                                    <DateTimeCell
-                                                        dateStr={item.created_at}
-                                                        icon={<TbClock />}
-                                                    />
-                                                </Td>
+                                                    <Td className="whitespace-nowrap">
+                                                        <DateTimeCell
+                                                            dateStr={
+                                                                item.updated_at
+                                                            }
+                                                            icon={<TbClock />}
+                                                        />
+                                                    </Td>
 
-                                                <Td className="whitespace-nowrap">
-                                                    <DateTimeCell
-                                                        dateStr={item.updated_at}
-                                                        icon={<TbRefresh />}
-                                                    />
-                                                </Td>
+                                                    <Td>
+                                                        <Tag
+                                                            className={`font-semibold border-0 ${status.bgClass} ${status.textClass}`}
+                                                        >
+                                                            {status.label}
+                                                        </Tag>
+                                                    </Td>
 
-                                                <Td className="whitespace-nowrap">
-                                                    <Tag
-                                                        className={`font-semibold border-0 ${status.bgClass} ${status.textClass}`}
-                                                    >
-                                                        {status.label}
-                                                    </Tag>
-                                                </Td>
-
-                                                <Td>
-                                                    <div className="min-w-[160px]">
-                                                        {reviewer ? (
-                                                            <>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <TbUser className="shrink-0 text-gray-400" />
-                                                                    <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                                        {reviewer.name ||
-                                                                            '—'}
-                                                                    </span>
-                                                                </div>
-                                                                {reviewer.phone ? (
-                                                                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                                    <Td>
+                                                        <div className="min-w-[160px]">
+                                                            {reviewer ? (
+                                                                <>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <TbUser className="shrink-0 text-gray-400" />
+                                                                        <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                                            {reviewer.name ||
+                                                                                '—'}
+                                                                        </span>
+                                                                    </div>
+                                                                    {reviewer.phone ? (
+                                                                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                                                                         <TbPhone className="shrink-0 text-gray-400" />
                                                                         <span>
                                                                             {formatRuPhone(
@@ -463,7 +463,19 @@ const AgencyRequests = () => {
                             </TBody>
                         </Table>
                     </div>
+
+                    {total > PAGE_SIZE ? (
+                        <div className="mt-4 flex items-center justify-start">
+                            <Pagination
+                                pageSize={PAGE_SIZE}
+                                currentPage={pageIndex}
+                                total={total}
+                                onChange={(page) => setPageIndex(page)}
+                            />
+                        </div>
+                    ) : null}
                 </Loading>
+                </div>
             </AdaptiveCard>
 
             <ConfirmDialog

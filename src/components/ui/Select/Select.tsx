@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import cn from '../utils/classNames'
 import { useEffect, useRef, useState } from 'react'
-import ReactSelect from 'react-select'
+import ReactSelect, { components as reactSelectComponents } from 'react-select'
+import type { MenuListProps } from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import AsyncSelect from 'react-select/async'
 import { useConfig } from '../ConfigProvider'
@@ -76,6 +77,27 @@ export type SelectProps<
         componentAs?: ReactSelect | CreatableSelect | AsyncSelect
         compactMulti?: boolean
     }
+
+
+const DefaultMenuList = (props: MenuListProps<any, any, any>) => {
+    const onMenuScrollToBottom = props.selectProps?.onMenuScrollToBottom
+    const prevScrollTopRef = useRef(0)
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+        // Вызываем только при скролле вниз, когда до конца остается <= 50px
+        if (scrollTop > prevScrollTopRef.current && scrollHeight - scrollTop - clientHeight <= 50) {
+            onMenuScrollToBottom?.()
+        }
+        prevScrollTopRef.current = scrollTop
+    }
+
+    return (
+        <div onScroll={handleScroll}>
+            <reactSelectComponents.MenuList {...props} />
+        </div>
+    )
+}
 
 function Select<
     Option,
@@ -262,6 +284,7 @@ function Select<
             components={{
                 IndicatorSeparator: () => null,
                 Option: DefaultOption,
+                MenuList: DefaultMenuList,
                 LoadingIndicator: DefaultLoadingIndicator,
                 DropdownIndicator: DefaultDropdownIndicator,
                 ClearIndicator: DefaultClearIndicator,

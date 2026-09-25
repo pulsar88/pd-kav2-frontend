@@ -35,7 +35,15 @@ const MobileNav = () => {
     const direction = useThemeStore((state) => state.direction)
     const currentRouteKey = useRouteKeyStore((state) => state.currentRouteKey)
 
-    const userAuthority = useSessionUser((state) => state.user.authority)
+    const user = useSessionUser((state) => state.user)
+    const userAuthority = user.authority ?? []
+    const isAgent = userAuthority.includes('agent') && !userAuthority.includes('supervisor') && !userAuthority.includes('admin')
+    const hasAgency = Boolean(user.agency || user.agencyName)
+
+    // Если у агента нет агентства — мобильное меню полностью скрыто
+    if (isAgent && !hasAgency) {
+        return null
+    }
 
     return (
         <>

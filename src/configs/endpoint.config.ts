@@ -15,6 +15,7 @@ const endpointConfig = {
     users: '/v2/users',
     userProfilePicture: '/v2/user/profile_picture',
     usersUpdate: (userId: string | number) => `/v2/users/${userId}`,
+    userBlock: (userId: string | number) => `/v2/users/${userId}/block`,
     userChangeAgency: (userId: string | number) =>
         `/v2/users/${userId}/change_agency`,
     userMakeSupervisor: (userId: string | number) =>

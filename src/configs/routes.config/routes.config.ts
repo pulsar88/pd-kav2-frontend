@@ -17,6 +17,7 @@ const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
 const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR, SUPERVISOR]
 const supervisorOnlyAuthority = [SUPERVISOR]
+const supervisorAndAgencySupervisorAuthority = [SUPERVISOR, AGENCY_SUPERVISOR]
 
 export const publicRoutes: Routes = [...authRoute]
 
@@ -283,7 +284,7 @@ export const protectedRoutes: Routes = [
         key: 'supervisorUsers',
         path: '/supervisor/users',
         component: lazy(() => import('@/views/supervisor/users')),
-        authority: supervisorOnlyAuthority,
+        authority: supervisorAndAgencySupervisorAuthority,
     },
     ...othersRoute,
 ]

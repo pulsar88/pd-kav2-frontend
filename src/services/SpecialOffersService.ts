@@ -4,16 +4,20 @@ import type {
     SpecialOffer,
     SpecialOfferDetailResponse,
     SpecialOffersListResponse,
+    GetSpecialOffersParams,
 } from '@/views/special-offers/types'
 
-export async function apiGetSpecialOffers(): Promise<SpecialOffer[]> {
+export async function apiGetSpecialOffers(
+    params?: GetSpecialOffersParams,
+): Promise<SpecialOffersListResponse> {
     const response =
         await ApiService.fetchDataWithAxios<SpecialOffersListResponse>({
             url: endpointConfig.specialOffers,
             method: 'get',
+            params,
         })
 
-    return response.data ?? []
+    return response
 }
 
 export async function apiGetSpecialOffer(

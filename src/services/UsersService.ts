@@ -29,6 +29,7 @@ export async function apiGetUsers(
             per_page: perPage,
             with: params.with ?? USERS_LIST_WITH,
             ...(search ? { search } : {}),
+            ...(params.agency_id ? { agency_id: params.agency_id } : {}),
         }),
     })
 
@@ -77,6 +78,23 @@ export async function apiMakeUserAgencySupervisor(
         ApiDataEnvelope<AdminUserListItem> | AdminUserListItem | null | undefined
     >({
         url: endpointConfig.userMakeSupervisor(userId),
+        method: 'get',
+    })
+
+    if (response == null) return
+
+    return unwrapApiData(response)
+}
+
+
+/** Заблокировать / разблокировать пользователя */
+export async function apiToggleUserBlock(
+    userId: string | number,
+): Promise<AdminUserListItem | void> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<AdminUserListItem> | AdminUserListItem | null | undefined
+    >({
+        url: endpointConfig.userBlock(userId),
         method: 'get',
     })
 

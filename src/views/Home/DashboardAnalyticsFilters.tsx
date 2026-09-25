@@ -68,9 +68,19 @@ const AgencyMenuList = (
     const isLoadingMore = Boolean(
         (props.selectProps as AgencySelectProps).isLoadingMore,
     )
+    const onMenuScrollToBottom = props.selectProps?.onMenuScrollToBottom
+    const prevScrollTopRef = useRef(0)
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+        if (scrollTop > prevScrollTopRef.current && scrollHeight - scrollTop - clientHeight <= 50) {
+            onMenuScrollToBottom?.(e as any)
+        }
+        prevScrollTopRef.current = scrollTop
+    }
 
     return (
-        <>
+        <div onScroll={handleScroll}>
             <components.MenuList {...props} />
             {isLoadingMore ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
@@ -78,7 +88,7 @@ const AgencyMenuList = (
                     Загрузка...
                 </div>
             ) : null}
-        </>
+        </div>
     )
 }
 

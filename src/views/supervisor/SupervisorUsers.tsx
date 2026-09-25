@@ -13,19 +13,24 @@ import type { ColumnDef } from '@/components/shared/DataTable'
 import {
     apiGetUsers,
     apiMakeUserAgencySupervisor,
+    apiToggleUserBlock,
 } from '@/services/UsersService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
+    ADMIN,
+    SUPERVISOR,
     AGENCY_SUPERVISOR,
     getUserRoleLabel,
 } from '@/constants/roles.constant'
+import { useSessionUser } from '@/store/authStore'
 import { formatRuPhone } from '@/views/fixations/utils'
 import type { AdminUserListItem } from '@/@types/users'
 import ChangeUserAgencyDialog from './components/ChangeUserAgencyDialog'
 import { HiOutlineUser } from 'react-icons/hi'
 import {
     TbBuilding,
-    TbRefresh,
+    TbLock,
+    TbLockOpen,
     TbSearch,
     TbUserCheck,
     TbUsers,
@@ -40,7 +45,28 @@ const canMakeAgencySupervisor = (user: AdminUserListItem) => {
     return !(user.roles ?? []).includes(AGENCY_SUPERVISOR)
 }
 
+const isUserBlocked = (user: AdminUserListItem): boolean =>
+    Boolean(user.blocked === 1 || user.blocked === true)
+
 const SupervisorUsers = () => {
+    const currentUser = useSessionUser((state) => state.user)
+    const authority = currentUser.authority ?? []
+
+    // Глобальный супервайзер/админ видит всех и может менять агентство
+    const isGlobalSupervisor =
+        authority.includes(SUPERVISOR) || authority.includes(ADMIN)
+
+    // Руководитель агентства (agency-supervisor / supervisor_agent)
+    const isAgencySupervisor =
+        !isGlobalSupervisor &&
+        (authority.includes(AGENCY_SUPERVISOR) ||
+            authority.includes('supervisor_agent'))
+
+    // ID агентства текущего руководителя
+    const agencyId = isAgencySupervisor
+        ? currentUser.agency?.id ?? undefined
+        : undefined
+
     const [users, setUsers] = useState<AdminUserListItem[]>([])
     const [total, setTotal] = useState(0)
     const [pageIndex, setPageIndex] = useState(1)
@@ -51,7 +77,11 @@ const SupervisorUsers = () => {
     )
     const [supervisorTarget, setSupervisorTarget] =
         useState<AdminUserListItem | null>(null)
+    const [blockTarget, setBlockTarget] = useState<AdminUserListItem | null>(
+        null,
+    )
     const [isMakingSupervisor, setIsMakingSupervisor] = useState(false)
+    const [isTogglingBlock, setIsTogglingBlock] = useState(false)
 
     const loadUsers = useCallback(async () => {
         setIsLoading(true)
@@ -60,6 +90,7 @@ const SupervisorUsers = () => {
                 page: pageIndex,
                 per_page: PAGE_SIZE,
                 search: search || undefined,
+                agency_id: agencyId,
             })
             setUsers(response.data)
             setTotal(response.meta?.total ?? response.data.length)
@@ -78,7 +109,7 @@ const SupervisorUsers = () => {
         } finally {
             setIsLoading(false)
         }
-    }, [pageIndex, search])
+    }, [pageIndex, search, agencyId])
 
     useEffect(() => {
         void loadUsers()
@@ -119,6 +150,39 @@ const SupervisorUsers = () => {
         }
     }
 
+    const handleConfirmToggleBlock = async () => {
+        if (!blockTarget) return
+
+        const blocked = isUserBlocked(blockTarget)
+        setIsTogglingBlock(true)
+        try {
+            await apiToggleUserBlock(blockTarget.id)
+            toast.push(
+                <Notification type={blocked ? 'success' : 'warning'}>
+                    Пользователь «{blockTarget.name}»{' '}
+                    {blocked ? 'разблокирован' : 'заблокирован'}
+                </Notification>,
+                { placement: 'top-center' },
+            )
+            setBlockTarget(null)
+            void loadUsers()
+        } catch (err: unknown) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        blocked
+                            ? 'Не удалось разблокировать пользователя'
+                            : 'Не удалось заблокировать пользователя',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
+        } finally {
+            setIsTogglingBlock(false)
+        }
+    }
+
     const columns: ColumnDef<AdminUserListItem>[] = useMemo(
         () => [
             {
@@ -126,6 +190,7 @@ const SupervisorUsers = () => {
                 accessorKey: 'name',
                 cell: ({ row }) => {
                     const user = row.original
+                    const blocked = isUserBlocked(user)
                     const avatarSrc =
                         user.profile_picture?.src ||
                         user.profile_picture?.url_path ||
@@ -140,9 +205,16 @@ const SupervisorUsers = () => {
                                 className="shrink-0 bg-gray-100 text-gray-400 dark:bg-gray-700"
                             />
                             <div className="min-w-0">
-                                <p className="truncate font-semibold text-gray-900 dark:text-gray-100">
-                                    {user.name || '—'}
-                                </p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="truncate font-semibold text-gray-900 dark:text-gray-100">
+                                        {user.name || '—'}
+                                    </p>
+                                    {blocked ? (
+                                        <Tag className="border-0 bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                                            Заблокирован
+                                        </Tag>
+                                    ) : null}
+                                </div>
                                 <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                                     {user.email || 'Email не указан'}
                                 </p>
@@ -202,20 +274,27 @@ const SupervisorUsers = () => {
                 id: 'actions',
                 cell: ({ row }) => {
                     const user = row.original
+                    const blocked = isUserBlocked(user)
+                    const isSelf = String(user.id) === String(currentUser.userId)
+
                     return (
                         <div className="flex items-center gap-1">
-                            <Tooltip title="Сменить агентство">
-                                <Button
-                                    size="xs"
-                                    variant="solid"
-                                    shape="circle"
-                                    icon={<TbBuilding />}
-                                    aria-label="Сменить агентство"
-                                    onClick={() => setSelectedUser(user)}
-                                />
-                            </Tooltip>
+                            {/* Смена агентства доступна только глобальному супервайзеру/админу */}
+                            {isGlobalSupervisor ? (
+                                <Tooltip title="Сменить агентство">
+                                    <Button
+                                        size="xs"
+                                        variant="solid"
+                                        shape="circle"
+                                        icon={<TbBuilding />}
+                                        aria-label="Сменить агентство"
+                                        onClick={() => setSelectedUser(user)}
+                                    />
+                                </Tooltip>
+                            ) : null}
 
-                            {canMakeAgencySupervisor(user) ? (
+                            {/* Назначить руководителем агентства доступно только глобальному супервайзеру/админу */}
+                            {isGlobalSupervisor && canMakeAgencySupervisor(user) ? (
                                 <Tooltip title="Назначить руководителем агентства">
                                     <Button
                                         size="xs"
@@ -227,13 +306,52 @@ const SupervisorUsers = () => {
                                     />
                                 </Tooltip>
                             ) : null}
+
+                            {/* Заблокировать/разблокировать доступно ТОЛЬКО глобальному супервайзеру/админу (не самого себя) */}
+                            {isGlobalSupervisor && !isSelf ? (
+                                <Tooltip
+                                    title={
+                                        blocked
+                                            ? 'Разблокировать пользователя'
+                                            : 'Заблокировать пользователя'
+                                    }
+                                >
+                                    <Button
+                                        size="xs"
+                                        variant="solid"
+                                        shape="circle"
+                                        className={
+                                            blocked
+                                                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                                                : 'bg-gray-100 hover:bg-gray-200 text-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200'
+                                        }
+                                        icon={
+                                            blocked ? <TbLock /> : <TbLockOpen />
+                                        }
+                                        aria-label={
+                                            blocked
+                                                ? 'Разблокировать'
+                                                : 'Заблокировать'
+                                        }
+                                        onClick={() => setBlockTarget(user)}
+                                    />
+                                </Tooltip>
+                            ) : null}
                         </div>
                     )
                 },
             },
         ],
-        [],
+        [isGlobalSupervisor, currentUser.userId],
     )
+
+    const isBlockTargetBlocked = Boolean(
+        blockTarget && isUserBlocked(blockTarget),
+    )
+
+    const agencySubtitle = isAgencySupervisor && currentUser.agencyName
+        ? `Список агентов агентства «${currentUser.agencyName}»`
+        : 'Список пользователей системы'
 
     return (
         <Container>
@@ -243,10 +361,10 @@ const SupervisorUsers = () => {
                         <div className="min-w-0">
                             <h3 className="mb-1 flex items-center gap-2">
                                 <TbUsers className="shrink-0 text-primary" />
-                                Пользователи
+                                {isAgencySupervisor ? 'Агенты' : 'Пользователи'}
                             </h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Список пользователей системы
+                                {agencySubtitle}
                             </p>
                         </div>
                     </div>
@@ -313,6 +431,44 @@ const SupervisorUsers = () => {
                 </p>
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     Текущий руководитель этого агентства станет агентом.
+                </p>
+            </ConfirmDialog>
+
+            <ConfirmDialog
+                isOpen={Boolean(blockTarget)}
+                type={isBlockTargetBlocked ? 'info' : 'danger'}
+                title={
+                    isBlockTargetBlocked
+                        ? 'Разблокировать пользователя?'
+                        : 'Заблокировать пользователя?'
+                }
+                confirmText={
+                    isBlockTargetBlocked
+                        ? 'Разблокировать'
+                        : 'Заблокировать'
+                }
+                cancelText="Отмена"
+                confirmButtonProps={{
+                    loading: isTogglingBlock,
+                    disabled: isTogglingBlock,
+                    className: isBlockTargetBlocked
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white',
+                }}
+                onCancel={() => {
+                    if (!isTogglingBlock) setBlockTarget(null)
+                }}
+                onClose={() => {
+                    if (!isTogglingBlock) setBlockTarget(null)
+                }}
+                onConfirm={() => {
+                    void handleConfirmToggleBlock()
+                }}
+            >
+                <p>
+                    {isBlockTargetBlocked
+                        ? `Разблокировать пользователя «${blockTarget?.name}»? Он снова сможет войти в систему.`
+                        : `Вы уверены, что хотите заблокировать пользователя «${blockTarget?.name}»? Его сессия будет прекращена, а доступ в систему ограничен.`}
                 </p>
             </ConfirmDialog>
         </Container>

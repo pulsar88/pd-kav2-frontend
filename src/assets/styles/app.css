@@ -5,13 +5,6 @@
 @import './others/index.css';
 @import './vendors/index.css';
 
-@media screen and (max-width: 768px) {
-  .select input,
-  .select-input-container input {
-    font-size: 16px !important;
-  }
-}
-
 /* TipTap ProseMirror Selected Node Styles */
 .ProseMirror-selectednode {
     outline: 2px solid var(--primary, #4f46e5) !important;
@@ -247,4 +240,19 @@
     .ProseMirror.article-editor-show-blocks
     > p:has(> br.ProseMirror-trailingBreak:only-child)::before {
     color: #64748b;
+}
+
+
+/* Запрет автозума на iOS Safari при фокусе на ЛЮБЫХ полях ввода (инпуты, селекты, textarea) */
+@media screen and (max-width: 768px) {
+    input,
+    textarea,
+    select,
+    .input,
+    .select input,
+    .select-input-container input,
+    .select__input input,
+    input[id^="react-select-"] {
+        font-size: 16px !important;
+    }
 }

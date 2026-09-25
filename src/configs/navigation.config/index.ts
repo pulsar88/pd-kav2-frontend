@@ -19,6 +19,7 @@ const agentCabinetAuthority = [...AGENT_CABINET_ROLES]
 const contentManagerAllowedAuthority = [...CONTENT_MANAGER_ALLOWED_ROLES]
 const objectsAuthority = [ADMIN, AGENT, AGENCY_SUPERVISOR, SUPERVISOR]
 const supervisorOnlyAuthority = [SUPERVISOR]
+const supervisorAndAgencySupervisorAuthority = [SUPERVISOR, AGENCY_SUPERVISOR]
 
 const navigationConfig: NavigationTree[] = [
     {
@@ -148,7 +149,7 @@ const navigationConfig: NavigationTree[] = [
                 translateKey: 'nav.supervisorUsers',
                 icon: 'users',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: supervisorOnlyAuthority,
+                authority: supervisorAndAgencySupervisorAuthority,
                 subMenu: [],
             },
         ],
