@@ -43,6 +43,7 @@ import {
     TbUser,
     TbUserCheck,
     TbUsers,
+    TbExternalLink,
 } from 'react-icons/tb'
 import { Tooltip } from '@/components/ui'
 
@@ -59,6 +60,11 @@ const isAgentBlocked = (agent: AgencyAgent): boolean =>
 const SupervisorAgencyDetail = () => {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
+
+    const crmBaseUrl = import.meta.env.VITE_CRM_BASE_URL?.trim().replace(/\/+$/, '') || ''
+    const openCrmLink = (path: string) => {
+        window.open(`${crmBaseUrl}${path}`, '_blank', 'noopener,noreferrer')
+    }
 
     const [agency, setAgency] = useState<AgencyItem | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -326,7 +332,12 @@ const SupervisorAgencyDetail = () => {
                         email: agent.email ?? null,
                         phone: agent.phone,
                         agency: agency
-                            ? { id: agency.id, name: agency.name }
+                            ? {
+                                  id: agency.id,
+                                  name: agency.name,
+                                  fix_days: agency.fix_days ?? 0,
+                                  is_aggregator: agency.is_aggregator,
+                              }
                             : null,
                     }
 
@@ -335,6 +346,24 @@ const SupervisorAgencyDetail = () => {
                             className="flex items-center gap-1"
                             onClick={(e) => e.stopPropagation()}
                         >
+                            {/* Открыть в CRM */}
+                            {agent.external_id ? (
+                                <Tooltip title="Открыть в CRM">
+                                    <Button
+                                        size="xs"
+                                        variant="solid"
+                                        shape="circle"
+                                        icon={<TbExternalLink />}
+                                        aria-label="Открыть в CRM"
+                                        onClick={() =>
+                                            openCrmLink(
+                                                `/contacts/detail/${agent.external_id}`,
+                                            )
+                                        }
+                                    />
+                                </Tooltip>
+                            ) : null}
+
                             {/* Сменить агентство */}
                             <Tooltip title="Сменить агентство">
                                 <Button
@@ -500,8 +529,22 @@ const SupervisorAgencyDetail = () => {
                                 </div>
                             </div>
 
-                            {/* Кнопка активации / деактивации на месте счетчиков */}
-                            <div className="shrink-0">
+                            {/* Кнопки действий: CRM и активация/деактивация */}
+                            <div className="shrink-0 flex items-center gap-2">
+                                {agency.external_id ? (
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        icon={<TbExternalLink />}
+                                        onClick={() =>
+                                            openCrmLink(
+                                                `/companies/detail/${agency.external_id}`,
+                                            )
+                                        }
+                                    >
+                                        В CRM
+                                    </Button>
+                                ) : null}
                                 <Button
                                     variant="solid"
                                     size="sm"

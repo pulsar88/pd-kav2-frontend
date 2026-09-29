@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router'
 import {
     useMemo,
     useRef,
@@ -42,6 +43,8 @@ type DataTableProps<T> = {
     onPaginationChange?: (page: number) => void
     onSort?: (sort: OnSortParam) => void
     onRowClick?: (row: T) => void
+    onRowMiddleClick?: (row: T) => void
+    getRowLink?: (row: T) => string
     selectable?: boolean
     skeletonAvatarColumns?: number[]
     skeletonAvatarProps?: SkeletonProps
@@ -118,6 +121,8 @@ function DataTable<T>(props: DataTableProps<T>) {
         onPaginationChange,
         onSort,
         onRowClick,
+        onRowMiddleClick,
+        getRowLink,
         selectable = false,
         skeletonAvatarProps,
         pagingData = {
@@ -238,6 +243,8 @@ function DataTable<T>(props: DataTableProps<T>) {
         table.resetRowSelection(true)
     }
 
+    const navigate = useNavigate()
+
     useImperativeHandle(ref, () => ({
         resetSorting,
         resetSelected,
@@ -327,51 +334,76 @@ function DataTable<T>(props: DataTableProps<T>) {
                                 .getRowModel()
                                 .rows.slice(0, pageSize)
                                 .map((row) => {
+                                    const rowLink = getRowLink ? getRowLink(row.original) : undefined
+                                    const isClickable = Boolean(onRowClick || rowLink)
+
                                     return (
-                                        <Tr
-                                            key={row.id}
-                                            data-table-row={
-                                                onRowClick ? 'true' : undefined
-                                            }
-                                            className={classNames(
-                                                onRowClick &&
-                                                    'cursor-pointer',
-                                            )}
-                                            onClick={(e) => {
-                                                // Если пользователь выделяет текст мышкой (номер телефона, имя и т.д.), не совершаем переход
-                                                const selection = window.getSelection()
-                                                if (selection && selection.toString().trim().length > 0) {
-                                                    return
-                                                }
-                                                // Если клик был по интерактивному элементу (ссылка, кнопка, инпут)
-                                                const target = e.target as HTMLElement | null
-                                                if (target?.closest('button, a, input, select, textarea, [role="button"]')) {
-                                                    return
-                                                }
-                                                onRowClick?.(row.original)
-                                            }}
-                                        >
-                                            {row
-                                                .getVisibleCells()
-                                                .map((cell) => {
-                                                    return (
-                                                        <Td
-                                                            key={cell.id}
-                                                            style={{
-                                                                width: cell.column.getSize(),
-                                                            }}
-                                                        >
-                                                            {flexRender(
+                                                <Tr
+                                                    key={row.id}
+                                                    data-table-row={isClickable ? 'true' : undefined}
+                                                    className={classNames(
+                                                        isClickable && 'cursor-pointer group/row relative select-text',
+                                                    )}
+                                                    onClick={(e) => {
+                                                        const selection = window.getSelection()
+                                                        if (selection && selection.toString().trim().length > 0) {
+                                                            return
+                                                        }
+                                                        const target = e.target as HTMLElement | null
+                                                        if (target?.closest('button, a, input, select, textarea, [role="button"]')) {
+                                                            return
+                                                        }
+                                                        if (rowLink) {
+                                                            // Ctrl/Cmd + click → новая вкладка
+                                                            if (e.ctrlKey || e.metaKey) {
+                                                                window.open(rowLink, '_blank', 'noopener,noreferrer')
+                                                                return
+                                                            }
+                                                            navigate(rowLink)
+                                                            return
+                                                        }
+                                                        onRowClick?.(row.original)
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        // средняя кнопка — предотвр. скролл, обработка в onAuxClick
+                                                        if (rowLink && e.button === 1) {
+                                                            e.preventDefault()
+                                                        }
+                                                    }}
+                                                    onAuxClick={(e) => {
+                                                        if (rowLink && e.button === 1) {
+                                                            e.preventDefault()
+                                                            window.open(rowLink, '_blank', 'noopener,noreferrer')
+                                                            onRowMiddleClick?.(row.original)
+                                                        }
+                                                    }}
+                                                >
+                                                    {row
+                                                        .getVisibleCells()
+                                                        .map((cell) => {
+                                                            const rendered = flexRender(
                                                                 cell.column
                                                                     .columnDef
                                                                     .cell,
                                                                 cell.getContext(),
-                                                            )}
-                                                        </Td>
-                                                    )
-                                                })}
-                                        </Tr>
-                                    )
+                                                            )
+
+                                                            return (
+                                                                <Td
+                                                                    key={cell.id}
+                                                                    style={{
+                                                                        width: cell.column.getSize(),
+                                                                    }}
+                                                                    className="select-text"
+                                                                >
+                                                                    <div className="select-text">
+                                                                        {rendered}
+                                                                    </div>
+                                                                </Td>
+                                                            )
+                                                        })}
+                                                </Tr>
+                                            )
                                 })
                         )}
                     </TBody>

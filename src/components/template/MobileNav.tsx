@@ -2,6 +2,7 @@ import { useState, Suspense, lazy } from 'react'
 import classNames from 'classnames'
 import Drawer from '@/components/ui/Drawer'
 import NavToggle from '@/components/shared/NavToggle'
+import ThemeModeToggle from '@/components/template/ThemeModeToggle'
 import { DIR_RTL } from '@/constants/theme.constant'
 import withHeaderItem, { WithHeaderItemProps } from '@/utils/hoc/withHeaderItem'
 import navigationConfig from '@/configs/navigation.config'
@@ -53,24 +54,29 @@ const MobileNav = () => {
             <Drawer
                 title="Меню"
                 isOpen={isOpen}
-                bodyClass={classNames('p-0')}
+                bodyClass={classNames('p-0 flex flex-col justify-between h-full')}
                 width={330}
                 placement={direction === DIR_RTL ? 'right' : 'left'}
                 onClose={handleDrawerClose}
                 onRequestClose={handleDrawerClose}
             >
-                <Suspense fallback={<></>}>
-                    {isOpen && (
-                        <VerticalMenuContent
-                            collapsed={false}
-                            navigationTree={navigationConfig}
-                            routeKey={currentRouteKey}
-                            userAuthority={userAuthority as string[]}
-                            direction={direction}
-                            onMenuItemClick={handleDrawerClose}
-                        />
-                    )}
-                </Suspense>
+                <div className="flex-1 overflow-y-auto">
+                    <Suspense fallback={<></>}>
+                        {isOpen && (
+                            <VerticalMenuContent
+                                collapsed={false}
+                                navigationTree={navigationConfig}
+                                routeKey={currentRouteKey}
+                                userAuthority={userAuthority as string[]}
+                                direction={direction}
+                                onMenuItemClick={handleDrawerClose}
+                            />
+                        )}
+                    </Suspense>
+                </div>
+                <div className="shrink-0 border-t border-gray-200 dark:border-gray-700 p-2">
+                    <ThemeModeToggle collapsed={false} />
+                </div>
             </Drawer>
         </>
     )

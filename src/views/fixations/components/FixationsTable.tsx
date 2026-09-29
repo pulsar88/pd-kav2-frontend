@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import Button from '@/components/ui/Button'
 import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
@@ -60,11 +60,23 @@ const FixationsTable = ({
         () => getFixationColumnsScope(user.authority ?? []),
         [user.authority],
     )
+    const [searchParams] = useSearchParams()
+    const initialAgencyId = useMemo(() => {
+        const raw = searchParams.get('agency_id')
+        const n = raw ? Number(raw) : undefined
+        return n != null && Number.isFinite(n) ? n : undefined
+    }, [searchParams])
+    const initialAgentId = useMemo(() => {
+        const raw = searchParams.get('agent_id')
+        const n = raw ? Number(raw) : undefined
+        return n != null && Number.isFinite(n) ? n : undefined
+    }, [searchParams])
+
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
     const [search, setSearch] = useState('')
-    const [agencyId, setAgencyId] = useState<number>()
-    const [agentId, setAgentId] = useState<number>()
+    const [agencyId, setAgencyId] = useState<number | undefined>(() => initialAgencyId)
+    const [agentId, setAgentId] = useState<number | undefined>(() => initialAgentId)
     const [agencyOptions, setAgencyOptions] = useState<{ value: number; label: string }[]>([])
     const [selectedAgencyOption, setSelectedAgencyOption] = useState<{ value: number; label: string } | null>(null)
     const [agencyPage, setAgencyPage] = useState(1)
@@ -92,6 +104,18 @@ const FixationsTable = ({
     const [refreshCount, setRefreshCount] = useState(0)
 
     useEffect(() => {
+        if (isSupervisor && agencyId != null && !selectedAgencyOption) {
+            void apiGetAgency(agencyId).then((agency) => {
+                if (agency) {
+                    const opt = { value: agency.id, label: agency.name }
+                    setSelectedAgencyOption(opt)
+                    setAgencyOptions((prev) => prev.some((item) => item.value === opt.value) ? prev : [opt, ...prev])
+                }
+            })
+        }
+    }, [isSupervisor, agencyId, selectedAgencyOption])
+
+    useEffect(() => {
         if (!isSupervisor) return
         setAgencyPage(1)
         setHasMoreAgencies(true)
@@ -107,13 +131,28 @@ const FixationsTable = ({
         })
     }, [isSupervisor, debouncedAgencySearch, selectedAgencyOption, searchReloadKey])
 
+    const initialAgentIdAppliedRef = useRef(false)
     useEffect(() => {
-        setAgentId(undefined)
-        if (effectiveAgencyId == null) { setAgentOptions([]); return }
+        if (effectiveAgencyId == null) {
+            setAgentOptions([])
+            setAgentId(undefined)
+            return
+        }
+
         void apiGetAgency(effectiveAgencyId, { with: 'agents' }).then((agency) => {
-            setAgentOptions((agency?.agents ?? []).map((agent: AgencyAgent) => ({ value: agent.id, label: agent.name })))
+            const agents = agency?.agents ?? []
+            const opts = agents.map((agent: AgencyAgent) => ({
+                value: Number(agent.id),
+                label: agent.name,
+            }))
+            setAgentOptions(opts)
+
+            if (!initialAgentIdAppliedRef.current && initialAgentId != null) {
+                initialAgentIdAppliedRef.current = true
+                setAgentId(Number(initialAgentId))
+            }
         })
-    }, [effectiveAgencyId])
+    }, [effectiveAgencyId, initialAgentId])
 
 
 
@@ -579,6 +618,8 @@ const FixationsTable = ({
                 onAgencyChange={(option) => {
                     setSelectedAgencyOption(option ?? null)
                     setAgencyId(option?.value)
+                    setAgentId(undefined)
+                    initialAgentIdAppliedRef.current = true
                     setPageIndex(1)
                 }}
                 onAgentChange={(value) => {
@@ -621,7 +662,7 @@ const FixationsTable = ({
                     pageSize,
                 }}
                 onPaginationChange={setPageIndex}
-                onRowClick={(row) => navigate(`/fixations/${row.id}`)}
+                getRowLink={(row) => `/fixations/${row.id}`}
             />
             <FixationExtendRequestDialog
                 isOpen={isExtendOpen}
@@ -634,10 +675,15 @@ const FixationsTable = ({
                 isOpen={Boolean(actionType && actionFixation)}
                 type={actionType === 'approve' ? 'info' : 'danger'}
                 title={actionType === 'approve' ? 'Одобрить фиксацию' : 'Отклонить фиксацию'}
-                confirmButtonColor={actionType === 'approve' ? 'emerald-600' : 'red-600'}
                 confirmText={actionType === 'approve' ? 'Одобрить' : 'Отклонить'}
                 cancelText="Отмена"
-                isLoading={isActionSubmitting}
+                confirmButtonProps={{
+                    loading: isActionSubmitting,
+                    disabled: isActionSubmitting,
+                    className: actionType === 'approve'
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-rose-600 hover:bg-rose-700 text-white',
+                }}
                 onClose={() => !isActionSubmitting && (setActionFixation(null), setActionType(null))}
                 onCancel={() => !isActionSubmitting && (setActionFixation(null), setActionType(null))}
                 onConfirm={handleConfirmAction}

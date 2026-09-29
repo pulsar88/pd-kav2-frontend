@@ -32,7 +32,7 @@ import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { nameFieldValidation, isValidHumanName, isFakeDuplication } from '../nameValidation'
+import { lastNameFieldValidation, firstNameFieldValidation, isValidHumanName, isFakeDuplication, normalizeHumanName } from '../nameValidation'
 import 'dayjs/locale/ru'
 import debounce from 'lodash/debounce'
 import { HiChevronDown } from 'react-icons/hi'
@@ -384,11 +384,11 @@ const CLIENT_PERSONAL_DATA_CONSENT_TEXT =
 
 const clientCreateSchema = z
     .object({
-        lastName: nameFieldValidation,
-        firstName: nameFieldValidation,
+        lastName: lastNameFieldValidation,
+        firstName: firstNameFieldValidation,
         middleName: z
             .string()
-            .transform((val) => val.trim())
+            .transform((val) => normalizeHumanName(val))
             .refine(
                 (val) => !val || isValidHumanName(val),
                 { message: 'Укажите корректное отчество или оставьте пустым' },
@@ -425,11 +425,11 @@ type ClientCreateSchema = z.infer<typeof clientCreateSchema>
 
 const relativeCreateSchema = z
     .object({
-        lastName: nameFieldValidation,
-        firstName: nameFieldValidation,
+        lastName: lastNameFieldValidation,
+        firstName: firstNameFieldValidation,
         middleName: z
             .string()
-            .transform((val) => val.trim())
+            .transform((val) => normalizeHumanName(val))
             .refine(
                 (val) => !val || isValidHumanName(val),
                 { message: 'Укажите корректное отчество или оставьте пустым' },
@@ -1801,6 +1801,11 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="family-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onBlur={(e) => {
+                                                        const normalized = normalizeHumanName(e.target.value)
+                                                        if (normalized !== e.target.value) field.onChange(normalized)
+                                                        field.onBlur()
+                                                    }}
                                                 />
                                             )}
                                         />
@@ -1822,6 +1827,11 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="given-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onBlur={(e) => {
+                                                        const normalized = normalizeHumanName(e.target.value)
+                                                        if (normalized !== e.target.value) field.onChange(normalized)
+                                                        field.onBlur()
+                                                    }}
                                                 />
                                             )}
                                         />
@@ -1844,6 +1854,11 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="additional-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onBlur={(e) => {
+                                                        const normalized = normalizeHumanName(e.target.value)
+                                                        if (normalized !== e.target.value) field.onChange(normalized)
+                                                        field.onBlur()
+                                                    }}
                                                 />
                                             )}
                                         />
@@ -2588,6 +2603,12 @@ const FixationsCreateWizardDialog = ({
                                                                 placeholder="Иванов"
                                                                 autoComplete="family-name"
                                                                 {...field}
+                                                                onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onBlur={(e) => {
+                                                                    const normalized = normalizeHumanName(e.target.value)
+                                                                    if (normalized !== e.target.value) field.onChange(normalized)
+                                                                    field.onBlur()
+                                                                }}
                                                             />
                                                         )}
                                                     />
@@ -2615,6 +2636,12 @@ const FixationsCreateWizardDialog = ({
                                                                 placeholder="Иван"
                                                                 autoComplete="given-name"
                                                                 {...field}
+                                                                onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onBlur={(e) => {
+                                                                    const normalized = normalizeHumanName(e.target.value)
+                                                                    if (normalized !== e.target.value) field.onChange(normalized)
+                                                                    field.onBlur()
+                                                                }}
                                                             />
                                                         )}
                                                     />
@@ -2641,6 +2668,12 @@ const FixationsCreateWizardDialog = ({
                                                                 placeholder="Иванович"
                                                                 autoComplete="additional-name"
                                                                 {...field}
+                                                                onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onBlur={(e) => {
+                                                                    const normalized = normalizeHumanName(e.target.value)
+                                                                    if (normalized !== e.target.value) field.onChange(normalized)
+                                                                    field.onBlur()
+                                                                }}
                                                             />
                                                         )}
                                                     />

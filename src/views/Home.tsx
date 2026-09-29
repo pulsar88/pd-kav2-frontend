@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import {
     TbBell,
@@ -313,6 +313,21 @@ const Home = () => {
         [donutSeries],
     )
 
+        const getFixationsUrlForStatus = useCallback(
+        (status: string) => {
+            const params = new URLSearchParams()
+            params.set('status', status)
+            if (agencyId != null) {
+                params.set('agency_id', String(agencyId))
+            }
+            if (selectedAgentId != null) {
+                params.set('agent_id', String(selectedAgentId))
+            }
+            return `/fixations?${params.toString()}`
+        },
+        [agencyId, selectedAgentId],
+    )
+
     const donutOptions = useMemo<ApexOptions>(
         () => ({
             labels: statusSummary.map((item) => item.label),
@@ -350,13 +365,13 @@ const Home = () => {
                     dataPointSelection: (_event, _ctx, config) => {
                         const item = statusSummary[config.dataPointIndex]
                         if (item) {
-                            navigate(`/fixations?status=${item.status}`)
+                            navigate(getFixationsUrlForStatus(item.status))
                         }
                     },
                 },
             },
         }),
-        [isDesktop, navigate, statusSummary],
+        [getFixationsUrlForStatus, isDesktop, navigate, statusSummary],
     )
 
     const statusTimeline = useMemo(
@@ -821,7 +836,7 @@ const Home = () => {
                                                     className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-gray-700 dark:hover:border-primary/40 dark:hover:bg-primary/10"
                                                     onClick={() =>
                                                         navigate(
-                                                            `/fixations?status=${item.status}`,
+                                                            getFixationsUrlForStatus(item.status),
                                                         )
                                                     }
                                                 >

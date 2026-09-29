@@ -347,7 +347,7 @@ const SupervisorAgencies = () => {
                             pageSize: PAGE_SIZE,
                         }}
                         onPaginationChange={setPageIndex}
-                        onRowClick={(row) => navigate(`/supervisor/agencies/${row.id}`)}
+                        getRowLink={(row) => `/supervisor/agencies/${row.id}`}
                     />
                 </div>
             </AdaptiveCard>

@@ -2,12 +2,13 @@ import classNames from '@/utils/classNames'
 import ScrollBar from '@/components/ui/ScrollBar'
 import Logo from '@/components/template/Logo'
 import VerticalMenuContent from '@/components/template/VerticalMenuContent'
+import ThemeModeToggle from '@/components/template/ThemeModeToggle'
 import { useThemeStore } from '@/store/themeStore'
 import { useSessionUser } from '@/store/authStore'
 import { useRouteKeyStore } from '@/store/routeKeyStore'
 import navigationConfig from '@/configs/navigation.config'
 import appConfig from '@/configs/app.config'
-import { getAuthenticatedEntryPath, isContentManagerOnly } from '@/constants/roles.constant'
+import { getAuthenticatedEntryPath } from '@/constants/roles.constant'
 import { Link } from 'react-router'
 import {
     SIDE_NAV_WIDTH,
@@ -63,7 +64,7 @@ const SideNav = ({
         <div
             style={sideNavCollapse ? sideNavCollapseStyle : sideNavStyle}
             className={classNames(
-                'side-nav',
+                'side-nav flex flex-col',
                 background && 'side-nav-bg',
                 !sideNavCollapse && 'side-nav-expand',
                 className,
@@ -72,7 +73,7 @@ const SideNav = ({
             <Link
                 to={entryPath}
                 className={classNames(
-                    'side-nav-header flex flex-col justify-center',
+                    'side-nav-header shrink-0 flex flex-col justify-center',
                     sideNavCollapse ? 'items-center' : 'items-start',
                 )}
                 style={{ height: HEADER_HEIGHT }}
@@ -89,7 +90,7 @@ const SideNav = ({
                     )}
                 />
             </Link>
-            <div className={classNames('side-nav-content', contentClass)}>
+            <div className={classNames('side-nav-content flex-1 min-h-0', contentClass)}>
                 <ScrollBar style={{ height: '100%' }} direction={direction}>
                     <VerticalMenuContent
                         collapsed={sideNavCollapse}
@@ -99,6 +100,9 @@ const SideNav = ({
                         userAuthority={userAuthority || []}
                     />
                 </ScrollBar>
+            </div>
+            <div className="shrink-0 border-t border-gray-200 dark:border-gray-700">
+                <ThemeModeToggle collapsed={sideNavCollapse} />
             </div>
         </div>
     )

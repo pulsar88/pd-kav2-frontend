@@ -17,7 +17,7 @@ import {
     type FixationGigalogItem,
 } from '@/services/FixationsService'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import { TbCheck } from 'react-icons/tb'
+import { TbCheck, TbCopy } from 'react-icons/tb'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import {
     TbAlertTriangle,
@@ -40,16 +40,57 @@ import {
     getFixationStatusDisplay,
 } from './utils'
 
-const InfoRow = ({ label, value }: { label: string; value: ReactNode }) => (
-    <div className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-700/60">
-        <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">
-            {label}
+const CopyValue = ({ text, children }: { text: string; children: ReactNode }) => {
+    const handleCopy = async () => {
+        const clean = String(text).trim()
+        if (!clean || clean === '—') return
+        try {
+            await navigator.clipboard.writeText(clean)
+            toast.push(<Notification type="success">Скопировано: {clean}</Notification>, { placement: 'top-center' })
+        } catch {
+            // fallback
+            const el = document.createElement('textarea')
+            el.value = clean
+            document.body.appendChild(el)
+            el.select()
+            document.execCommand('copy')
+            document.body.removeChild(el)
+            toast.push(<Notification type="success">Скопировано: {clean}</Notification>, { placement: 'top-center' })
+        }
+    }
+    if (!text || String(text).trim() === '' || String(text).trim() === '—') {
+        return <>{children}</>
+    }
+    return (
+        <span className="inline-flex items-center gap-1.5 justify-end select-text">
+            <span className="select-text">{children}</span>
+            <button
+                type="button"
+                onClick={handleCopy}
+                className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                title="Копировать"
+                aria-label={`Копировать ${String(text)}`}
+            >
+                <TbCopy className="text-sm" />
+            </button>
         </span>
-        <div className="min-w-0 flex-1 text-right text-sm font-medium text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
-            {value || '—'}
+    )
+}
+
+const InfoRow = ({ label, value, copyText }: { label: string; value: ReactNode; copyText?: string }) => {
+    const textForCopy = copyText ?? (typeof value === 'string' ? value : '')
+    const isCopyable = Boolean(textForCopy && String(textForCopy).trim() && String(textForCopy).trim() !== '—')
+    return (
+        <div className="flex items-start justify-between gap-3 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-700/60">
+            <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0 select-none">
+                {label}
+            </span>
+            <div className="min-w-0 flex-1 text-right text-sm font-medium text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere] select-text">
+                {isCopyable ? <CopyValue text={String(textForCopy)}>{value || '—'}</CopyValue> : (value || '—')}
+            </div>
         </div>
-    </div>
-)
+    )
+}
 
 const SectionCard = ({
     title,
@@ -102,15 +143,15 @@ const SummaryStat = ({
     value: ReactNode
     accentClassName?: string
 }) => (
-    <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/30 min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+    <div className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-700 dark:bg-gray-900/30 min-w-0 select-text">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 select-none">
             {label}
         </p>
         <div
             className={
                 accentClassName
-                    ? `mt-2 text-lg break-words [overflow-wrap:anywhere] ${accentClassName}`
-                    : 'mt-2 text-lg font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]'
+                    ? `mt-2 text-lg break-words [overflow-wrap:anywhere] select-text ${accentClassName}`
+                    : 'mt-2 text-lg font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere] select-text'
             }
         >
             {value || '—'}
@@ -648,7 +689,7 @@ const FixationDetails = () => {
                                                 type="button"
                                                 size="sm"
                                                 onClick={() =>
-                                                    openCrmLink(`/contacts/${data.clientExternalId}`)
+                                                    openCrmLink(`/contacts/detail/${data.clientExternalId}`)
                                                 }
                                             >
                                                 Клиент
@@ -672,11 +713,11 @@ const FixationDetails = () => {
                                         label="Клиент"
                                         value={
                                             <div>
-                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
-                                                    {data.fullName || '—'}
+                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere] select-text">
+                                                    <CopyValue text={data.fullName || ''}>{data.fullName || '—'}</CopyValue>
                                                 </div>
-                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words">
-                                                    {data.phone || '—'}
+                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words select-text">
+                                                    <CopyValue text={data.phone || ''}>{data.phone || '—'}</CopyValue>
                                                 </div>
                                             </div>
                                         }
@@ -720,11 +761,11 @@ const FixationDetails = () => {
 
                                             return (
                                                 <div>
-                                                    <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
-                                                        {name}
+                                                    <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere] select-text">
+                                                        <CopyValue text={name}>{name}</CopyValue>
                                                     </div>
-                                                    <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words">
-                                                        {phone}
+                                                    <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words select-text">
+                                                        <CopyValue text={phone}>{phone}</CopyValue>
                                                     </div>
                                                 </div>
                                             )
@@ -734,11 +775,11 @@ const FixationDetails = () => {
                                         label="Менеджер"
                                         value={
                                             <div>
-                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere]">
-                                                    {data.managerName || '—'}
+                                                <div className="text-base font-semibold text-gray-900 dark:text-gray-100 break-words [overflow-wrap:anywhere] select-text">
+                                                    <CopyValue text={data.managerName || ''}>{data.managerName || '—'}</CopyValue>
                                                 </div>
-                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words">
-                                                    {data.managerPhone || '—'}
+                                                <div className="mt-1 text-sm font-medium text-gray-500 dark:text-gray-400 break-words select-text">
+                                                    <CopyValue text={data.managerPhone || ''}>{data.managerPhone || '—'}</CopyValue>
                                                 </div>
                                             </div>
                                         }
@@ -811,15 +852,12 @@ const FixationDetails = () => {
                                                             key={relative.id}
                                                             className="rounded-xl border border-gray-100 p-3 dark:border-gray-700/60"
                                                         >
-                                                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                                {
-                                                                    relative.fullName
-                                                                }
+                                                            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 select-text">
+                                                                <CopyValue text={relative.fullName}>{relative.fullName}</CopyValue>
                                                             </div>
-                                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                                                <span>
-                                                                    {relative.phone ||
-                                                                        '—'}
+                                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400 select-text">
+                                                                <span className="select-text">
+                                                                    <CopyValue text={relative.phone || ''}>{relative.phone || '—'}</CopyValue>
                                                                 </span>
                                                                 {relative.relation ? (
                                                                     <>

@@ -55,8 +55,6 @@ const _UserDropdown = () => {
     }
 
     const handleAddAccount = () => {
-        // Очищаем текущую сессию в памяти, сохраняя аккаунт в списке сохраненных,
-        // и переходим на страницу логина для входа под вторым аккаунтом
         setToken('')
         useSessionUser.getState().setUser({})
         useSessionUser.getState().setSessionSignedIn(false)

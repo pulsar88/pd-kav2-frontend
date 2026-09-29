@@ -14,6 +14,7 @@ export type AgencyAgentBonus = {
 
 export type AgencyAgent = {
     id: number
+    external_id?: number | string | null
     name: string
     email?: string | null
     phone: string
@@ -27,6 +28,7 @@ export type AgencyAgent = {
 
 export type AgencySupervisor = {
     id: number
+    external_id?: number | string | null
     name: string
     email?: string | null
     phone: string
@@ -41,6 +43,7 @@ export type AgencySupervisor = {
 
 export type AgencyItem = {
     id: number
+    external_id?: number | string | null
     name: string
     fix_days: number
     is_aggregator?: number
