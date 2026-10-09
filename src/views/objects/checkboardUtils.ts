@@ -10,7 +10,10 @@ import type {
 import type { ObjectsSearchFilters, Premise, PremiseType, RealtyPropertyTypeCode } from './types'
 import { matchesRealtyRoomFilters } from './realtyPropertyQuery'
 import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
-import { propertyHasSpecialOffer } from './specialOfferUtils'
+import {
+    propertyHasSpecialOffer,
+    resolveSpecialOffers,
+} from './specialOfferUtils'
 
 const mapCheckboardTypeCodeToPremiseType = (code: string): PremiseType => {
     const normalized = code.toLowerCase()
@@ -66,15 +69,7 @@ export const buildPremiseFromCheckboardProperty = (
         specialOffers:
             propertyDetails?.specialOffers ??
             (property.special_offers?.length
-                ? property.special_offers.map((offer) => ({
-                      id: offer.id,
-                      name: offer.name,
-                      active: offer.active,
-                      color: offer.color,
-                      text_color: offer.text_color,
-                      badge_text: offer.badge_text ?? null,
-                      badge_icon: offer.badge_icon ?? null,
-                  }))
+                ? resolveSpecialOffers(property.special_offers)
                 : undefined),
         layoutImage: propertyDetails?.layoutImage,
         layout: propertyDetails?.layout,

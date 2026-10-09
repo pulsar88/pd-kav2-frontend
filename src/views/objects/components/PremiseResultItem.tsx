@@ -6,6 +6,7 @@ import {
     TbBuildingSkyscraper,
     TbHeart,
     TbHeartFilled,
+    TbHelpCircle,
     TbLayoutGrid,
     TbScale,
     TbZoomIn,
@@ -19,8 +20,14 @@ import toast from '@/components/ui/toast'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
-import type { ObjectsSearchFilters, Premise } from '../types'
+import { stripHtml } from '@/views/special-offers/utils'
+import type {
+    ObjectsSearchFilters,
+    Premise,
+    PremiseSpecialOffer,
+} from '../types'
 import { serializeObjectsSearchFilters, withoutComplexFilters, appendObjectsCatalogTab } from '../filtersQuery'
+import { getSpecialOfferDiscountAmount } from '../specialOfferUtils'
 import {
     finishingLabel,
     formatArea,
@@ -33,8 +40,18 @@ import {
     houseStatusLabel,
     houseTypeLabel,
 } from '../utils'
-import SpecialOfferBadges from './SpecialOfferBadges'
-import { hasPremiseDiscount } from '../specialOfferUtils'
+
+const OfferBadge = ({ offer }: { offer: PremiseSpecialOffer }) => (
+    <span
+        className="inline-flex max-w-full shrink-0 items-center truncate rounded-lg px-2 py-0.5 text-[11px] font-bold leading-tight shadow-sm"
+        style={{
+            backgroundColor: offer.color || '#0ea5e9',
+            color: offer.text_color || '#ffffff',
+        }}
+    >
+        {offer.badge_text || offer.name}
+    </span>
+)
 
 const PendingRemovalBanner = ({
     startedAt,
@@ -207,11 +224,9 @@ const PremiseResultItem = ({
     const toggleComparison = useComparisonStore((state) => state.togglePremise)
 
     const typeLabel = getPremiseTypeLabel(premise)
-    const showDiscount = hasPremiseDiscount(premise)
-    const pricePerSqm = getPremisePricePerSqm(
-        showDiscount ? premise.discountPrice : premise.price,
-        premise.area,
-    )
+    const specialOffers = premise.specialOffers ?? []
+    const hasSpecialOffers = specialOffers.length > 0
+    const regularPricePerSqm = getPremisePricePerSqm(premise.price, premise.area)
     const coverImage = getPremiseCoverImage(premise)
     const coverImageLabel = premise.layoutImage ? 'Планировка' : 'План этажа'
     const canPreviewImages = hasPremisePreviewImages(premise)
@@ -262,38 +277,110 @@ const PremiseResultItem = ({
                     value={`${premise.ceilingHeight} м`}
                 />
             ) : null}
-            {premise.price !== undefined ? (
+            {!hasSpecialOffers && premise.price !== undefined ? (
                 <Detail
                     label="Стоимость"
-                    value={
-                        showDiscount ? (
-                            <span className="text-gray-400 line-through dark:text-gray-500">
-                                {formatPrice(premise.price)}
-                            </span>
-                        ) : (
-                            formatPrice(premise.price)
-                        )
-                    }
+                    value={formatPrice(premise.price)}
                 />
             ) : null}
-            {showDiscount && premise.discountPrice != null ? (
-                <Detail
-                    label="Акционная цена"
-                    value={
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatPrice(premise.discountPrice)}
-                        </span>
-                    }
-                />
-            ) : null}
-            {pricePerSqm !== undefined ? (
+            {!hasSpecialOffers && regularPricePerSqm !== undefined ? (
                 <Detail
                     label="Цена за м²"
-                    value={formatPrice(pricePerSqm)}
+                    value={formatPrice(regularPricePerSqm)}
                 />
             ) : null}
         </>
     )
+
+    const offersDetails =
+        hasSpecialOffers ? (
+            <div className="mt-5 border-t border-gray-200 pt-5 dark:border-gray-700">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    Акции и скидки
+                </p>
+                <div className="mb-4 grid grid-cols-2 gap-4">
+                    <Detail
+                        label="Стоимость"
+                        value={
+                            premise.price !== undefined
+                                ? formatPrice(premise.price)
+                                : '—'
+                        }
+                    />
+                    <Detail
+                        label="Цена за м²"
+                        value={
+                            regularPricePerSqm !== undefined
+                                ? formatPrice(regularPricePerSqm)
+                                : '—'
+                        }
+                    />
+                </div>
+                <div className="space-y-4">
+                    {specialOffers.map((offer) => {
+                        const offerPricePerSqm = getPremisePricePerSqm(
+                            offer.price,
+                            premise.area,
+                        )
+                        const discountAmount = getSpecialOfferDiscountAmount(
+                            premise.price,
+                            offer.price,
+                        )
+                        const description = stripHtml(offer.description || '')
+
+                        return (
+                            <div key={offer.id}>
+                                <div className="mb-2 flex items-center gap-1.5">
+                                    <OfferBadge offer={offer} />
+                                    {description ? (
+                                        <Tooltip title={description}>
+                                            <button
+                                                type="button"
+                                                className="inline-flex shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
+                                                aria-label="Описание акции"
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
+                                            >
+                                                <TbHelpCircle className="text-base" />
+                                            </button>
+                                        </Tooltip>
+                                    ) : null}
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Detail
+                                        label="Цена по акции"
+                                        value={
+                                            offer.price != null ? (
+                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatPrice(offer.price)}
+                                                </span>
+                                            ) : (
+                                                '—'
+                                            )
+                                        }
+                                    />
+                                    <Detail
+                                        label="Цена за м²"
+                                        value={
+                                            offerPricePerSqm !== undefined
+                                                ? formatPrice(offerPricePerSqm)
+                                                : '—'
+                                        }
+                                    />
+                                </div>
+                                {discountAmount != null ? (
+                                    <p className="mt-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                        Скидка по акции{' '}
+                                        {formatPrice(discountAmount)}
+                                    </p>
+                                ) : null}
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+        ) : null
 
     const houseDetails = (
         <>
@@ -355,61 +442,49 @@ const PremiseResultItem = ({
         Boolean(premise.deliveryDate)
 
     const priceBlock = (
-        <>
-            {showDiscount && premise.discountPrice != null ? (
-                <>
-                    <p
-                        className={classNames(
-                            'font-bold leading-snug text-emerald-600 dark:text-emerald-400',
-                            open && '!text-emerald-600 dark:!text-emerald-400',
-                        )}
-                    >
-                        {formatPrice(premise.discountPrice)}
-                    </p>
-                    {premise.price !== undefined ? (
-                        <p
-                            className={classNames(
-                                'text-xs leading-snug line-through',
-                                open
-                                    ? 'text-gray-600 dark:text-gray-400'
-                                    : 'text-gray-400 dark:text-gray-500',
-                            )}
-                        >
-                            {formatPrice(premise.price)}
-                        </p>
-                    ) : null}
-                </>
-            ) : premise.price !== undefined ? (
+        <div className="flex flex-col gap-1 sm:items-end">
+            {premise.price !== undefined ? (
                 <p
                     className={classNames(
-                        'font-semibold leading-snug',
-                        open
-                            ? 'text-gray-900 dark:text-gray-100'
-                            : 'text-gray-900 dark:text-gray-100',
+                        'font-semibold leading-snug text-gray-900 dark:text-gray-100',
                     )}
                 >
                     {formatPrice(premise.price)}
                 </p>
             ) : null}
-            {pricePerSqm !== undefined ? (
-                <p
-                    className={classNames(
-                        'text-xs leading-snug',
-                        open
-                            ? 'text-gray-400'
-                            : 'text-gray-500 dark:text-gray-400',
-                    )}
-                >
-                    {formatPrice(pricePerSqm)} / м²
-                </p>
-            ) : null}
-        </>
+            {hasSpecialOffers
+                ? specialOffers.map((offer) =>
+                      offer.price != null ? (
+                          <div
+                              key={offer.id}
+                              className="flex max-w-full items-center gap-1.5 sm:justify-end"
+                          >
+                              <OfferBadge offer={offer} />
+                              <p className="shrink-0 font-bold leading-snug text-emerald-600 dark:text-emerald-400">
+                                  {formatPrice(offer.price)}
+                              </p>
+                          </div>
+                      ) : null,
+                  )
+                : regularPricePerSqm !== undefined ? (
+                      <p
+                          className={classNames(
+                              'text-xs leading-snug',
+                              open
+                                  ? 'text-gray-400'
+                                  : 'text-gray-500 dark:text-gray-400',
+                          )}
+                      >
+                          {formatPrice(regularPricePerSqm)} / м²
+                      </p>
+                  ) : null}
+        </div>
     )
 
     const hasPriceInfo =
         premise.price !== undefined ||
-        showDiscount ||
-        pricePerSqm !== undefined
+        hasSpecialOffers ||
+        regularPricePerSqm !== undefined
 
     const statusName = premise.statusName ?? premise.status?.name
     const statusColor = premise.statusColor ?? premise.status?.color
@@ -437,20 +512,11 @@ const PremiseResultItem = ({
         </span>
     ) : null
 
-    const offerBadges =
-        premise.specialOffers && premise.specialOffers.length > 0 ? (
-            <SpecialOfferBadges
-                offers={premise.specialOffers}
-                interactiveDetails
-            />
-        ) : null
-
     const badgesRow =
-        complexBadge || statusBadge || offerBadges ? (
+        complexBadge || statusBadge ? (
             <div className="mb-1.5 flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
                 {complexBadge}
                 {statusBadge}
-                {offerBadges}
             </div>
         ) : null
 
@@ -653,9 +719,7 @@ const PremiseResultItem = ({
                             {premiseMetaLine}
                         </p>
                         {hasPriceInfo ? (
-                            <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 sm:hidden">
-                                {priceBlock}
-                            </div>
+                            <div className="mt-2 sm:hidden">{priceBlock}</div>
                         ) : null}
                     </div>
                     {hasPriceInfo ? (
@@ -708,10 +772,7 @@ const PremiseResultItem = ({
                             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:items-stretch">
                                 {coverImage ? (
                                     <div className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-gray-300 bg-gray-50 lg:h-full dark:border-gray-700 dark:bg-gray-800">
-                                        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
-                                            <div className="min-w-0 flex-1">
-                                                {offerBadges}
-                                            </div>
+                                        <div className="flex shrink-0 items-center justify-end gap-3 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
                                             <button
                                                 type="button"
                                                 className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-gray-400 transition-colors hover:text-primary"
@@ -748,8 +809,10 @@ const PremiseResultItem = ({
                                         {apartmentDetails}
                                     </div>
 
+                                    {offersDetails}
+
                                     {hasHouseDetails ? (
-                                        <div className="mt-5 border-t border-gray-700 pt-5">
+                                        <div className="mt-5 border-t border-gray-200 pt-5 dark:border-gray-700">
                                             <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
                                                 Дом
                                             </p>

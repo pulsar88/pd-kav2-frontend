@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import Drawer from '@/components/ui/Drawer'
-import { Button, Carousel } from '@/components/ui'
+import { Button, Carousel, Tooltip } from '@/components/ui'
 import ImageGallery from '@/components/shared/ImageGallery'
 import Loading from '@/components/shared/Loading'
 import useResponsive from '@/utils/hooks/useResponsive'
@@ -13,10 +13,12 @@ import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
 import { apiCheckRealtyCollectionProperties } from '@/services/RealtyCollectionsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { stripHtml } from '@/views/special-offers/utils'
 import {
     TbChevronDown,
     TbHeart,
     TbHeartFilled,
+    TbHelpCircle,
     TbLayoutGrid,
     TbPlus,
     TbScale,
@@ -36,8 +38,11 @@ import {
     FloorPlanGallerySlide,
     FloorPlanPathOverlay,
 } from '../FloorPlanOverlay'
-import SpecialOfferBadges from '../SpecialOfferBadges'
-import { resolveDiscountPrice } from '../../specialOfferUtils'
+import {
+    getSpecialOfferDiscountAmount,
+    resolveSpecialOffers,
+} from '../../specialOfferUtils'
+import { getPremisePricePerSqm } from '../../utils'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -251,25 +256,10 @@ const CheckboardPropertyDrawer = ({
         const price =
             propertyDetails?.price ??
             (property.price > 0 ? property.price : undefined)
-        const discountPrice = resolveDiscountPrice(
-            propertyDetails?.discountPrice ?? property.discount_price,
-            {
-                basePrice:
-                    propertyDetails?.price ??
-                    (property.price > 0 ? property.price : undefined),
-                hasOffers: Boolean(
-                    (
-                        propertyDetails?.specialOffers ??
-                        property.special_offers
-                    )?.length,
-                ),
-            },
-        )
         const specialOffers =
             propertyDetails?.specialOffers ??
-            (property.special_offers?.length
-                ? property.special_offers
-                : undefined)
+            resolveSpecialOffers(property.special_offers)
+        const pricePerSqm = getPremisePricePerSqm(price, area)
 
         return {
             section,
@@ -281,7 +271,7 @@ const CheckboardPropertyDrawer = ({
             typeName,
             hasRooms,
             price,
-            discountPrice,
+            pricePerSqm,
             specialOffers,
         }
     }, [property, propertyDetails])
@@ -504,15 +494,6 @@ const CheckboardPropertyDrawer = ({
                                 Изображения
                             </h5>
                             <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
-                                {display.specialOffers?.length ? (
-                                    <div className="absolute left-4 top-4 z-20 max-w-[calc(100%-2rem)]">
-                                        <SpecialOfferBadges
-                                            offers={display.specialOffers}
-                                            max={3}
-                                            interactiveDetails
-                                        />
-                                    </div>
-                                ) : null}
                                 {hasImages ? (
                                     <Carousel
                                         opts={{ loop: imageUrls.length > 1 }}
@@ -634,6 +615,115 @@ const CheckboardPropertyDrawer = ({
 
                         <div>
                             <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                Стоимость
+                            </h5>
+                            <div className="rounded-2xl border border-gray-200 px-4 py-3 dark:border-gray-700">
+                                <div className="flex items-start justify-between gap-4">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                                        Цена
+                                    </span>
+                                    <div className="max-w-[70%] text-right">
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                            {display.price != null &&
+                                            display.price > 0
+                                                ? formatCheckboardPrice(
+                                                      display.price,
+                                                  )
+                                                : '—'}
+                                        </p>
+                                        {display.pricePerSqm != null ? (
+                                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                                {formatCheckboardPrice(
+                                                    display.pricePerSqm,
+                                                )}{' '}
+                                                / м²
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                {display.specialOffers.map((offer) => {
+                                    if (offer.price == null) return null
+
+                                    const offerPricePerSqm =
+                                        getPremisePricePerSqm(
+                                            offer.price,
+                                            display.area,
+                                        )
+                                    const discountAmount =
+                                        getSpecialOfferDiscountAmount(
+                                            display.price,
+                                            offer.price,
+                                        )
+                                    const description = stripHtml(
+                                        offer.description || '',
+                                    )
+
+                                    return (
+                                        <div
+                                            key={offer.id}
+                                            className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                    <span
+                                                        className="inline-flex max-w-full items-center truncate rounded-lg px-2 py-0.5 text-[11px] font-bold leading-tight"
+                                                        style={{
+                                                            backgroundColor:
+                                                                offer.color ||
+                                                                '#0ea5e9',
+                                                            color:
+                                                                offer.text_color ||
+                                                                '#ffffff',
+                                                        }}
+                                                    >
+                                                        {offer.badge_text ||
+                                                            offer.name}
+                                                    </span>
+                                                    {description ? (
+                                                        <Tooltip
+                                                            title={description}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                className="inline-flex shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
+                                                                aria-label="Описание акции"
+                                                            >
+                                                                <TbHelpCircle className="text-base" />
+                                                            </button>
+                                                        </Tooltip>
+                                                    ) : null}
+                                                </div>
+                                                <p className="shrink-0 text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCheckboardPrice(
+                                                        offer.price,
+                                                    )}
+                                                </p>
+                                            </div>
+                                            {discountAmount != null ? (
+                                                <p className="mt-1 text-right text-xs text-emerald-600/80 dark:text-emerald-400/80">
+                                                    Скидка по акции{' '}
+                                                    {formatCheckboardPrice(
+                                                        discountAmount,
+                                                    )}
+                                                </p>
+                                            ) : null}
+                                            {offerPricePerSqm != null ? (
+                                                <p className="mt-0.5 text-right text-xs text-gray-500 dark:text-gray-400">
+                                                    {formatCheckboardPrice(
+                                                        offerPricePerSqm,
+                                                    )}{' '}
+                                                    / м²
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h5 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
                                 Детали помещения
                             </h5>
                             <Loading loading={isDetailsLoading} type="cover">
@@ -670,42 +760,6 @@ const CheckboardPropertyDrawer = ({
                                                 : '—'
                                         }
                                     />
-                                    <InfoRow
-                                        label="Цена"
-                                        value={
-                                            display.price != null &&
-                                            display.price > 0 ? (
-                                                display.discountPrice !=
-                                                    null &&
-                                                display.discountPrice > 0 ? (
-                                                    <span className="text-gray-400 line-through dark:text-gray-500">
-                                                        {formatCheckboardPrice(
-                                                            display.price,
-                                                        )}
-                                                    </span>
-                                                ) : (
-                                                    formatCheckboardPrice(
-                                                        display.price,
-                                                    )
-                                                )
-                                            ) : (
-                                                '—'
-                                            )
-                                        }
-                                    />
-                                    {display.discountPrice != null &&
-                                    display.discountPrice > 0 ? (
-                                        <InfoRow
-                                            label="Акционная цена"
-                                            value={
-                                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                                                    {formatCheckboardPrice(
-                                                        display.discountPrice,
-                                                    )}
-                                                </span>
-                                            }
-                                        />
-                                    ) : null}
                                     <InfoRow
                                         label="Статус"
                                         value={

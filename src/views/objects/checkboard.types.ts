@@ -44,8 +44,10 @@ export type CheckboardProperty = {
         active?: number
         color?: string
         text_color?: string
+        description?: string
         badge_text?: string | null
         badge_icon?: string | null
+        price?: number
     }>
     account_id: number
     checkboard_offset: number | null

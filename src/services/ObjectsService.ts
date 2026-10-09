@@ -113,6 +113,7 @@ type RealtyPropertySpecialOfferApi = {
     end_date?: string
     badge_icon?: string | null
     badge_text?: string | null
+    price?: number | null
 }
 
 type RealtyPropertyApi = {

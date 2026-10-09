@@ -206,54 +206,66 @@
 
 	/* Unified scrollbar styles (native scroll areas) */
 	* {
-			scrollbar-width: thin;
-			scrollbar-color: #9ca3af #f3f4f6;
+		scrollbar-width: thin;
+		scrollbar-color: #9ca3af #f3f4f6;
 	}
 
 	.dark * {
-			scrollbar-color: #9ca3af #f3f4f6;
+		scrollbar-color: #6b7280 #262626;
 	}
 
 	*::-webkit-scrollbar {
-			height: 10px;
-			width: 10px;
+		height: 10px;
+		width: 10px;
 	}
 
 	*::-webkit-scrollbar-track {
-			@apply rounded-full bg-gray-900;
+		@apply rounded-full bg-gray-100 dark:bg-zinc-800;
 	}
 
 	*::-webkit-scrollbar-thumb {
-			@apply rounded-full bg-gray-400 dark:bg-gray-500;
-			border: 2px solid transparent;
-			background-clip: padding-box;
+		@apply rounded-full bg-gray-400 dark:bg-zinc-500;
+		border: 2px solid transparent;
+		background-clip: padding-box;
 	}
 
 	*::-webkit-scrollbar-thumb:hover {
-			@apply bg-primary;
+		@apply bg-primary;
 	}
 
 	*::-webkit-scrollbar-corner {
-			@apply bg-gray-900;
+		@apply bg-gray-100 dark:bg-zinc-800;
 	}
 
 	/* Keep simplebar hidden scrollbars intact */
 	.simplebar-content-wrapper,
 	.simplebar-hide-scrollbar {
-			scrollbar-width: none;
-			-ms-overflow-style: none;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
 	}
 
 	/* Alias for existing usages */
 	.checkboard-scroll {
-			scrollbar-width: thin;
-			scrollbar-color: #9ca3af #f3f4f6;
+		scrollbar-width: thin;
+		scrollbar-color: #9ca3af #f3f4f6;
+	}
+	.dark .checkboard-scroll {
+		scrollbar-color: #6b7280 #262626;
+	}
+	.checkboard-scroll::-webkit-scrollbar-track {
+		@apply bg-gray-100 dark:bg-zinc-800;
+	}
+	.checkboard-scroll::-webkit-scrollbar-corner {
+		@apply bg-gray-100 dark:bg-zinc-800;
 	}
 }
 
 html.dark {
-  scrollbar-color: #6b7280 #171717;
+  scrollbar-color: #6b7280 #262626;
 }
 html.dark *::-webkit-scrollbar-track {
-  background: #171717;
+  background: #262626;
+}
+html.dark *::-webkit-scrollbar-corner {
+  background: #262626;
 }

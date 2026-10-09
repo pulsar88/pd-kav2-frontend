@@ -82,10 +82,32 @@ export const resolveSpecialOffers = (raw: unknown): PremiseSpecialOffer[] => {
             mapped.end_date = offer.endDate
         }
 
+        const pivot =
+            offer.pivot && typeof offer.pivot === 'object'
+                ? (offer.pivot as Record<string, unknown>)
+                : null
+        const offerPrice = toFiniteNumber(
+            offer.price ?? pivot?.price ?? offer.special_price,
+        )
+        if (offerPrice != null) mapped.price = offerPrice
+
         offers.push(mapped)
     })
 
     return offers
+}
+
+/** Скидка по акции = обычная цена − цена по акции */
+export const getSpecialOfferDiscountAmount = (
+    basePrice?: number | null,
+    offerPrice?: number | null,
+): number | undefined => {
+    const base = toFiniteNumber(basePrice)
+    const offer = toFiniteNumber(offerPrice)
+    if (base == null || offer == null) return undefined
+
+    const amount = base - offer
+    return amount > 0 ? amount : undefined
 }
 
 export const hasPremiseDiscount = (premise: {

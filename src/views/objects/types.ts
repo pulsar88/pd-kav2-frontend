@@ -23,6 +23,8 @@ export type PremiseSpecialOffer = {
     end_date?: string
     badge_icon?: string | null
     badge_text?: string | null
+    /** Акционная цена из special_offers.price */
+    price?: number
 }
 
 export type RealtyProjectType = {
