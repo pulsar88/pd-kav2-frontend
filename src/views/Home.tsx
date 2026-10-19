@@ -116,7 +116,7 @@ const Home = () => {
             return undefined
         }
 
-        // API уже поддерживает agent_id[]: null в фильтре означает всех агентов
+        // API ждёт agent_id строкой через запятую; null в фильтре — все агенты
         // выбранного агентства, а не запрос статистики без ограничений.
         return selectedAgentId ?? agencyAgents.agentIds
     }, [agencyAgents, agencyId, analyticsScope.canSelectAgent, selectedAgentId])

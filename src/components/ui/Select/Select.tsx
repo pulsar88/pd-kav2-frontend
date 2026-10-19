@@ -86,16 +86,28 @@ const DefaultMenuList = (props: MenuListProps<any, any, any>) => {
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
         // Вызываем только при скролле вниз, когда до конца остается <= 50px
-        if (scrollTop > prevScrollTopRef.current && scrollHeight - scrollTop - clientHeight <= 50) {
-            onMenuScrollToBottom?.()
+        if (
+            scrollTop > prevScrollTopRef.current &&
+            scrollHeight - scrollTop - clientHeight <= 50
+        ) {
+            // react-select типизирует аргумент как WheelEvent | TouchEvent
+            onMenuScrollToBottom?.(e as unknown as WheelEvent)
         }
         prevScrollTopRef.current = scrollTop
     }
 
+    // Скролл у MenuList, а не у обёртки — scroll-события не всплывают
     return (
-        <div onScroll={handleScroll}>
-            <reactSelectComponents.MenuList {...props} />
-        </div>
+        <reactSelectComponents.MenuList
+            {...props}
+            innerProps={{
+                ...props.innerProps,
+                onScroll: (e) => {
+                    props.innerProps?.onScroll?.(e)
+                    handleScroll(e)
+                },
+            }}
+        />
     )
 }
 

@@ -220,8 +220,9 @@ const ChangeUserAgencyDialog = ({
     // Это гарантирует работу скролла в любом режиме: мобильные устройства, эмуляция DevTools, тачпад, мышь
     useEffect(() => {
         const handleNativeScroll = (e: Event) => {
-            const target = e.target as HTMLElement | null
-            if (!target) return
+            // scroll на window/document даёт target без classList (Document/Window)
+            const target = e.target
+            if (!(target instanceof HTMLElement)) return
 
             const isMenuList =
                 target.classList.contains('select-menu__menu-list') ||

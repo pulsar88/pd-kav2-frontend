@@ -73,15 +73,28 @@ const AgencyMenuList = (
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
-        if (scrollTop > prevScrollTopRef.current && scrollHeight - scrollTop - clientHeight <= 50) {
-            onMenuScrollToBottom?.(e as any)
+        if (
+            scrollTop > prevScrollTopRef.current &&
+            scrollHeight - scrollTop - clientHeight <= 50
+        ) {
+            onMenuScrollToBottom?.(e as unknown as WheelEvent)
         }
         prevScrollTopRef.current = scrollTop
     }
 
+    // Скролл у MenuList, а не у обёртки — scroll-события не всплывают
     return (
-        <div onScroll={handleScroll}>
-            <components.MenuList {...props} />
+        <div>
+            <components.MenuList
+                {...props}
+                innerProps={{
+                    ...props.innerProps,
+                    onScroll: (e) => {
+                        props.innerProps?.onScroll?.(e)
+                        handleScroll(e)
+                    },
+                }}
+            />
             {isLoadingMore ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-xs text-gray-400">
                     <Spinner size={14} />

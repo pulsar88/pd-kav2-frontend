@@ -228,8 +228,9 @@ const JoinAgencyDialog = ({
     // Это гарантирует работу скролла в любом режиме: десктоп, мобильный режим DevTools, тачпад, мышь
     useEffect(() => {
         const handleNativeScroll = (e: Event) => {
-            const target = e.target as HTMLElement | null
-            if (!target) return
+            // scroll на window/document даёт target без classList (Document/Window)
+            const target = e.target
+            if (!(target instanceof HTMLElement)) return
 
             // В react-select выпадающий список рендерится с классом select-menu__menu-list или css-...-MenuList
             const isMenuList =

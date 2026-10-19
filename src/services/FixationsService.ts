@@ -98,7 +98,8 @@ const toStatsAgentIdParams = (
         return {}
     }
 
-    return { 'agent_id[]': ids }
+    // API ожидает agent_id как строку id через запятую: "14,320"
+    return { agent_id: ids.join(',') }
 }
 
 const toStatsObjectIdParams = (
@@ -125,7 +126,7 @@ export async function apiGetFixationsStats(params: {
     agent_id?: number | number[]
     object_id?: number | number[]
 }): Promise<FixationGigalogItem[]> {
-    // Пустое агентство не должно превращаться в запрос без фильтра agent_id[].
+    // Пустое агентство не должно превращаться в запрос без фильтра agent_id.
     if (Array.isArray(params.agent_id) && params.agent_id.length === 0) {
         return []
     }
