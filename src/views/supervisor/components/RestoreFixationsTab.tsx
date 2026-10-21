@@ -1,17 +1,28 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
 import Dropdown from '@/components/ui/Dropdown'
+import Select from '@/components/ui/Select'
 import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import DataTable from '@/components/shared/DataTable'
+import DebouceInput from '@/components/shared/DebouceInput'
 import { apiGetFixations, apiRestoreFixation } from '@/services/FixationsService'
+import { apiGetAgencies, apiGetAgency } from '@/services/AgencyService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import type { AgencyAgent } from '@/@types/agency'
 import type { ColumnDef } from '@/components/shared/DataTable'
-import type { Fixation, GetFixationsResponse } from '@/views/fixations/types'
+import type {
+    Fixation,
+    FixationStatus,
+    GetFixationsResponse,
+} from '@/views/fixations/types'
+import { FIXATION_STATUS_ORDER } from '@/views/fixations/dashboard.constants'
 import {
     formatFixationDate,
+    fixationStatusMap,
     getFixationStatusDisplay,
     getFixationExpiryAccentClass,
 } from '@/views/fixations/utils'
@@ -21,6 +32,7 @@ import {
     TbBuilding,
     TbUser,
     TbColumns,
+    TbSearch,
 } from 'react-icons/tb'
 import FixationRestoreDialog, {
     type FixationRestoreValues,
@@ -35,6 +47,18 @@ export type RestoreColumnId =
     | 'expiresAt'
 
 export type RestoreColumnVisibility = Record<RestoreColumnId, boolean>
+
+type FilterOption = { value: number; label: string }
+
+type StatusOption = {
+    value: FixationStatus
+    label: string
+}
+
+const STATUS_OPTIONS: StatusOption[] = FIXATION_STATUS_ORDER.map((status) => ({
+    value: status,
+    label: fixationStatusMap[status].label,
+}))
 
 export const RESTORE_COLUMN_OPTIONS: Array<{
     id: RestoreColumnId
@@ -84,6 +108,24 @@ const saveColumnVisibility = (visibility: RestoreColumnVisibility) => {
 const RestoreFixationsTab = () => {
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
+    const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState<FixationStatus | undefined>(
+        'expired',
+    )
+    const [agencyId, setAgencyId] = useState<number | undefined>()
+    const [agentId, setAgentId] = useState<number | undefined>()
+    const [agencyOptions, setAgencyOptions] = useState<FilterOption[]>([])
+    const [selectedAgencyOption, setSelectedAgencyOption] =
+        useState<FilterOption | null>(null)
+    const [agencyPage, setAgencyPage] = useState(1)
+    const [hasMoreAgencies, setHasMoreAgencies] = useState(true)
+    const [isLoadingMoreAgencies, setIsLoadingMoreAgencies] = useState(false)
+    const [debouncedAgencySearch, setDebouncedAgencySearch] = useState('')
+    const [searchReloadKey, setSearchReloadKey] = useState(0)
+    const agencySearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    )
+    const [agentOptions, setAgentOptions] = useState<FilterOption[]>([])
     const [columnVisibility, setColumnVisibility] =
         useState<RestoreColumnVisibility>(() => loadColumnVisibility())
     const [data, setData] = useState<GetFixationsResponse | undefined>(undefined)
@@ -97,6 +139,74 @@ const RestoreFixationsTab = () => {
         saveColumnVisibility(columnVisibility)
     }, [columnVisibility])
 
+    useEffect(() => {
+        return () => {
+            if (agencySearchTimerRef.current) {
+                clearTimeout(agencySearchTimerRef.current)
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        if (agencyId != null && !selectedAgencyOption) {
+            void apiGetAgency(agencyId).then((agency) => {
+                if (agency) {
+                    const opt = { value: agency.id, label: agency.name }
+                    setSelectedAgencyOption(opt)
+                    setAgencyOptions((prev) =>
+                        prev.some((item) => item.value === opt.value)
+                            ? prev
+                            : [opt, ...prev],
+                    )
+                }
+            })
+        }
+    }, [agencyId, selectedAgencyOption])
+
+    useEffect(() => {
+        setAgencyPage(1)
+        setHasMoreAgencies(true)
+        void apiGetAgencies({
+            page: 1,
+            per_page: 20,
+            search: debouncedAgencySearch || undefined,
+        }).then((result) => {
+            const list = result.data.map((agency) => ({
+                value: agency.id,
+                label: agency.name,
+            }))
+            setAgencyOptions(() => {
+                const combined =
+                    selectedAgencyOption &&
+                    !list.some(
+                        (item) => item.value === selectedAgencyOption.value,
+                    )
+                        ? [selectedAgencyOption, ...list]
+                        : list
+                return combined
+            })
+            setHasMoreAgencies((result.meta?.last_page ?? 1) > 1)
+        })
+    }, [debouncedAgencySearch, selectedAgencyOption, searchReloadKey])
+
+    useEffect(() => {
+        if (agencyId == null) {
+            setAgentOptions([])
+            setAgentId(undefined)
+            return
+        }
+
+        void apiGetAgency(agencyId, { with: 'agents' }).then((agency) => {
+            const agents = agency?.agents ?? []
+            setAgentOptions(
+                agents.map((agent: AgencyAgent) => ({
+                    value: Number(agent.id),
+                    label: agent.name,
+                })),
+            )
+        })
+    }, [agencyId])
+
     const handleColumnVisibilityChange = (
         columnId: RestoreColumnId,
         visible: boolean,
@@ -109,7 +219,64 @@ const RestoreFixationsTab = () => {
         })
     }
 
-    const visibleColumnsCount = Object.values(columnVisibility).filter(Boolean).length
+    const visibleColumnsCount = Object.values(columnVisibility).filter(
+        Boolean,
+    ).length
+
+    const loadMoreAgencies = () => {
+        if (isLoadingMoreAgencies || !hasMoreAgencies) return
+        const nextPage = agencyPage + 1
+        setIsLoadingMoreAgencies(true)
+        void apiGetAgencies({
+            page: nextPage,
+            per_page: 20,
+            search: debouncedAgencySearch || undefined,
+        })
+            .then((result) => {
+                setAgencyOptions((current) => [
+                    ...current,
+                    ...result.data
+                        .filter(
+                            (agency) =>
+                                !current.some(
+                                    (item) => item.value === agency.id,
+                                ),
+                        )
+                        .map((agency) => ({
+                            value: agency.id,
+                            label: agency.name,
+                        })),
+                ])
+                setAgencyPage(nextPage)
+                setHasMoreAgencies(
+                    (result.meta?.last_page ?? nextPage) > nextPage,
+                )
+            })
+            .finally(() => setIsLoadingMoreAgencies(false))
+    }
+
+    const handleSearchChange = (value: string) => {
+        setSearch(value)
+        setPageIndex(1)
+    }
+
+    const handleAgencySearchChange = (value: string) => {
+        const trimmed = value.trim()
+        setAgencyPage(1)
+        if (agencySearchTimerRef.current) {
+            clearTimeout(agencySearchTimerRef.current)
+            agencySearchTimerRef.current = null
+        }
+        if (!trimmed) {
+            setDebouncedAgencySearch('')
+            setSearchReloadKey((prev) => prev + 1)
+            return
+        }
+        agencySearchTimerRef.current = setTimeout(() => {
+            agencySearchTimerRef.current = null
+            setDebouncedAgencySearch(trimmed)
+        }, 400)
+    }
 
     useEffect(() => {
         let cancelled = false
@@ -118,7 +285,10 @@ const RestoreFixationsTab = () => {
         void apiGetFixations({
             page: pageIndex,
             page_size: pageSize,
-            status: 'expired',
+            search: search || undefined,
+            status: statusFilter,
+            agency_id: agencyId,
+            agent_id: agentId,
         })
             .then((response) => {
                 if (!cancelled) setData(response)
@@ -143,10 +313,21 @@ const RestoreFixationsTab = () => {
         return () => {
             cancelled = true
         }
-    }, [pageIndex, pageSize, refreshKey])
+    }, [
+        pageIndex,
+        pageSize,
+        refreshKey,
+        search,
+        statusFilter,
+        agencyId,
+        agentId,
+    ])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
+
+    const selectedStatus =
+        STATUS_OPTIONS.find((item) => item.value === statusFilter) ?? null
 
     const handleOpenRestore = (fixation: Fixation) => {
         setRestoreFixation(fixation)
@@ -216,30 +397,37 @@ const RestoreFixationsTab = () => {
             {
                 id: 'object',
                 header: 'Объект',
-                size: 240,
-                minSize: 200,
-                cell: (props) => (
-                    <div className="flex items-start gap-2.5 whitespace-nowrap">
-                        <div className="mt-0.5 p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
-                            <TbBuilding className="text-base" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                                {props.row.original.projectName ||
-                                    props.row.original.objectName ||
-                                    '—'}
-                                {props.row.original.apartment
-                                    ? `, кв. ${props.row.original.apartment}`
-                                    : ''}
+                size: 220,
+                minSize: 180,
+                maxSize: 260,
+                cell: (props) => {
+                    const title =
+                        (props.row.original.projectName ||
+                            props.row.original.objectName ||
+                            '—') +
+                        (props.row.original.apartment
+                            ? `, кв. ${props.row.original.apartment}`
+                            : '')
+                    const address = props.row.original.address
+
+                    return (
+                        <div className="flex max-w-[220px] items-start gap-2.5">
+                            <div className="mt-0.5 shrink-0 rounded-lg bg-emerald-50 p-1.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                <TbBuilding className="text-base" />
                             </div>
-                            {props.row.original.address && (
-                                <div className="text-xs text-gray-400 whitespace-nowrap">
-                                    {props.row.original.address}
+                            <div className="min-w-0">
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                    {title}
                                 </div>
-                            )}
+                                {address ? (
+                                    <div className="break-words text-xs leading-snug text-gray-400">
+                                        {address}
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
-                    </div>
-                ),
+                    )
+                },
             },
             {
                 id: 'agent',
@@ -350,76 +538,149 @@ const RestoreFixationsTab = () => {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Панель инструментов: выбор столбцов и обновление */}
-            <div className="flex items-center justify-end gap-2">
-                <Dropdown
-                    placement="bottom-end"
-                    renderTitle={
-                        <Button
-                            type="button"
-                            icon={<TbColumns />}
-                            className="shrink-0"
-                        >
-                            Столбцы
-                        </Button>
-                    }
-                >
-                    <Dropdown.Item variant="header">
-                        <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Отображаемые столбцы
-                        </div>
-                    </Dropdown.Item>
-                    {RESTORE_COLUMN_OPTIONS.map((column) => {
-                        const checked = columnVisibility[column.id]
-                        const disableUncheck =
-                            checked && visibleColumnsCount <= 1
-
-                        return (
-                            <Dropdown.Item
-                                key={column.id}
-                                variant="custom"
-                                onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                }}
+            <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+                <div className="min-w-[260px] flex-1">
+                    <DebouceInput
+                        placeholder="Поиск по фиксациям..."
+                        suffix={<TbSearch className="text-lg" />}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            handleSearchChange(e.target.value)
+                        }
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-[19.5rem]">
+                    <Select<FilterOption, false>
+                        isClearable
+                        isSearchable
+                        placeholder="Все агентства"
+                        options={agencyOptions}
+                        value={
+                            agencyOptions.find(
+                                (item) => item.value === agencyId,
+                            ) ?? null
+                        }
+                        filterOption={() => true}
+                        isLoading={isLoadingMoreAgencies}
+                        onChange={(option) => {
+                            setSelectedAgencyOption(option ?? null)
+                            setAgencyId(option?.value)
+                            setAgentId(undefined)
+                            setPageIndex(1)
+                        }}
+                        onInputChange={(value, actionMeta) => {
+                            if (actionMeta.action === 'input-change') {
+                                handleAgencySearchChange(value)
+                            } else if (
+                                actionMeta.action === 'menu-close' ||
+                                actionMeta.action === 'input-blur'
+                            ) {
+                                handleAgencySearchChange('')
+                            }
+                            return value
+                        }}
+                        onMenuScrollToBottom={loadMoreAgencies}
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-[19.5rem]">
+                    <Select<FilterOption, false>
+                        isClearable
+                        isSearchable
+                        placeholder="Все агенты"
+                        options={agentOptions}
+                        value={
+                            agentOptions.find(
+                                (item) => item.value === agentId,
+                            ) ?? null
+                        }
+                        isDisabled={!agencyId}
+                        onChange={(option) => {
+                            setAgentId(option?.value)
+                            setPageIndex(1)
+                        }}
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-56">
+                    <Select<StatusOption, false>
+                        isClearable
+                        isSearchable={false}
+                        placeholder="Все статусы"
+                        options={STATUS_OPTIONS}
+                        value={selectedStatus}
+                        onChange={(option) => {
+                            setStatusFilter(option?.value)
+                            setPageIndex(1)
+                        }}
+                    />
+                </div>
+                <div className="flex shrink-0 gap-2 lg:ml-auto">
+                    <Dropdown
+                        placement="bottom-end"
+                        renderTitle={
+                            <Button
+                                type="button"
+                                icon={<TbColumns />}
+                                className="shrink-0"
                             >
-                                <label
-                                    className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700/60"
-                                    onClick={(event) =>
-                                        event.stopPropagation()
-                                    }
-                                >
-                                    <Checkbox
-                                        checked={checked}
-                                        disabled={disableUncheck}
-                                        onChange={(value) =>
-                                            handleColumnVisibilityChange(
-                                                column.id,
-                                                value,
-                                            )
-                                        }
-                                    />
-                                    <span className="text-sm">
-                                        {column.label}
-                                    </span>
-                                </label>
-                            </Dropdown.Item>
-                        )
-                    })}
-                </Dropdown>
+                                Столбцы
+                            </Button>
+                        }
+                    >
+                        <Dropdown.Item variant="header">
+                            <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Отображаемые столбцы
+                            </div>
+                        </Dropdown.Item>
+                        {RESTORE_COLUMN_OPTIONS.map((column) => {
+                            const checked = columnVisibility[column.id]
+                            const disableUncheck =
+                                checked && visibleColumnsCount <= 1
 
-                <Button
-                    type="button"
-                    variant="default"
-                    icon={<TbRefresh />}
-                    loading={isLoading}
-                    onClick={() => setRefreshKey((prev) => prev + 1)}
-                >
-                    Обновить
-                </Button>
+                            return (
+                                <Dropdown.Item
+                                    key={column.id}
+                                    variant="custom"
+                                    onClick={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                    }}
+                                >
+                                    <label
+                                        className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700/60"
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                    >
+                                        <Checkbox
+                                            checked={checked}
+                                            disabled={disableUncheck}
+                                            onChange={(value) =>
+                                                handleColumnVisibilityChange(
+                                                    column.id,
+                                                    value,
+                                                )
+                                            }
+                                        />
+                                        <span className="text-sm">
+                                            {column.label}
+                                        </span>
+                                    </label>
+                                </Dropdown.Item>
+                            )
+                        })}
+                    </Dropdown>
+
+                    <Button
+                        type="button"
+                        variant="default"
+                        icon={<TbRefresh />}
+                        loading={isLoading}
+                        onClick={() => setRefreshKey((prev) => prev + 1)}
+                    >
+                        Обновить
+                    </Button>
+                </div>
             </div>
 
-            {/* Таблица */}
             <DataTable
                 className="w-full min-w-[850px]"
                 columns={columns}
@@ -434,7 +695,6 @@ const RestoreFixationsTab = () => {
                 onPaginationChange={setPageIndex}
             />
 
-            {/* Диалог восстановления */}
             <FixationRestoreDialog
                 isOpen={isRestoreOpen}
                 fixation={restoreFixation}
