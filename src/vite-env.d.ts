@@ -9,6 +9,7 @@ interface ImportMetaEnv {
     readonly VITE_PUSHER_FORCE_TLS: string
     readonly VITE_BROADCAST_AUTH_URL: string
     readonly VITE_CRM_BASE_URL: string
+    readonly VITE_SENTRY_DSN: string
 }
 
 interface ImportMeta {
