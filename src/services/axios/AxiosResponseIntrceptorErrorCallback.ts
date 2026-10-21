@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import {
     SERVER_PROBE_HEADER,
     isServerOutageStatus,
@@ -9,6 +10,21 @@ import type { AxiosError } from 'axios'
 
 const unauthorizedCode = [401, 419, 440]
 
+const reportApi400ToSentry = (error: AxiosError) => {
+    const { response, config } = error
+    if (!response || response.status !== 400) return
+
+    Sentry.captureException(
+        new Error(`API Error 400: ${config?.url ?? 'unknown'}`),
+        {
+            extra: {
+                responseData: response.data,
+                requestPayload: config?.data,
+            },
+        },
+    )
+}
+
 const AxiosResponseIntrceptorErrorCallback = (error: AxiosError) => {
     const { response, config } = error
     const { setToken } = useToken()
@@ -18,7 +34,9 @@ const AxiosResponseIntrceptorErrorCallback = (error: AxiosError) => {
             config?.headers?.common?.[SERVER_PROBE_HEADER],
     )
 
-    const responseData = response?.data as { code?: string; message?: string } | undefined
+    const responseData = response?.data as
+        | { code?: string; message?: string }
+        | undefined
     if (
         response?.status === 403 &&
         (responseData?.code === 'user_blocked' ||
@@ -35,6 +53,10 @@ const AxiosResponseIntrceptorErrorCallback = (error: AxiosError) => {
         useServerStatusStore
             .getState()
             .reportServerOutage(response.status, responseData?.message)
+    }
+
+    if (!isProbe) {
+        reportApi400ToSentry(error)
     }
 
     if (response && unauthorizedCode.includes(response.status)) {

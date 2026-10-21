@@ -28,6 +28,7 @@ import {
     apiGetFixationManagers,
     apiSetRelatedClientsForFixation,
 } from '@/services/FixationsService'
+import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
@@ -905,13 +906,15 @@ const FixationsCreateWizardDialog = ({
             complexesPageRef.current = currentPage
             complexesHasMoreRef.current = more
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось загрузить список домов'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось загрузить список домов',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             complexesLoadingMoreRef.current = false
             setIsComplexesLoadingMore(false)
@@ -999,13 +1002,15 @@ const FixationsCreateWizardDialog = ({
             managersPageRef.current = currentPage
             managersHasMoreRef.current = more
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось загрузить список менеджеров'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось загрузить список менеджеров',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             managersLoadingMoreRef.current = false
             setIsManagersLoadingMore(false)
@@ -1250,13 +1255,15 @@ const FixationsCreateWizardDialog = ({
                 { placement: 'top-center' },
             )
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось сохранить данные клиента'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось сохранить данные клиента',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             setIsCreatingClient(false)
         }
@@ -1656,13 +1663,12 @@ const FixationsCreateWizardDialog = ({
             onSuccess?.()
             onClose()
         } catch (err: unknown) {
-            const message =
-                err instanceof Error
-                    ? err.message
-                    : 'Не удалось создать фиксацию'
-            toast.push(<Notification type="danger">{message}</Notification>, {
-                placement: 'top-center',
-            })
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(err, 'Не удалось создать фиксацию')}
+                </Notification>,
+                { placement: 'top-center' },
+            )
         } finally {
             setIsSubmitting(false)
         }

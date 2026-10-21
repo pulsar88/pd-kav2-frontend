@@ -27,36 +27,56 @@ export const unwrapApiData = <T>(payload: ApiDataEnvelope<T> | T): T => {
     return payload as T
 }
 
-export const getApiErrorMessage = (errors: unknown, fallback = 'Произошла ошибка') => {
+const isGenericAxiosMessage = (message?: string) =>
+    Boolean(
+        message &&
+            /^Request failed with status code \d+$/i.test(message.trim()),
+    )
+
+export const getApiErrorMessage = (
+    errors: unknown,
+    fallback = 'Произошла ошибка',
+) => {
     const err = errors as {
         response?: {
-            data?: {
-                message?: string
-                error?: string
-                errors?: Record<string, string[] | string>
-            }
+            data?:
+                | string
+                | {
+                      message?: string
+                      error?: string
+                      errors?: Record<string, string[] | string>
+                  }
         }
         message?: string
     }
 
     const data = err?.response?.data
-    if (data?.message) return data.message
-    if (data?.error) return data.error
+    if (typeof data === 'string' && data.trim()) {
+        return data.trim()
+    }
 
-    if (data?.errors && typeof data.errors === 'object') {
-        const messages = Object.values(data.errors).flatMap((value) => {
-            if (Array.isArray(value)) {
-                return value.filter(Boolean)
+    if (data && typeof data === 'object') {
+        if (data.message?.trim()) return data.message.trim()
+        if (data.error?.trim()) return data.error.trim()
+
+        if (data.errors && typeof data.errors === 'object') {
+            const messages = Object.values(data.errors).flatMap((value) => {
+                if (Array.isArray(value)) {
+                    return value.filter(Boolean)
+                }
+
+                return value ? [value] : []
+            })
+
+            if (messages.length > 0) {
+                return messages.join(' ')
             }
-
-            return value ? [value] : []
-        })
-
-        if (messages.length > 0) {
-            return messages.join(' ')
         }
     }
 
-    if (err?.message) return err.message
+    if (err?.message && !isGenericAxiosMessage(err.message)) {
+        return err.message
+    }
+
     return fallback
 }
