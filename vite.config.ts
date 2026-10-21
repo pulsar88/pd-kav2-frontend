@@ -1,6 +1,8 @@
+import fs from 'node:fs'
+import path from 'path'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 import dynamicImport from 'vite-plugin-dynamic-import'
 
 const resolveRemoteOrigin = (apiBaseUrl?: string) => {
@@ -15,13 +17,62 @@ const resolveRemoteOrigin = (apiBaseUrl?: string) => {
     }
 }
 
+const deleteSourceMaps = (outDir: string) => ({
+    name: 'delete-source-maps',
+    apply: 'build' as const,
+    closeBundle() {
+        const root = path.resolve(outDir)
+        if (!fs.existsSync(root)) {
+            return
+        }
+
+        const walk = (dir: string) => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const fullPath = path.join(dir, entry.name)
+                if (entry.isDirectory()) {
+                    walk(fullPath)
+                } else if (entry.name.endsWith('.map')) {
+                    fs.rmSync(fullPath)
+                }
+            }
+        }
+
+        walk(root)
+    },
+})
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
     const remoteOrigin = resolveRemoteOrigin(env.VITE_API_BASE_URL)
+    const outDir = process.env.BUILD_OUT_DIR || 'build'
+    const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN
 
     return {
-        plugins: [react(), dynamicImport()],
+        plugins: [
+            react(),
+            dynamicImport(),
+            sentryVitePlugin({
+                url: process.env.SENTRY_URL || 'https://sentry.top-metr.ru',
+                org: process.env.SENTRY_ORG,
+                project: process.env.SENTRY_PROJECT,
+                authToken: sentryAuthToken,
+                disable: !sentryAuthToken,
+                telemetry: false,
+                errorHandler(error) {
+                    throw error
+                },
+                release: {
+                    create: false,
+                    finalize: false,
+                    setCommits: false,
+                },
+                sourcemaps: {
+                    filesToDeleteAfterUpload: [`./${outDir}/**/*.map`],
+                },
+            }),
+            deleteSourceMaps(outDir),
+        ],
         assetsInclude: ['**/*.md'],
         resolve: {
             alias: {
@@ -57,7 +108,8 @@ export default defineConfig(({ mode }) => {
             },
         },
         build: {
-            outDir: 'build',
+            outDir,
+            sourcemap: 'hidden',
         },
     }
 })
