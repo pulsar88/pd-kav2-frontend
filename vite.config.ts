@@ -46,16 +46,17 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
     const remoteOrigin = resolveRemoteOrigin(env.VITE_API_BASE_URL)
     const outDir = process.env.BUILD_OUT_DIR || 'build'
-    const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN
+    const sentryAuthToken = env.SENTRY_AUTH_TOKEN
+    const sentryRelease = process.env.SENTRY_RELEASE || env.SENTRY_RELEASE
 
     return {
         plugins: [
             react(),
             dynamicImport(),
             sentryVitePlugin({
-                url: process.env.SENTRY_URL || 'https://sentry.top-metr.ru',
-                org: process.env.SENTRY_ORG,
-                project: process.env.SENTRY_PROJECT,
+                url: env.SENTRY_URL || 'https://sentry.top-metr.ru',
+                org: env.SENTRY_ORG,
+                project: env.SENTRY_PROJECT,
                 authToken: sentryAuthToken,
                 disable: !sentryAuthToken,
                 telemetry: false,
@@ -63,6 +64,7 @@ export default defineConfig(({ mode }) => {
                     throw error
                 },
                 release: {
+                    ...(sentryRelease ? { name: sentryRelease } : {}),
                     create: false,
                     finalize: false,
                     setCommits: false,
