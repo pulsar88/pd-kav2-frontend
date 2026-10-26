@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import DataTable from '@/components/shared/DataTable'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import DebouceInput from '@/components/shared/DebouceInput'
 import Tag from '@/components/ui/Tag'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
+import DatePicker from '@/components/ui/DatePicker'
+import type { DatePickerRangeValue } from '@/components/ui/DatePicker'
 import Dropdown from '@/components/ui/Dropdown'
 import Input from '@/components/ui/Input'
 import Tooltip from '@/components/ui/Tooltip'
@@ -17,6 +21,7 @@ import {
     type FixationExtendRequest,
 } from '@/services/FixationsService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { formatStatsApiDate } from '@/views/fixations/fixationStatsMapper'
 import {
     formatFixationDate,
     formatFixationDateTime,
@@ -33,6 +38,7 @@ import {
     TbPhone,
     TbMessage,
     TbColumns,
+    TbSearch,
 } from 'react-icons/tb'
 
 export type ExtendColumnId =
@@ -200,6 +206,11 @@ const ExtendRequestsTab = () => {
     const [total, setTotal] = useState(0)
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
+    const [search, setSearch] = useState('')
+    const [dateRange, setDateRange] = useState<DatePickerRangeValue>([
+        null,
+        null,
+    ])
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [columnVisibility, setColumnVisibility] =
@@ -210,6 +221,15 @@ const ExtendRequestsTab = () => {
         null,
     )
     const [rejectReason, setRejectReason] = useState('')
+
+    const hasFullDateRange =
+        dateRange[0] instanceof Date && dateRange[1] instanceof Date
+    const dateFrom = hasFullDateRange
+        ? formatStatsApiDate(dateRange[0] as Date)
+        : undefined
+    const dateTo = hasFullDateRange
+        ? formatStatsApiDate(dateRange[1] as Date)
+        : undefined
 
     const closeActionDialog = () => {
         setSelectedRequest(null)
@@ -236,12 +256,25 @@ const ExtendRequestsTab = () => {
     const visibleColumnsCount =
         Object.values(columnVisibility).filter(Boolean).length
 
+    const handleSearchChange = (value: string) => {
+        setSearch(value)
+        setPageIndex(1)
+    }
+
+    const handleDateRangeChange = (value: DatePickerRangeValue) => {
+        setDateRange(value)
+        setPageIndex(1)
+    }
+
     const loadRequests = useCallback(async () => {
         setIsLoading(true)
         try {
             const response = await apiGetFixationExtendRequests({
                 page: pageIndex,
                 page_size: pageSize,
+                search: search || undefined,
+                date_from: dateFrom,
+                date_to: dateTo,
             })
             setRequests(response.list || [])
             setTotal(response.total ?? 0)
@@ -256,7 +289,7 @@ const ExtendRequestsTab = () => {
         } finally {
             setIsLoading(false)
         }
-    }, [pageIndex, pageSize])
+    }, [pageIndex, pageSize, search, dateFrom, dateTo])
 
     useEffect(() => {
         void loadRequests()
@@ -608,73 +641,94 @@ const ExtendRequestsTab = () => {
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Панель инструментов: выбор столбцов и обновление */}
-            <div className="flex items-center justify-end gap-2">
-                <Dropdown
-                    placement="bottom-end"
-                    renderTitle={
-                        <Button
-                            type="button"
-                            icon={<TbColumns />}
-                            className="shrink-0"
-                        >
-                            Столбцы
-                        </Button>
-                    }
-                >
-                    <Dropdown.Item variant="header">
-                        <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            Отображаемые столбцы
-                        </div>
-                    </Dropdown.Item>
-                    {EXTEND_COLUMN_OPTIONS.map((column) => {
-                        const checked = columnVisibility[column.id]
-                        const disableUncheck =
-                            checked && visibleColumnsCount <= 1
-
-                        return (
-                            <Dropdown.Item
-                                key={column.id}
-                                variant="custom"
-                                onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                }}
+            <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center">
+                <div className="min-w-[260px] flex-1">
+                    <DebouceInput
+                        placeholder="Поиск по запросам..."
+                        suffix={<TbSearch className="text-lg" />}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            handleSearchChange(e.target.value)
+                        }
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-72">
+                    <DatePicker.DatePickerRange
+                        value={dateRange}
+                        locale="ru"
+                        inputFormat="DD.MM.YYYY"
+                        placeholder="Период запроса"
+                        separator="—"
+                        maxDate={new Date()}
+                        onChange={handleDateRangeChange}
+                    />
+                </div>
+                <div className="flex shrink-0 gap-2 lg:ml-auto">
+                    <Dropdown
+                        placement="bottom-end"
+                        renderTitle={
+                            <Button
+                                type="button"
+                                icon={<TbColumns />}
+                                className="shrink-0"
                             >
-                                <label
-                                    className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700/60"
-                                    onClick={(event) =>
-                                        event.stopPropagation()
-                                    }
-                                >
-                                    <Checkbox
-                                        checked={checked}
-                                        disabled={disableUncheck}
-                                        onChange={(value) =>
-                                            handleColumnVisibilityChange(
-                                                column.id,
-                                                value,
-                                            )
-                                        }
-                                    />
-                                    <span className="text-sm">
-                                        {column.label}
-                                    </span>
-                                </label>
-                            </Dropdown.Item>
-                        )
-                    })}
-                </Dropdown>
+                                Столбцы
+                            </Button>
+                        }
+                    >
+                        <Dropdown.Item variant="header">
+                            <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                Отображаемые столбцы
+                            </div>
+                        </Dropdown.Item>
+                        {EXTEND_COLUMN_OPTIONS.map((column) => {
+                            const checked = columnVisibility[column.id]
+                            const disableUncheck =
+                                checked && visibleColumnsCount <= 1
 
-                <Button
-                    type="button"
-                    variant="default"
-                    icon={<TbRefresh />}
-                    loading={isLoading}
-                    onClick={() => void loadRequests()}
-                >
-                    Обновить
-                </Button>
+                            return (
+                                <Dropdown.Item
+                                    key={column.id}
+                                    variant="custom"
+                                    onClick={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                    }}
+                                >
+                                    <label
+                                        className="flex cursor-pointer items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700/60"
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                    >
+                                        <Checkbox
+                                            checked={checked}
+                                            disabled={disableUncheck}
+                                            onChange={(value) =>
+                                                handleColumnVisibilityChange(
+                                                    column.id,
+                                                    value,
+                                                )
+                                            }
+                                        />
+                                        <span className="text-sm">
+                                            {column.label}
+                                        </span>
+                                    </label>
+                                </Dropdown.Item>
+                            )
+                        })}
+                    </Dropdown>
+
+                    <Button
+                        type="button"
+                        variant="default"
+                        icon={<TbRefresh />}
+                        loading={isLoading}
+                        onClick={() => void loadRequests()}
+                    >
+                        Обновить
+                    </Button>
+                </div>
             </div>
 
             {/* Таблица с пагинацией и переходом по строке */}

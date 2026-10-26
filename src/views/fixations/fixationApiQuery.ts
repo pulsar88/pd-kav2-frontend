@@ -30,6 +30,14 @@ export const buildFixationsListParams = (params: GetFixationsParams = {}) => {
         }
     }
 
+    if (params.date_from) {
+        query.date_from = params.date_from
+    }
+
+    if (params.date_to) {
+        query.date_to = params.date_to
+    }
+
     return toAxiosParams(query)
 }
 

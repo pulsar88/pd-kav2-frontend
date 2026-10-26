@@ -303,4 +303,14 @@ export const serializeRuPhoneForApi = (input: string) => {
     return `+7${digits}`
 }
 
+/** Сравнивает два RU-телефона по нормализованным 10 цифрам (9xxxxxxxxx). */
+export const phonesMatch = (
+    left?: string | null,
+    right?: string | null,
+): boolean => {
+    const leftDigits = normalizeRuPhoneDigits(left?.trim() ?? '')
+    const rightDigits = normalizeRuPhoneDigits(right?.trim() ?? '')
+    return Boolean(leftDigits && rightDigits && leftDigits === rightDigits)
+}
+
 export const RU_PHONE_REGEX = /^\+7 9\d{2} \d{3} \d{2} \d{2}$/

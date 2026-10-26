@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import Button from '@/components/ui/Button'
 import Checkbox from '@/components/ui/Checkbox'
+import DatePicker from '@/components/ui/DatePicker'
+import type { DatePickerRangeValue } from '@/components/ui/DatePicker'
 import Dropdown from '@/components/ui/Dropdown'
 import Select from '@/components/ui/Select'
 import Tooltip from '@/components/ui/Tooltip'
@@ -16,13 +18,11 @@ import type { AgencyAgent } from '@/@types/agency'
 import type { ColumnDef } from '@/components/shared/DataTable'
 import type {
     Fixation,
-    FixationStatus,
     GetFixationsResponse,
 } from '@/views/fixations/types'
-import { FIXATION_STATUS_ORDER } from '@/views/fixations/dashboard.constants'
+import { formatStatsApiDate } from '@/views/fixations/fixationStatsMapper'
 import {
     formatFixationDate,
-    fixationStatusMap,
     getFixationStatusDisplay,
     getFixationExpiryAccentClass,
 } from '@/views/fixations/utils'
@@ -49,16 +49,6 @@ export type RestoreColumnId =
 export type RestoreColumnVisibility = Record<RestoreColumnId, boolean>
 
 type FilterOption = { value: number; label: string }
-
-type StatusOption = {
-    value: FixationStatus
-    label: string
-}
-
-const STATUS_OPTIONS: StatusOption[] = FIXATION_STATUS_ORDER.map((status) => ({
-    value: status,
-    label: fixationStatusMap[status].label,
-}))
 
 export const RESTORE_COLUMN_OPTIONS: Array<{
     id: RestoreColumnId
@@ -109,9 +99,10 @@ const RestoreFixationsTab = () => {
     const [pageIndex, setPageIndex] = useState(1)
     const pageSize = 20
     const [search, setSearch] = useState('')
-    const [statusFilter, setStatusFilter] = useState<FixationStatus | undefined>(
-        'expired',
-    )
+    const [dateRange, setDateRange] = useState<DatePickerRangeValue>([
+        null,
+        null,
+    ])
     const [agencyId, setAgencyId] = useState<number | undefined>()
     const [agentId, setAgentId] = useState<number | undefined>()
     const [agencyOptions, setAgencyOptions] = useState<FilterOption[]>([])
@@ -260,6 +251,20 @@ const RestoreFixationsTab = () => {
         setPageIndex(1)
     }
 
+    const handleDateRangeChange = (value: DatePickerRangeValue) => {
+        setDateRange(value)
+        setPageIndex(1)
+    }
+
+    const hasFullDateRange =
+        dateRange[0] instanceof Date && dateRange[1] instanceof Date
+    const dateFrom = hasFullDateRange
+        ? formatStatsApiDate(dateRange[0] as Date)
+        : undefined
+    const dateTo = hasFullDateRange
+        ? formatStatsApiDate(dateRange[1] as Date)
+        : undefined
+
     const handleAgencySearchChange = (value: string) => {
         const trimmed = value.trim()
         setAgencyPage(1)
@@ -286,9 +291,11 @@ const RestoreFixationsTab = () => {
             page: pageIndex,
             page_size: pageSize,
             search: search || undefined,
-            status: statusFilter,
+            status: 'expired',
             agency_id: agencyId,
             agent_id: agentId,
+            date_from: dateFrom,
+            date_to: dateTo,
         })
             .then((response) => {
                 if (!cancelled) setData(response)
@@ -318,16 +325,14 @@ const RestoreFixationsTab = () => {
         pageSize,
         refreshKey,
         search,
-        statusFilter,
         agencyId,
         agentId,
+        dateFrom,
+        dateTo,
     ])
 
     const list = data?.list ?? []
     const total = data?.total ?? 0
-
-    const selectedStatus =
-        STATUS_OPTIONS.find((item) => item.value === statusFilter) ?? null
 
     const handleOpenRestore = (fixation: Fixation) => {
         setRestoreFixation(fixation)
@@ -548,6 +553,17 @@ const RestoreFixationsTab = () => {
                         }
                     />
                 </div>
+                <div className="w-full shrink-0 lg:w-72">
+                    <DatePicker.DatePickerRange
+                        value={dateRange}
+                        locale="ru"
+                        inputFormat="DD.MM.YYYY"
+                        placeholder="Период создания"
+                        separator="—"
+                        maxDate={new Date()}
+                        onChange={handleDateRangeChange}
+                    />
+                </div>
                 <div className="w-full shrink-0 lg:w-[19.5rem]">
                     <Select<FilterOption, false>
                         isClearable
@@ -595,19 +611,6 @@ const RestoreFixationsTab = () => {
                         isDisabled={!agencyId}
                         onChange={(option) => {
                             setAgentId(option?.value)
-                            setPageIndex(1)
-                        }}
-                    />
-                </div>
-                <div className="w-full shrink-0 lg:w-56">
-                    <Select<StatusOption, false>
-                        isClearable
-                        isSearchable={false}
-                        placeholder="Все статусы"
-                        options={STATUS_OPTIONS}
-                        value={selectedStatus}
-                        onChange={(option) => {
-                            setStatusFilter(option?.value)
                             setPageIndex(1)
                         }}
                     />

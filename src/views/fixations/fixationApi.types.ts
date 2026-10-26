@@ -167,4 +167,6 @@ export type GetFixationsParams = {
     search?: string
     agency_id?: number
     agent_id?: number
+    date_from?: string
+    date_to?: string
 }

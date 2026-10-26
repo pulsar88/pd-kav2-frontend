@@ -20,6 +20,7 @@ import Checkbox from '@/components/ui/Checkbox'
 import PhoneInput from '@/components/shared/PhoneInput'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import {
     apiCreateFixation,
     apiCreateFixationClient,
@@ -71,6 +72,8 @@ import {
     formatFixationKinship,
     fixationKinshipOptions,
     formatRuPhone,
+    normalizeRuPhoneDigits,
+    phonesMatch,
     RU_PHONE_REGEX,
 } from '../utils'
 import { useSessionUser } from '@/store/authStore'
@@ -91,6 +94,12 @@ type SelectedRelative = {
 }
 
 type ManagerSelection = FixationManager | 'any'
+
+type ExistingClientConflict = {
+    client: FixationClient
+    mode: 'client' | 'relative'
+    relation?: string
+}
 
 type FixationsCreateWizardDialogProps = {
     isOpen: boolean
@@ -567,6 +576,9 @@ const FixationsCreateWizardDialog = ({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isCreatingClient, setIsCreatingClient] = useState(false)
     const [isCreatingRelative, setIsCreatingRelative] = useState(false)
+    const [isSubmittingRelative, setIsSubmittingRelative] = useState(false)
+    const [existingClientConflict, setExistingClientConflict] =
+        useState<ExistingClientConflict | null>(null)
     const contentScrollRef = useRef<HTMLDivElement | null>(null)
     const clientsTableScrollRef = useRef<HTMLDivElement | null>(null)
     const initialSelectionAppliedRef = useRef(false)
@@ -662,6 +674,8 @@ const FixationsCreateWizardDialog = ({
         setSelectedManager(null)
         setSelectedRelatives([])
         setIsCreatingRelative(false)
+        setIsSubmittingRelative(false)
+        setExistingClientConflict(null)
         setNote('')
         setClientPhoneQuery('')
         setClientSearchQuery('')
@@ -1223,43 +1237,102 @@ const FixationsCreateWizardDialog = ({
         setStep('complex')
     }
 
+    const findExistingClientByPhone = async (
+        phone: string,
+    ): Promise<FixationClient | null> => {
+        const digits = normalizeRuPhoneDigits(phone)
+        const response = await apiGetFixationClients({
+            q: digits || phone,
+            page: 1,
+            page_size: CLIENTS_PAGE_SIZE,
+        })
+
+        return (
+            response.list.find((item) => phonesMatch(item.phone, phone)) ?? null
+        )
+    }
+
+    const applySelectedClient = (client: FixationClient, isNew: boolean) => {
+        const nextClient: FixationClient = isNew
+            ? client
+            : { ...client, isNew: false }
+
+        setSelectedClient(nextClient)
+        setSelectedRelatives((prev) =>
+            prev.filter((relative) => relative.client.id !== nextClient.id),
+        )
+        resetClientForm(emptyClientForm)
+        setExistingClientConflict(null)
+        setStep('complex')
+        toast.push(
+            <Notification type="success">
+                {isNew ? 'Клиент заполнен и выбран' : 'Клиент выбран'}
+            </Notification>,
+            { placement: 'top-center' },
+        )
+    }
+
+    const applySelectedRelative = (
+        client: FixationClient,
+        relation: string,
+        isNew: boolean,
+    ) => {
+        const nextClient: FixationClient = isNew
+            ? client
+            : { ...client, isNew: false }
+
+        setSelectedRelatives((prev) => [
+            ...prev.filter((relative) => relative.client.id !== nextClient.id),
+            { client: nextClient, relation },
+        ])
+        setIsCreatingRelative(false)
+        resetRelativeForm(emptyRelativeForm)
+        setExistingClientConflict(null)
+        toast.push(
+            <Notification type="success">
+                {isNew ? 'Родственник добавлен' : 'Родственник выбран'}
+            </Notification>,
+            { placement: 'top-center' },
+        )
+    }
+
     const handleCreateClient = async (values: ClientCreateSchema) => {
         try {
             setIsCreatingClient(true)
+
+            const existing = await findExistingClientByPhone(values.phone)
+            if (existing) {
+                setExistingClientConflict({
+                    client: existing,
+                    mode: 'client',
+                })
+                return
+            }
+
             const fullName = [values.lastName, values.firstName, values.middleName]
                 .map((part) => part?.trim())
                 .filter(Boolean)
                 .join(' ')
 
-            const client: FixationClient = {
-                id: `new-${Date.now()}`,
-                fullName,
-                phone: values.phone,
-                isNew: true,
-                lastName: values.lastName,
-                firstName: values.firstName,
-                secondName: values.middleName,
-                countryCode: 'RU',
-            }
-
-            setSelectedClient(client)
-            setSelectedRelatives((prev) =>
-                prev.filter((relative) => relative.client.id !== client.id),
-            )
-            resetClientForm(emptyClientForm)
-            setStep('complex')
-            toast.push(
-                <Notification type="success">
-                    Клиент заполнен и выбран
-                </Notification>,
-                { placement: 'top-center' },
+            applySelectedClient(
+                {
+                    id: `new-${Date.now()}`,
+                    fullName,
+                    phone: values.phone,
+                    isNew: true,
+                    lastName: values.lastName,
+                    firstName: values.firstName,
+                    secondName: values.middleName,
+                    countryCode: 'RU',
+                },
+                true,
             )
         } catch (err: unknown) {
             toast.push(
                 <Notification type="danger">
                     {getApiErrorMessage(
                         err,
-                        'Не удалось сохранить данные клиента',
+                        'Не удалось проверить номер телефона',
                     )}
                 </Notification>,
                 { placement: 'top-center' },
@@ -1269,35 +1342,73 @@ const FixationsCreateWizardDialog = ({
         }
     }
 
-    const handleCreateRelative = (values: RelativeCreateSchema) => {
-        const fullName = [values.lastName, values.firstName, values.middleName]
-            .map((part) => part?.trim())
-            .filter(Boolean)
-            .join(' ')
+    const handleCreateRelative = async (values: RelativeCreateSchema) => {
+        try {
+            setIsSubmittingRelative(true)
 
-        const newClient: FixationClient = {
-            id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            fullName,
-            phone: values.phone,
-            isNew: true,
-            lastName: values.lastName,
-            firstName: values.firstName,
-            secondName: values.middleName,
-            countryCode: 'RU',
+            const existing = await findExistingClientByPhone(values.phone)
+            if (existing) {
+                setExistingClientConflict({
+                    client: existing,
+                    mode: 'relative',
+                    relation: values.relation,
+                })
+                return
+            }
+
+            const fullName = [values.lastName, values.firstName, values.middleName]
+                .map((part) => part?.trim())
+                .filter(Boolean)
+                .join(' ')
+
+            applySelectedRelative(
+                {
+                    id: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    fullName,
+                    phone: values.phone,
+                    isNew: true,
+                    lastName: values.lastName,
+                    firstName: values.firstName,
+                    secondName: values.middleName,
+                    countryCode: 'RU',
+                },
+                values.relation,
+                true,
+            )
+        } catch (err: unknown) {
+            toast.push(
+                <Notification type="danger">
+                    {getApiErrorMessage(
+                        err,
+                        'Не удалось проверить номер телефона',
+                    )}
+                </Notification>,
+                { placement: 'top-center' },
+            )
+        } finally {
+            setIsSubmittingRelative(false)
+        }
+    }
+
+    const handleConfirmExistingClient = () => {
+        if (!existingClientConflict) {
+            return
         }
 
-        setSelectedRelatives((prev) => [
-            ...prev,
-            { client: newClient, relation: values.relation },
-        ])
-        setIsCreatingRelative(false)
-        resetRelativeForm(emptyRelativeForm)
-        toast.push(
-            <Notification type="success">
-                Родственник добавлен
-            </Notification>,
-            { placement: 'top-center' },
+        if (existingClientConflict.mode === 'client') {
+            applySelectedClient(existingClientConflict.client, false)
+            return
+        }
+
+        applySelectedRelative(
+            existingClientConflict.client,
+            existingClientConflict.relation || '',
+            false,
         )
+    }
+
+    const handleDismissExistingClient = () => {
+        setExistingClientConflict(null)
     }
 
     const handleComplexChange = (option: SelectOption | null) => {
@@ -2802,8 +2913,12 @@ const FixationsCreateWizardDialog = ({
                                                     variant="solid"
                                                     type="submit"
                                                     size="sm"
+                                                    loading={
+                                                        isSubmittingRelative
+                                                    }
                                                     disabled={
-                                                        !isRelativeFormValid
+                                                        !isRelativeFormValid ||
+                                                        isSubmittingRelative
                                                     }
                                                 >
                                                     Добавить родственника
@@ -3287,6 +3402,36 @@ const FixationsCreateWizardDialog = ({
                     </div>
                 </div>
             </Dialog>
+
+            <ConfirmDialog
+                isOpen={Boolean(existingClientConflict)}
+                type="warning"
+                title="Клиент уже существует"
+                confirmText="Выбрать этого клиента"
+                cancelText="Изменить номер"
+                overlayClassName="!z-[70]"
+                onClose={handleDismissExistingClient}
+                onCancel={handleDismissExistingClient}
+                onConfirm={handleConfirmExistingClient}
+            >
+                <p className="text-sm text-gray-700 dark:text-gray-200">
+                    Клиент с номером{' '}
+                    <span className="font-medium">
+                        {existingClientConflict?.client.phone || '—'}
+                    </span>{' '}
+                    уже есть в системе.
+                </p>
+                <p className="mt-2 text-sm text-gray-700 dark:text-gray-200">
+                    <span className="font-medium">
+                        {existingClientConflict?.client.fullName || '—'}
+                    </span>
+                </p>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    {existingClientConflict?.mode === 'relative'
+                        ? 'Можно выбрать его как родственника или изменить номер.'
+                        : 'Можно выбрать его для фиксации или изменить номер.'}
+                </p>
+            </ConfirmDialog>
         </>
     )
 }

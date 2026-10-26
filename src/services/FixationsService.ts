@@ -654,12 +654,21 @@ export async function apiGetFixationExtendRequests(params?: {
     page?: number
     page_size?: number
     search?: string
+    date_from?: string
+    date_to?: string
     with?: string
 }): Promise<{ list: FixationExtendRequest[]; total: number }> {
-    const queryParams: Record<string, unknown> = {
-        with: 'fixation.object,fixation.client,fixation.client.phones,fixation.agent,reviewer',
-        ...(params ? toAxiosParams(params) : {}),
-    }
+    const search = params?.search?.trim()
+    const queryParams = toAxiosParams({
+        with:
+            params?.with ||
+            'fixation.object,fixation.client,fixation.client.phones,fixation.agent,reviewer',
+        ...(params?.page != null ? { page: params.page } : {}),
+        ...(params?.page_size != null ? { page_size: params.page_size } : {}),
+        ...(search ? { search } : {}),
+        ...(params?.date_from ? { date_from: params.date_from } : {}),
+        ...(params?.date_to ? { date_to: params.date_to } : {}),
+    })
 
     const response = await ApiService.fetchDataWithAxios<
         | FixationExtendRequest[]

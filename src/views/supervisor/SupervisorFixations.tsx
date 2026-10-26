@@ -17,7 +17,7 @@ const SupervisorFixations = () => {
             <div className="mb-6">
                 <h3 className="mb-1">Управление фиксациями</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Управление запросами на продление и восстановлением фиксаций
+                    Управление запросами на продление и восстановление фиксаций
                 </p>
             </div>
 
