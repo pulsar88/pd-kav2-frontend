@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import classNames from '@/utils/classNames'
 import useResponsive from '@/utils/hooks/useResponsive'
+import Alert from '@/components/ui/Alert'
 import Button from '@/components/ui/Button'
 import Dialog from '@/components/ui/Dialog'
 import Steps from '@/components/ui/Steps'
@@ -3107,7 +3108,26 @@ const FixationsCreateWizardDialog = ({
                         ) : null}
 
                         {step === 'confirm' ? (
-                            <div className="grid gap-4 md:grid-cols-2">
+                            <div className="flex flex-col gap-4">
+                                <Alert
+                                    showIcon
+                                    className="[&>div]:items-start border border-amber-300 !bg-amber-100 !text-amber-900 [&_span]:!text-amber-700 dark:border-transparent dark:!bg-warning-subtle dark:!text-warning dark:[&_span]:!text-warning"
+                                    type="warning"
+                                >
+                                    <p>
+                                        Обращаем внимание, что продление
+                                        фиксации клиента осуществляется Агентом
+                                        самостоятельно через Кабинет агента. Для
+                                        этого в списке фиксаций необходимо
+                                        нажать на активную кнопку «Продлить
+                                        фиксацию».
+                                    </p>
+                                    <p className="mt-2 font-semibold">
+                                        После истечения срока фиксации её
+                                        продление становится невозможным.
+                                    </p>
+                                </Alert>
+                                <div className="grid gap-4 md:grid-cols-2">
                                 <SummaryCard
                                     icon={<TbUser />}
                                     label="Клиент"
@@ -3219,6 +3239,7 @@ const FixationsCreateWizardDialog = ({
                                         />
                                     </>
                                 ) : null}
+                                </div>
                             </div>
                         ) : null}
                     </div>
