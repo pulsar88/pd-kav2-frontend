@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from 'react'
 import classNames from '@/utils/classNames'
 import useResponsive from '@/utils/hooks/useResponsive'
 import Alert from '@/components/ui/Alert'
@@ -35,7 +35,7 @@ import { apiGetCheckboard, apiGetRealtyObject } from '@/services/ObjectsService'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { lastNameFieldValidation, firstNameFieldValidation, isValidHumanName, isFakeDuplication, normalizeHumanName } from '../nameValidation'
+import { lastNameFieldValidation, firstNameFieldValidation, middleNameFieldValidation, normalizeHumanName, splitPastedFullName } from '../nameValidation'
 import 'dayjs/locale/ru'
 import debounce from 'lodash/debounce'
 import { HiChevronDown } from 'react-icons/hi'
@@ -406,83 +406,35 @@ const CLIENT_PERSONAL_DATA_CONSENT_TEXT =
 
 
 
-const clientCreateSchema = z
-    .object({
-        lastName: lastNameFieldValidation,
-        firstName: firstNameFieldValidation,
-        middleName: z
-            .string()
-            .transform((val) => normalizeHumanName(val))
-            .refine(
-                (val) => !val || isValidHumanName(val),
-                { message: 'Укажите корректное отчество или оставьте пустым' },
-            )
-            .optional(),
-        phone: z
-            .string()
-            .min(1, { message: 'Введите номер телефона' })
-            .regex(RU_PHONE_REGEX, {
-                message: 'Введите номер телефона',
-            }),
-        personalDataConsent: z.boolean().refine((value) => value, {
-            message: 'Необходимо подтверждение',
+const clientCreateSchema = z.object({
+    lastName: lastNameFieldValidation,
+    firstName: firstNameFieldValidation,
+    middleName: middleNameFieldValidation,
+    phone: z
+        .string()
+        .min(1, { message: 'Введите номер телефона' })
+        .regex(RU_PHONE_REGEX, {
+            message: 'Введите номер телефона',
         }),
-    })
-    .superRefine((data, ctx) => {
-        const last = data.lastName?.trim()
-        const first = data.firstName?.trim()
-        if (last && first && isFakeDuplication(last, first)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Фамилия и имя не должны дублировать друг друга',
-                path: ['lastName'],
-            })
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Имя не должно дублировать фамилию',
-                path: ['firstName'],
-            })
-        }
-    })
+    personalDataConsent: z.boolean().refine((value) => value, {
+        message: 'Необходимо подтверждение',
+    }),
+})
 
 type ClientCreateSchema = z.infer<typeof clientCreateSchema>
 
-const relativeCreateSchema = z
-    .object({
-        lastName: lastNameFieldValidation,
-        firstName: firstNameFieldValidation,
-        middleName: z
-            .string()
-            .transform((val) => normalizeHumanName(val))
-            .refine(
-                (val) => !val || isValidHumanName(val),
-                { message: 'Укажите корректное отчество или оставьте пустым' },
-            )
-            .optional(),
-        phone: z
-            .string()
-            .min(1, { message: 'Введите номер телефона' })
-            .regex(RU_PHONE_REGEX, {
-                message: 'Введите номер телефона',
-            }),
-        relation: z.string().min(1, { message: 'Выберите степень родства' }),
-    })
-    .superRefine((data, ctx) => {
-        const last = data.lastName?.trim()
-        const first = data.firstName?.trim()
-        if (last && first && isFakeDuplication(last, first)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Фамилия и имя не должны дублировать друг друга',
-                path: ['lastName'],
-            })
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'Имя не должно дублировать фамилию',
-                path: ['firstName'],
-            })
-        }
-    })
+const relativeCreateSchema = z.object({
+    lastName: lastNameFieldValidation,
+    firstName: firstNameFieldValidation,
+    middleName: middleNameFieldValidation,
+    phone: z
+        .string()
+        .min(1, { message: 'Введите номер телефона' })
+        .regex(RU_PHONE_REGEX, {
+            message: 'Введите номер телефона',
+        }),
+    relation: z.string().min(1, { message: 'Выберите степень родства' }),
+})
 
 type RelativeCreateSchema = z.infer<typeof relativeCreateSchema>
 
@@ -563,6 +515,12 @@ const SummaryCard = ({
         </Button>
     </div>
 )
+
+const pastedNameFieldOptions = {
+    shouldDirty: true,
+    shouldTouch: true,
+    shouldValidate: true,
+} as const
 
 const FixationsCreateWizardDialog = ({
     isOpen,
@@ -646,6 +604,7 @@ const FixationsCreateWizardDialog = ({
         control: clientControl,
         handleSubmit: handleClientSubmit,
         reset: resetClientForm,
+        setValue: setClientValue,
         formState: { errors: clientErrors, isValid: isClientFormValid },
     } = useForm<ClientCreateSchema>({
         defaultValues: emptyClientForm,
@@ -657,12 +616,31 @@ const FixationsCreateWizardDialog = ({
         control: relativeControl,
         handleSubmit: handleRelativeSubmit,
         reset: resetRelativeForm,
+        setValue: setRelativeValue,
         formState: { errors: relativeErrors, isValid: isRelativeFormValid },
     } = useForm<RelativeCreateSchema>({
         defaultValues: emptyRelativeForm,
         resolver: zodResolver(relativeCreateSchema),
         mode: 'onChange',
     })
+
+    const handleClientNamePaste = (event: ClipboardEvent<HTMLInputElement>) => {
+        const parsed = splitPastedFullName(event.clipboardData.getData('text'))
+        if (!parsed) return
+        event.preventDefault()
+        setClientValue('lastName', parsed.lastName, pastedNameFieldOptions)
+        setClientValue('firstName', parsed.firstName, pastedNameFieldOptions)
+        setClientValue('middleName', parsed.middleName, pastedNameFieldOptions)
+    }
+
+    const handleRelativeNamePaste = (event: ClipboardEvent<HTMLInputElement>) => {
+        const parsed = splitPastedFullName(event.clipboardData.getData('text'))
+        if (!parsed) return
+        event.preventDefault()
+        setRelativeValue('lastName', parsed.lastName, pastedNameFieldOptions)
+        setRelativeValue('firstName', parsed.firstName, pastedNameFieldOptions)
+        setRelativeValue('middleName', parsed.middleName, pastedNameFieldOptions)
+    }
 
     const resetWizard = () => {
         setStep('client')
@@ -1932,6 +1910,7 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="family-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onPaste={handleClientNamePaste}
                                                     onBlur={(e) => {
                                                         const normalized = normalizeHumanName(e.target.value)
                                                         if (normalized !== e.target.value) field.onChange(normalized)
@@ -1958,6 +1937,7 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="given-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onPaste={handleClientNamePaste}
                                                     onBlur={(e) => {
                                                         const normalized = normalizeHumanName(e.target.value)
                                                         if (normalized !== e.target.value) field.onChange(normalized)
@@ -1985,6 +1965,7 @@ const FixationsCreateWizardDialog = ({
                                                     autoComplete="additional-name"
                                                     {...field}
                                                     onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                    onPaste={handleClientNamePaste}
                                                     onBlur={(e) => {
                                                         const normalized = normalizeHumanName(e.target.value)
                                                         if (normalized !== e.target.value) field.onChange(normalized)
@@ -2735,6 +2716,7 @@ const FixationsCreateWizardDialog = ({
                                                                 autoComplete="family-name"
                                                                 {...field}
                                                                 onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onPaste={handleRelativeNamePaste}
                                                                 onBlur={(e) => {
                                                                     const normalized = normalizeHumanName(e.target.value)
                                                                     if (normalized !== e.target.value) field.onChange(normalized)
@@ -2768,6 +2750,7 @@ const FixationsCreateWizardDialog = ({
                                                                 autoComplete="given-name"
                                                                 {...field}
                                                                 onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onPaste={handleRelativeNamePaste}
                                                                 onBlur={(e) => {
                                                                     const normalized = normalizeHumanName(e.target.value)
                                                                     if (normalized !== e.target.value) field.onChange(normalized)
@@ -2800,6 +2783,7 @@ const FixationsCreateWizardDialog = ({
                                                                 autoComplete="additional-name"
                                                                 {...field}
                                                                 onChange={(e) => field.onChange(e.target.value.replace(/^\s+/, ''))}
+                                                                onPaste={handleRelativeNamePaste}
                                                                 onBlur={(e) => {
                                                                     const normalized = normalizeHumanName(e.target.value)
                                                                     if (normalized !== e.target.value) field.onChange(normalized)
