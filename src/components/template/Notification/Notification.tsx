@@ -1,27 +1,21 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import classNames from 'classnames'
+import { HiOutlineMailOpen } from 'react-icons/hi'
+import { PiCheckCircle } from 'react-icons/pi'
 
 import withHeaderItem from '@/utils/hoc/withHeaderItem'
-
 import Dropdown from '@/components/ui/Dropdown'
-
+import type { DropdownRef } from '@/components/ui/Dropdown'
 import ScrollBar from '@/components/ui/ScrollBar'
-
 import Spinner from '@/components/ui/Spinner'
-
 import Badge from '@/components/ui/Badge'
-
 import Button from '@/components/ui/Button'
-
 import NotificationToggle from './NotificationToggle'
 
 import UserLogAvatar from '@/views/notifications/components/UserLogAvatar'
+import UserLogActionButton from '@/views/notifications/components/UserLogActionButton'
 import NotificationLogSkeleton from '@/views/notifications/components/NotificationLogSkeleton'
-
-import { HiOutlineMailOpen } from 'react-icons/hi'
-
-import { PiCheckCircle } from 'react-icons/pi'
 
 import {
     apiGetNotificationDictionaries,
@@ -34,61 +28,71 @@ import {
     formatUserLogTime,
     getUserLogBadgeInnerClass,
     isUserLogRead,
-    resolveLogActionHref,
 } from '@/views/notifications/utils'
 
 import { getUserLogTypeName } from '@/utils/notificationDictionary'
-
 import { registerUserLogsBroadcastHandlers } from '@/services/broadcast/userLogsBroadcastBus'
-
 import useInfiniteScroll from '@/utils/hooks/useInfiniteScroll'
-
-import isLastChild from '@/utils/isLastChild'
-
 import useResponsive from '@/utils/hooks/useResponsive'
 
-import { useNavigate, Link } from 'react-router'
-
-import type { DropdownRef } from '@/components/ui/Dropdown'
-
 import type {
-    UserLog,
     NotificationTypeDictionaryItem,
+    UserLog,
 } from '@/@types/notification'
 
 const notificationExpandedHeight = 'h-[280px]'
+const seenNotificationRatio = 0.6
 
-const _Notification = ({ className }: { className?: string }) => {
+const isNotificationSeen = (entry: IntersectionObserverEntry) => {
+    if (entry.intersectionRatio >= seenNotificationRatio) {
+        return true
+    }
+
+    const rootHeight = entry.rootBounds?.height ?? 0
+
+    return (
+        rootHeight > 0 &&
+        entry.isIntersecting &&
+        entry.boundingClientRect.height > rootHeight &&
+        entry.intersectionRect.height >= rootHeight * 0.85
+    )
+}
+
+type NotificationProps = {
+    className?: string
+}
+
+const _Notification = ({ className }: NotificationProps) => {
     const [notificationList, setNotificationList] = useState<UserLog[]>([])
-
-    const [unreadCount, setUnreadCount] = useState(0)
-
-    const [badgePulseKey, setBadgePulseKey] = useState(0)
-
-    const [initialLoading, setInitialLoading] = useState(false)
-
-    const [loaded, setLoaded] = useState(false)
-
-    const [page, setPage] = useState(1)
-
-    const [hasMore, setHasMore] = useState(false)
-
     const [notificationTypes, setNotificationTypes] = useState<
         NotificationTypeDictionaryItem[]
     >([])
+    const [unreadCount, setUnreadCount] = useState(0)
+    const [badgePulseKey, setBadgePulseKey] = useState(0)
+    const [initialLoading, setInitialLoading] = useState(false)
+    const [loaded, setLoaded] = useState(false)
+    const [hasMore, setHasMore] = useState(false)
+    const [page, setPage] = useState(1)
 
     const { larger } = useResponsive()
-
     const navigate = useNavigate()
 
-    const refreshUnreadCount = useCallback(async () => {
-        const count = await apiGetUnreadLogsCount()
+    const notificationDropdownRef = useRef<DropdownRef>(null)
+    const loadRequestRef = useRef(0)
+    const seenNotificationIdsRef = useRef<Set<number>>(new Set())
+    const scrollRootRef = useRef<HTMLElement | null>(null)
 
-        setUnreadCount(count)
+    const refreshUnreadCount = useCallback(async () => {
+        try {
+            const count = await apiGetUnreadLogsCount()
+            setUnreadCount(count)
+        } catch {
+            // Счётчик не критичен для работы уведомлений
+        }
     }, [])
 
     useEffect(() => {
-        refreshUnreadCount()
+        void refreshUnreadCount()
     }, [refreshUnreadCount])
 
     useEffect(() => {
@@ -118,12 +122,40 @@ const _Notification = ({ className }: { className?: string }) => {
         })
     }, [refreshUnreadCount])
 
-    const onNotificationOpen = async () => {
-        const isFirstLoad = !loaded
+    const loadPage = useCallback(
+        async (pageNumber: number) => {
+            const response = await apiGetUserLogs({
+                page: pageNumber,
+                is_unread: true,
+                set_read: false,
+                notificationTypes,
+            })
 
-        if (isFirstLoad) {
-            setInitialLoading(true)
+            return response
+        },
+        [notificationTypes],
+    )
+
+    const onNotificationOpen = async (open: boolean) => {
+        if (!open) {
+            const ids = [...seenNotificationIdsRef.current]
+            seenNotificationIdsRef.current.clear()
+
+            if (ids.length > 0) {
+                void apiMarkUserLogsAsRead({ ids })
+            }
+
+            return
         }
+
+        seenNotificationIdsRef.current.clear()
+
+        const requestId = loadRequestRef.current + 1
+        loadRequestRef.current = requestId
+
+        const knownIds = new Set(notificationList.map((item) => item.id))
+
+        setInitialLoading(true)
 
         try {
             let types = notificationTypes
@@ -131,57 +163,78 @@ const _Notification = ({ className }: { className?: string }) => {
             if (types.length === 0) {
                 const dictionaries = await apiGetNotificationDictionaries()
                 types = dictionaries.notification_types
+
+                if (requestId !== loadRequestRef.current) {
+                    return
+                }
+
                 setNotificationTypes(types)
             }
 
             const response = await apiGetUserLogs({
                 page: 1,
                 is_unread: true,
-                set_read: true,
+                set_read: false,
                 notificationTypes: types,
             })
 
-            setNotificationList(response.data)
+            if (requestId !== loadRequestRef.current) {
+                return
+            }
+
+            setNotificationList((current) => {
+                const fetchedIds = new Set(response.data.map((item) => item.id))
+                const arrivedDuringLoad = current.filter(
+                    (item) =>
+                        !knownIds.has(item.id) && !fetchedIds.has(item.id),
+                )
+
+                return [...arrivedDuringLoad, ...response.data]
+            })
             setHasMore(response.meta.current_page < response.meta.last_page)
             setPage(1)
             setLoaded(true)
             await refreshUnreadCount()
         } finally {
-            setInitialLoading(false)
+            if (requestId === loadRequestRef.current) {
+                setInitialLoading(false)
+            }
         }
     }
 
-    const handleLoadMore = useCallback(async () => {
+    const onLoadMore = useCallback(async () => {
+        if (!hasMore) {
+            return
+        }
+
         const nextPage = page + 1
-
-        const response = await apiGetUserLogs({
-            page: nextPage,
-
-            is_unread: true,
-
-            set_read: true,
-
-            notificationTypes,
-        })
+        const response = await loadPage(nextPage)
 
         setNotificationList((prevList) => [...prevList, ...response.data])
-
         setHasMore(response.meta.current_page < response.meta.last_page)
-
         setPage(nextPage)
-    }, [notificationTypes, page])
+    }, [hasMore, loadPage, page])
 
     const { containerRef, isLoading: loadingMore } = useInfiniteScroll({
-        shouldStop: !hasMore || !loaded || initialLoading,
-
-        onLoadMore: handleLoadMore,
+        shouldStop: !hasMore || !loaded,
+        onLoadMore,
     })
 
-    const unreadIds = notificationList
+    const setScrollNode = (node: HTMLElement | null) => {
+        scrollRootRef.current = node
 
-        .filter((item) => !isUserLogRead(item))
+        if (typeof containerRef === 'function') {
+            containerRef(node)
+        }
+    }
 
-        .map((item) => item.id)
+    const unreadIds = useMemo(
+        () =>
+            notificationList
+                .filter((item) => !isUserLogRead(item))
+                .map((item) => item.id),
+        [notificationList],
+    )
 
     const onMarkAllAsRead = async () => {
         if (unreadIds.length === 0) {
@@ -191,9 +244,7 @@ const _Notification = ({ className }: { className?: string }) => {
         await apiMarkUserLogsAsRead({ ids: unreadIds })
 
         setNotificationList([])
-
         setHasMore(false)
-
         await refreshUnreadCount()
     }
 
@@ -213,21 +264,66 @@ const _Notification = ({ className }: { className?: string }) => {
         await refreshUnreadCount()
     }
 
-    const notificationDropdownRef = useRef<DropdownRef>(null)
-
     const handleViewAllActivity = () => {
         setNotificationList([])
-        navigate('/account/notifications')
+        setHasMore(false)
         notificationDropdownRef.current?.handleDropdownClose()
+        navigate('/account/notifications')
     }
 
-    const showEmptyState = loaded && notificationList.length === 0
+    /* Отмечаем уведомления прочитанными, когда пользователь реально их увидел */
+    useEffect(() => {
+        const root = scrollRootRef.current
+
+        if (!root || !loaded) {
+            return
+        }
+
+        const nodes = root.querySelectorAll<HTMLElement>(
+            '[data-notification-id]',
+        )
+
+        if (nodes.length === 0) {
+            return
+        }
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    const element = entry.target as HTMLElement
+
+                    if (element.dataset.notificationUnread !== 'true') {
+                        return
+                    }
+
+                    if (!isNotificationSeen(entry)) {
+                        return
+                    }
+
+                    const id = Number(element.dataset.notificationId)
+
+                    if (!Number.isFinite(id)) {
+                        return
+                    }
+
+                    seenNotificationIdsRef.current.add(id)
+                })
+            },
+            { root, threshold: [0, seenNotificationRatio, 1] },
+        )
+
+        nodes.forEach((node) => observer.observe(node))
+
+        return () => observer.disconnect()
+    }, [loaded, notificationList])
+
+    const showEmptyState =
+        !initialLoading && loaded && notificationList.length === 0
 
     const useExpandedHeight = notificationList.length >= 3
 
     const scrollAreaHeight = useMemo(
         () => (useExpandedHeight ? notificationExpandedHeight : 'h-auto'),
-
         [useExpandedHeight],
     )
 
@@ -252,99 +348,25 @@ const _Notification = ({ className }: { className?: string }) => {
             <Dropdown.Item variant="header">
                 <div className="dark:border-gray-700 px-2 flex items-center justify-between mb-1">
                     <h6>Уведомления</h6>
-
                     <Button
                         variant="plain"
                         shape="circle"
                         size="sm"
                         icon={<HiOutlineMailOpen className="text-xl" />}
                         title="Отметить все как прочитанные"
-                        onClick={onMarkAllAsRead}
+                        disabled={unreadIds.length === 0}
+                        onClick={() => {
+                            void onMarkAllAsRead()
+                        }}
                     />
                 </div>
             </Dropdown.Item>
 
             <ScrollBar
                 className={classNames('overflow-y-auto', scrollAreaHeight)}
-                scrollableNodeProps={{ ref: containerRef }}
+                scrollableNodeProps={{ ref: setScrollNode }}
             >
-                {notificationList.length > 0 &&
-                    notificationList.map((item, index) => {
-                        const action = item.action
-                            ? resolveLogActionHref(item.action.url)
-                            : null
-
-                        return (
-                            <div key={item.id}>
-                                <div
-                                    className="relative flex cursor-pointer gap-3 rounded-xl border border-transparent px-4 py-3 transition-all duration-200 hover:border-primary hover:bg-primary/10 hover:shadow-md dark:hover:border-primary dark:hover:bg-primary/15"
-                                    onClick={() => onMarkAsRead(item.id)}
-                                >
-                                    <UserLogAvatar type={item.type} />
-
-                                    <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <p className="font-semibold heading-text min-w-0">
-                                                {getUserLogTypeName(item)}
-                                            </p>
-
-                                            <Badge
-                                                className="mt-1 shrink-0 border-0"
-                                                innerClass={getUserLogBadgeInnerClass(
-                                                    item,
-                                                )}
-                                            />
-                                        </div>
-
-                                        <p className="heading-text text-sm">
-                                            {item.message}
-                                        </p>
-
-                                        {item.action ? (
-                                            <div>
-                                                {action?.external ? (
-                                                    <a
-                                                        href={item.action.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="text-sm font-medium text-primary hover:underline"
-                                                        onClick={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                    >
-                                                        {item.action.text}
-                                                    </a>
-                                                ) : (
-                                                    <Link
-                                                        to={
-                                                            action?.href ||
-                                                            item.action.url
-                                                        }
-                                                        className="text-sm font-medium text-primary hover:underline"
-                                                        onClick={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                    >
-                                                        {item.action.text}
-                                                    </Link>
-                                                )}
-                                            </div>
-                                        ) : null}
-
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {formatUserLogTime(item.created_at)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {!isLastChild(notificationList, index) ? (
-                                    <div className="border-b border-gray-200 dark:border-gray-700 my-2" />
-                                ) : null}
-                            </div>
-                        )
-                    })}
-
-                {initialLoading && (
+                {initialLoading && notificationList.length === 0 ? (
                     <div className="px-1 py-2">
                         <NotificationLogSkeleton
                             count={2}
@@ -352,7 +374,62 @@ const _Notification = ({ className }: { className?: string }) => {
                             compact
                         />
                     </div>
-                )}
+                ) : null}
+
+                {notificationList.map((item) => {
+                    return (
+                        <div key={item.id}>
+                            <div
+                                data-notification-id={item.id}
+                                data-notification-unread={
+                                    isUserLogRead(item) ? 'false' : 'true'
+                                }
+                                className="relative flex cursor-pointer gap-3 rounded-xl border border-transparent px-4 py-3 transition-all duration-200 hover:border-primary hover:bg-primary/10 hover:shadow-md dark:hover:border-primary dark:hover:bg-primary/15"
+                                onClick={() => {
+                                    void onMarkAsRead(item.id)
+                                }}
+                            >
+                                <UserLogAvatar type={item.type} />
+
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p className="font-semibold heading-text min-w-0">
+                                            {getUserLogTypeName(item)}
+                                        </p>
+                                        <Badge
+                                            className="mt-1 shrink-0 border-0"
+                                            innerClass={getUserLogBadgeInnerClass(
+                                                item,
+                                            )}
+                                        />
+                                    </div>
+
+                                    <p
+                                        className="line-clamp-2 break-words text-sm heading-text"
+                                        title={item.message}
+                                    >
+                                        {item.message}
+                                    </p>
+
+                                    {item.action ? (
+                                        <div className="mt-1.5">
+                                            <UserLogActionButton
+                                                action={item.action}
+                                                onRead={() => {
+                                                    void onMarkAsRead(item.id)
+                                                }}
+                                            />
+                                        </div>
+                                    ) : null}
+
+                                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {formatUserLogTime(item.created_at)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
 
                 {loadingMore && notificationList.length > 0 ? (
                     <div className="flex items-center justify-center py-3">
@@ -360,11 +437,10 @@ const _Notification = ({ className }: { className?: string }) => {
                     </div>
                 ) : null}
 
-                {showEmptyState && (
+                {showEmptyState ? (
                     <div
                         className={classNames(
                             'flex items-center justify-center',
-
                             centeredContentHeight,
                         )}
                     >
@@ -372,13 +448,12 @@ const _Notification = ({ className }: { className?: string }) => {
                             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-3xl text-gray-400 dark:bg-gray-700 dark:text-gray-500">
                                 <PiCheckCircle />
                             </div>
-
                             <h6 className="font-semibold">
                                 Новых уведомлений нет
                             </h6>
                         </div>
                     </div>
-                )}
+                ) : null}
             </ScrollBar>
 
             <Dropdown.Item variant="header">

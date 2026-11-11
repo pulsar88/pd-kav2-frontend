@@ -10,6 +10,12 @@ import Checkbox from '@/components/ui/Checkbox'
 import Pagination from '@/components/ui/Pagination'
 import DebouceInput from '@/components/shared/DebouceInput'
 import ImageGallery from '@/components/shared/ImageGallery'
+import { isImageSlide } from 'yet-another-react-lightbox'
+import {
+    FLOOR_PLAN_HIGHLIGHT_COLOR,
+    FloorPlanGallerySlide,
+    loadImageSize,
+} from '@/views/objects/components/FloorPlanOverlay'
 import PremiseResultItem from '@/views/objects/components/PremiseResultItem'
 import PremisesListSkeleton from '@/views/objects/components/PremisesListSkeleton'
 import { createEmptyObjectsSearchFilters } from '@/views/objects/filtersQuery'
@@ -28,6 +34,7 @@ import {
     parsePremiseSortKey,
     premiseSortFields,
     toPremiseSortKey,
+    type PremisePreviewSlide,
     type PremiseSortField,
     type PremiseSortState,
 } from '@/views/objects/utils'
@@ -56,7 +63,7 @@ const FavoritePremisesList = ({
     const pageSize = PAGE_SIZE
     const [search, setSearch] = useState('')
     const [previewIndex, setPreviewIndex] = useState(-1)
-    const [previewSlides, setPreviewSlides] = useState<Array<{ src: string }>>(
+    const [previewSlides, setPreviewSlides] = useState<PremisePreviewSlide[]>(
         [],
     )
     const [data, setData] = useState<FavoriteCollectionPageData | undefined>()
@@ -316,9 +323,30 @@ const FavoritePremisesList = ({
         onSelectedIdsChange(selectedIds.filter((id) => !pageIds.includes(id)))
     }
 
-    const handlePreviewLayout = (premise: Premise) => {
+    const handlePreviewLayout = async (premise: Premise) => {
         const slides = getPremisePreviewSlides(premise)
         if (slides.length === 0) return
+
+        const floorSlide = slides.find((slide) => Boolean(slide.floorPath))
+        if (floorSlide) {
+            const size = await loadImageSize(floorSlide.src)
+            if (size) {
+                setPreviewSlides(
+                    slides.map((slide) =>
+                        slide.src === floorSlide.src
+                            ? {
+                                  ...slide,
+                                  width: size.width,
+                                  height: size.height,
+                              }
+                            : slide,
+                    ),
+                )
+                setPreviewIndex(0)
+                return
+            }
+        }
+
         setPreviewSlides(slides)
         setPreviewIndex(0)
     }
@@ -476,6 +504,25 @@ const FavoritePremisesList = ({
             <ImageGallery
                 index={previewIndex}
                 slides={previewSlides}
+                render={{
+                    slide: (props) => {
+                        if (
+                            !isImageSlide(props.slide) ||
+                            !('floorPath' in props.slide) ||
+                            !props.slide.floorPath
+                        ) {
+                            return undefined
+                        }
+
+                        return (
+                            <FloorPlanGallerySlide
+                                {...props}
+                                floorPath={String(props.slide.floorPath)}
+                                color={FLOOR_PLAN_HIGHLIGHT_COLOR}
+                            />
+                        )
+                    },
+                }}
                 onClose={() => setPreviewIndex(-1)}
             />
         </div>

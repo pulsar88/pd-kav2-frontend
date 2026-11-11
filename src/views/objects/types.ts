@@ -1,3 +1,5 @@
+import type { MediaImage } from '@/utils/mediaImage'
+
 export type PremiseType = 'apartment' | 'apartments' | 'commercial'
 
 export type RealtyPropertyTypeCode =
@@ -55,7 +57,7 @@ export type Complex = {
     name: string
     externalId?: number
     address?: string
-    image?: string
+    image?: MediaImage
     apartmentsCount?: number
     priceFrom?: number
     pricePerSqm?: number
@@ -103,10 +105,10 @@ export type Premise = {
     ceilingHeight?: number
     layout?: string
     layoutName?: string
-    layoutImage?: string
-    floorPlanImage?: string
+    layoutImage?: MediaImage
+    floorPlanImage?: MediaImage
     floorPath?: string
-    complexImage?: string
+    complexImage?: MediaImage
     promoText?: string
     description?: string
     statusId?: number

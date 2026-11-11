@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import Upload from '@/components/ui/Upload'
 import Input from '@/components/ui/Input'
@@ -45,10 +45,14 @@ import {
 } from '../utils'
 import { RU_PHONE_REGEX } from '@/views/fixations/utils'
 import type { User } from '@/@types/auth'
-import type { AgencyRequestStatus, JoinAgencyRequest } from '@/@types/agency'
+import type { JoinAgencyRequest } from '@/@types/agency'
 import type { GetSettingsProfileResponse } from '../types'
 import JoinAgencyDialog from './JoinAgencyDialog'
 import AgencyRequiredBanner from '@/components/template/AgencyRequiredBanner'
+import ChangePassword, {
+    type ChangePasswordHandle,
+} from './ChangePassword'
+import PrimaryColor from './PrimaryColor'
 import classNames from '@/utils/classNames'
 
 type ProfileSchema = {
@@ -93,10 +97,14 @@ const agencyRequestStatusConfig: Record<
     },
 }
 
-const getAgencyBorderClass = (status?: AgencyRequestStatus) =>
+const getAgencyBorderClass = (status?: string) =>
     (status && agencyRequestStatusConfig[status]?.borderClass) || 'bg-primary'
 
-const ProfileForm = () => {
+type ProfileFormProps = {
+    aside?: ReactNode
+}
+
+const ProfileForm = ({ aside }: ProfileFormProps) => {
     const user = useSessionUser((state) => state.user)
     const setUser = useSessionUser((state) => state.setUser)
     const [data, setData] = useState<GetSettingsProfileResponse | null>(null)
@@ -107,6 +115,9 @@ const ProfileForm = () => {
     const [isJoinAgencyOpen, setIsJoinAgencyOpen] = useState(false)
     const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
     const [isCancelling, setIsCancelling] = useState(false)
+    const [passwordDirty, setPasswordDirty] = useState(false)
+    const [isAccountSaving, setIsAccountSaving] = useState(false)
+    const passwordRef = useRef<ChangePasswordHandle>(null)
 
     const userId = user.userId
     const authority = user.authority ?? []
@@ -166,7 +177,9 @@ const ProfileForm = () => {
         const fetchLatestRequest = async () => {
             setIsAgencyRequestLoading(true)
             try {
-                const request = await apiGetLatestAgencyRequest(userId)
+                const request = await apiGetLatestAgencyRequest(
+                    userId ?? undefined,
+                )
                 if (!cancelled) {
                     setLatestAgencyRequest(request)
                 }
@@ -231,7 +244,7 @@ const ProfileForm = () => {
     const {
         handleSubmit,
         reset,
-        formState: { errors, isSubmitting, isDirty },
+        formState: { errors, isDirty },
         control,
     } = useForm<ProfileSchema>({
         resolver: zodResolver(validationSchema),
@@ -348,14 +361,14 @@ const ProfileForm = () => {
     const handleJoinAgencySuccess = async () => {
         await loadProfile()
         try {
-            const request = await apiGetLatestAgencyRequest(userId)
+            const request = await apiGetLatestAgencyRequest(userId ?? undefined)
             setLatestAgencyRequest(request)
         } catch {
             setLatestAgencyRequest(null)
         }
     }
 
-    const onSubmit = async (values: ProfileSchema) => {
+    const saveProfile = async (values: ProfileSchema) => {
         if (!data?.id) {
             toast.push(
                 <Notification type="danger">
@@ -363,7 +376,7 @@ const ProfileForm = () => {
                 </Notification>,
                 { placement: 'top-center' },
             )
-            return
+            return false
         }
 
         try {
@@ -390,6 +403,7 @@ const ProfileForm = () => {
                 <Notification type="success">Профиль сохранён</Notification>,
                 { placement: 'top-center' },
             )
+            return true
         } catch (err: unknown) {
             const message =
                 err instanceof Error
@@ -398,6 +412,35 @@ const ProfileForm = () => {
             toast.push(<Notification type="danger">{message}</Notification>, {
                 placement: 'top-center',
             })
+            return false
+        }
+    }
+
+    const saveAccount = async () => {
+        if (isAccountSaving) return
+        setIsAccountSaving(true)
+        try {
+            const tasks: Array<Promise<boolean>> = []
+            if (isDirty) {
+                tasks.push(
+                    new Promise((resolve) => {
+                        void handleSubmit(
+                            async (values) => {
+                                resolve(await saveProfile(values))
+                            },
+                            () => resolve(false),
+                        )()
+                    }),
+                )
+            }
+            if (passwordDirty) {
+                tasks.push(
+                    passwordRef.current?.save() ?? Promise.resolve(false),
+                )
+            }
+            await Promise.all(tasks)
+        } finally {
+            setIsAccountSaving(false)
         }
     }
 
@@ -408,30 +451,31 @@ const ProfileForm = () => {
         : getAgencyBorderClass(latestRequestStatus)
 
     return (
-        <Form noValidate onSubmit={handleSubmit(onSubmit)}>
+        <>
             <AgencyRequiredBanner
                 latestAgencyRequest={latestAgencyRequest}
                 isAgencyRequestLoading={isAgencyRequestLoading}
                 onActionClick={() => setIsJoinAgencyOpen(true)}
                 onCancelClick={() => setIsCancelDialogOpen(true)}
             />
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-stretch">
-                <Card className="xl:col-span-4 h-full" bodyClass="p-0">
+            <div className="flex flex-col gap-6 xl:grid xl:grid-cols-12 xl:items-stretch">
+                <div className="contents xl:col-span-4 xl:flex xl:h-full xl:flex-col xl:gap-6">
+                <Card className="order-1 xl:order-none xl:shrink-0" bodyClass="p-0">
                     <div className="px-6 py-6">
                         <div className="flex flex-col items-center text-center">
                             <Avatar
                                 size={96}
-                                className="border-4 border-gray-100 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 text-gray-300 shadow-md"
+                                className="border-4 border-gray-100 bg-gray-100 text-gray-300 shadow-md dark:border-gray-700 dark:bg-gray-700"
                                 icon={<HiOutlineUser />}
                                 src={data?.img || ''}
                             />
-                            <h4 className="mt-4 mb-1 text-base font-semibold line-clamp-2">
+                            <h4 className="mt-4 mb-1 line-clamp-2 text-base font-semibold">
                                 {data?.fullName || 'Ваше имя'}
                             </h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-1">
+                            <p className="mb-4 line-clamp-1 text-sm text-gray-500 dark:text-gray-400">
                                 {data?.email || 'Email не указан'}
                             </p>
-                            <div className="flex items-center gap-2 mb-5">
+                            <div className="mb-5 flex items-center gap-2">
                                 <Upload
                                     showList={false}
                                     uploadLimit={1}
@@ -462,9 +506,9 @@ const ProfileForm = () => {
                                 ) : null}
                             </div>
                         </div>
-                        <div className="space-y-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+                        <div className="space-y-3 border-t border-gray-100 pt-4 dark:border-gray-700">
                             {showAgency ? (
-                                <div className="relative overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-700/40 p-3 pl-4 text-left">
+                                <div className="relative overflow-hidden rounded-xl bg-gray-50 p-3 pl-4 text-left dark:bg-gray-700/40">
                                     <span
                                         className={classNames(
                                             'absolute inset-y-0 left-0 w-1',
@@ -472,25 +516,21 @@ const ProfileForm = () => {
                                         )}
                                         aria-hidden
                                     />
-                                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                                            <TbBuilding className="text-lg" />
-                                            <span className="text-xs font-medium uppercase tracking-wide">
-                                                Агентство
-                                            </span>
-                                        </div>
+                                    <div className="mb-1.5 flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                        <TbBuilding className="text-lg" />
+                                        <span className="text-xs font-medium uppercase tracking-wide">
+                                            Агентство
+                                        </span>
                                     </div>
-
                                     {hasAgency ? (
                                         <div className="flex flex-col gap-2 pt-1">
-                                            <div className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">
+                                            <div className="text-base font-semibold leading-snug text-gray-900 dark:text-gray-100">
                                                 {data?.agency}
                                             </div>
                                             {canChangeAgency ? (
                                                 isAgencyRequestLoading ? (
                                                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                        Загрузка статуса
-                                                        заявки...
+                                                        Загрузка статуса заявки...
                                                     </p>
                                                 ) : isPendingRequest ? (
                                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -502,10 +542,8 @@ const ProfileForm = () => {
                                                                       'Заявка на рассмотрении'}
                                                             </p>
                                                             {pendingTargetAgencyName ? (
-                                                                <p className="mt-0.5 text-sm font-semibold text-gray-900 dark:text-gray-100 leading-snug">
-                                                                    {
-                                                                        pendingTargetAgencyName
-                                                                    }
+                                                                <p className="mt-0.5 text-sm font-semibold leading-snug text-gray-900 dark:text-gray-100">
+                                                                    {pendingTargetAgencyName}
                                                                 </p>
                                                             ) : null}
                                                         </div>
@@ -518,9 +556,7 @@ const ProfileForm = () => {
                                                             }
                                                             icon={<TbX />}
                                                             onClick={() =>
-                                                                setIsCancelDialogOpen(
-                                                                    true,
-                                                                )
+                                                                setIsCancelDialogOpen(true)
                                                             }
                                                         >
                                                             Отменить заявку
@@ -529,8 +565,7 @@ const ProfileForm = () => {
                                                 ) : (
                                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            Можно подать заявку
-                                                            в другое агентство
+                                                            Можно подать заявку в другое агентство
                                                         </p>
                                                         <Button
                                                             size="xs"
@@ -539,9 +574,7 @@ const ProfileForm = () => {
                                                             className="w-full shrink-0 sm:w-auto"
                                                             icon={<TbSend />}
                                                             onClick={() =>
-                                                                setIsJoinAgencyOpen(
-                                                                    true,
-                                                                )
+                                                                setIsJoinAgencyOpen(true)
                                                             }
                                                         >
                                                             Сменить агентство
@@ -560,13 +593,9 @@ const ProfileForm = () => {
                                                           'Нет агентства'}
                                                 </p>
                                                 {!isAgencyRequestLoading &&
-                                                latestAgencyRequest?.agency
-                                                    ?.name ? (
-                                                    <p className="mt-0.5 text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">
-                                                        {
-                                                            latestAgencyRequest
-                                                                .agency.name
-                                                        }
+                                                latestAgencyRequest?.agency?.name ? (
+                                                    <p className="mt-0.5 text-base font-semibold leading-snug text-gray-900 dark:text-gray-100">
+                                                        {latestAgencyRequest.agency.name}
                                                     </p>
                                                 ) : null}
                                             </div>
@@ -579,13 +608,9 @@ const ProfileForm = () => {
                                                         'border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10'
                                                     }
                                                     icon={<TbX />}
-                                                    disabled={
-                                                        isAgencyRequestLoading
-                                                    }
+                                                    disabled={isAgencyRequestLoading}
                                                     onClick={() =>
-                                                        setIsCancelDialogOpen(
-                                                            true,
-                                                        )
+                                                        setIsCancelDialogOpen(true)
                                                     }
                                                 >
                                                     Отменить заявку
@@ -597,13 +622,9 @@ const ProfileForm = () => {
                                                     type="button"
                                                     className="w-full shrink-0 sm:w-auto"
                                                     icon={<TbSend />}
-                                                    disabled={
-                                                        isAgencyRequestLoading
-                                                    }
+                                                    disabled={isAgencyRequestLoading}
                                                     onClick={() =>
-                                                        setIsJoinAgencyOpen(
-                                                            true,
-                                                        )
+                                                        setIsJoinAgencyOpen(true)
                                                     }
                                                 >
                                                     Отправить заявку
@@ -613,163 +634,181 @@ const ProfileForm = () => {
                                     )}
                                 </div>
                             ) : null}
-
-                            <div className="grid grid-cols-1 gap-3">
-                                <div className="relative overflow-hidden rounded-xl bg-gray-50 dark:bg-gray-700/40 p-3 pl-4 text-left">
-                                    <span
-                                        className="absolute inset-y-0 left-0 w-1 bg-primary"
-                                        aria-hidden
-                                    />
-                                    <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1.5">
-                                        <TbBriefcase className="text-lg" />
-                                        <span className="text-xs font-medium uppercase tracking-wide">
-                                            Роль
-                                        </span>
-                                    </div>
-                                    <div className="text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug">
-                                        {data?.role || '—'}
-                                    </div>
+                            <div className="relative overflow-hidden rounded-xl bg-gray-50 p-3 pl-4 text-left dark:bg-gray-700/40">
+                                <span
+                                    className="absolute inset-y-0 left-0 w-1 bg-primary"
+                                    aria-hidden
+                                />
+                                <div className="mb-1.5 flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                                    <TbBriefcase className="text-lg" />
+                                    <span className="text-xs font-medium uppercase tracking-wide">
+                                        Роль
+                                    </span>
                                 </div>
+                                <div className="text-base font-semibold leading-snug text-gray-900 dark:text-gray-100">
+                                    {data?.role || '—'}
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-700/40">
+                                <PrimaryColor />
                             </div>
                         </div>
                     </div>
                 </Card>
+                {aside ? (
+                    <div className="order-3 empty:hidden xl:order-none xl:mt-auto">
+                        {aside}
+                    </div>
+                ) : null}
+                </div>
 
                 <Card
-                    className="xl:col-span-8 h-full flex flex-col"
-                    bodyClass="flex-1"
+                    className="order-2 flex flex-col xl:order-none xl:col-span-8 xl:h-full"
+                    bodyClass="flex flex-1 flex-col"
                     header={{
                         content: (
                             <div>
                                 <h4 className="mb-1">Личные данные</h4>
                                 <p className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                                    Эти данные видны вам и используются для
-                                    связи
+                                    Эти данные видны вам и используются для связи
                                 </p>
                             </div>
                         ),
                         bordered: true,
                     }}
-                    footer={{
-                        content: (
-                            <div className="flex justify-end">
-                                <Button
-                                    variant="solid"
-                                    type="submit"
-                                    loading={isSubmitting}
-                                    disabled={!isDirty}
-                                >
-                                    Сохранить изменения
-                                </Button>
-                            </div>
-                        ),
-                        bordered: true,
-                    }}
                 >
-                    <div className="grid grid-cols-1 gap-x-4">
-                        <FormItem
-                            label="ФИО"
-                            errorMode="reserved"
-                            invalid={Boolean(errors.fullName)}
-                            errorMessage={errors.fullName?.message}
-                        >
-                            <Controller
-                                name="fullName"
-                                control={control}
-                                render={({ field }) => (
-                                    <Input
-                                        type="text"
-                                        autoComplete="off"
-                                        placeholder="Иванов Иван Иванович"
-                                        prefix={<TbUser className="text-lg" />}
-                                        {...field}
-                                    />
-                                )}
-                            />
-                        </FormItem>
-                        <FormItem
-                            label="Email"
-                            errorMode="reserved"
-                            invalid={Boolean(errors.email)}
-                            errorMessage={errors.email?.message}
-                        >
-                            <Controller
-                                name="email"
-                                control={control}
-                                render={({ field }) => (
-                                    <Input
-                                        type="text"
-                                        inputMode="email"
-                                        autoComplete="off"
-                                        placeholder="name@example.com"
-                                        prefix={<TbMail className="text-lg" />}
-                                        {...field}
-                                    />
-                                )}
-                            />
-                        </FormItem>
-                        <FormItem
-                            label="Телефон"
-                            errorMode="reserved"
-                            invalid={Boolean(errors.phone)}
-                            errorMessage={errors.phone?.message}
-                        >
-                            <Controller
-                                name="phone"
-                                control={control}
-                                render={({ field }) => (
-                                    <PhoneInput
-                                        invalid={Boolean(errors.phone)}
-                                        disabled={isPhoneLocked}
-                                        value={field.value ?? ''}
-                                        onBlur={field.onBlur}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            />
-                        </FormItem>
-                    </div>
-                </Card>
-
-                {showAgency ? (
-                    <>
-                        <JoinAgencyDialog
-                            isOpen={isJoinAgencyOpen}
-                            currentAgencyId={currentAgencyId}
-                            currentAgencyName={currentAgencyName || undefined}
-                            onClose={() => setIsJoinAgencyOpen(false)}
-                            onSuccess={() => {
-                                void handleJoinAgencySuccess()
+                    <Form
+                        noValidate
+                        onSubmit={(event) => {
+                            event.preventDefault()
+                            void saveAccount()
+                        }}
+                    >
+                        <div className="grid grid-cols-1 gap-x-4">
+                            <FormItem
+                                label="ФИО"
+                                errorMode="reserved"
+                                invalid={Boolean(errors.fullName)}
+                                errorMessage={errors.fullName?.message}
+                            >
+                                <Controller
+                                    name="fullName"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            type="text"
+                                            autoComplete="off"
+                                            placeholder="Иванов Иван Иванович"
+                                            prefix={<TbUser className="text-lg" />}
+                                            {...field}
+                                        />
+                                    )}
+                                />
+                            </FormItem>
+                            <FormItem
+                                label="Email"
+                                errorMode="reserved"
+                                invalid={Boolean(errors.email)}
+                                errorMessage={errors.email?.message}
+                            >
+                                <Controller
+                                    name="email"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            type="text"
+                                            inputMode="email"
+                                            autoComplete="off"
+                                            placeholder="name@example.com"
+                                            prefix={<TbMail className="text-lg" />}
+                                            {...field}
+                                        />
+                                    )}
+                                />
+                            </FormItem>
+                            <FormItem
+                                label="Телефон"
+                                errorMode="reserved"
+                                invalid={Boolean(errors.phone)}
+                                errorMessage={errors.phone?.message}
+                            >
+                                <Controller
+                                    name="phone"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <PhoneInput
+                                            invalid={Boolean(errors.phone)}
+                                            disabled={isPhoneLocked}
+                                            value={field.value ?? ''}
+                                            onBlur={field.onBlur}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                            </FormItem>
+                        </div>
+                    </Form>
+                    <div className="mt-6">
+                        <ChangePassword
+                            ref={passwordRef}
+                            onDirtyChange={setPasswordDirty}
+                            onRequestSave={() => {
+                                void saveAccount()
                             }}
                         />
-
-                        <ConfirmDialog
-                            isOpen={isCancelDialogOpen}
-                            type="warning"
-                            title="Отменить заявку?"
-                            confirmText="Отменить заявку"
-                            cancelText="Закрыть"
-                            confirmButtonProps={{
-                                loading: isCancelling,
-                                customColorClass: () =>
-                                    'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 border-rose-600',
+                    </div>
+                    <div className="xl:flex-1" />
+                    <div className="mt-6 flex justify-end border-t border-gray-200 pt-4 dark:border-gray-700">
+                        <Button
+                            variant="solid"
+                            type="button"
+                            loading={isAccountSaving}
+                            disabled={!isDirty && !passwordDirty}
+                            onClick={() => {
+                                void saveAccount()
                             }}
-                            onCancel={() => setIsCancelDialogOpen(false)}
-                            onConfirm={() => {
-                                void handleCancelAgencyRequest()
-                            }}
-                            onClose={() => setIsCancelDialogOpen(false)}
                         >
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Заявка на присоединение к агентству будет
-                                отменена. Вы сможете отправить новую заявку
-                                позже.
-                            </p>
-                        </ConfirmDialog>
-                    </>
-                ) : null}
+                            Сохранить
+                        </Button>
+                    </div>
+                </Card>
             </div>
-        </Form>
+            {showAgency ? (
+                <>
+                    <JoinAgencyDialog
+                        isOpen={isJoinAgencyOpen}
+                        currentAgencyId={currentAgencyId}
+                        currentAgencyName={currentAgencyName || undefined}
+                        onClose={() => setIsJoinAgencyOpen(false)}
+                        onSuccess={() => {
+                            void handleJoinAgencySuccess()
+                        }}
+                    />
+                    <ConfirmDialog
+                        isOpen={isCancelDialogOpen}
+                        type="warning"
+                        title="Отменить заявку?"
+                        confirmText="Отменить заявку"
+                        cancelText="Закрыть"
+                        confirmButtonProps={{
+                            loading: isCancelling,
+                            customColorClass: () =>
+                                'bg-rose-600 hover:bg-rose-500 active:bg-rose-700 border-rose-600',
+                        }}
+                        onCancel={() => setIsCancelDialogOpen(false)}
+                        onConfirm={() => {
+                            void handleCancelAgencyRequest()
+                        }}
+                        onClose={() => setIsCancelDialogOpen(false)}
+                    >
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                            Заявка на присоединение к агентству будет отменена. Вы
+                            сможете отправить новую заявку позже.
+                        </p>
+                    </ConfirmDialog>
+                </>
+            ) : null}
+        </>
     )
 }
 

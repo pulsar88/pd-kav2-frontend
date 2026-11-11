@@ -19,7 +19,12 @@ type AuthAction = {
     setUser: (payload: User) => void
 }
 
-const getPersistStorage = () => {
+type SyncStorage = {
+    getItem: (name: string) => string | null
+    setItem: (name: string, value: string) => void
+}
+
+const getPersistStorage = (): SyncStorage => {
     if (appConfig.accessTokenPersistStrategy === 'localStorage') {
         return localStorage
     }

@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { TbBuilding, TbCalendar, TbHome, TbMapPin, TbRuler } from 'react-icons/tb'
 import { DEFAULT_COMPLEX_IMAGE } from '@/views/objects/constants'
+import { getResponsiveImageAttrs } from '@/utils/mediaImage'
 import type { Complex, ObjectsSearchFilters } from '../types'
 import { serializeObjectsSearchFilters, withoutComplexFilters } from '../filtersQuery'
 import { formatCompletionDate, formatPrice } from '../utils'
@@ -22,7 +23,10 @@ const ComplexCard = ({
         ? serializeObjectsSearchFilters(withoutComplexFilters(searchFilters))
         : new URLSearchParams()
 
-    const image = complex.image || DEFAULT_COMPLEX_IMAGE
+    const image = getResponsiveImageAttrs(
+        complex.image || DEFAULT_COMPLEX_IMAGE,
+        '(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw',
+    )
     const address = complex.address?.trim() || dash
     const apartmentsCount =
         complex.apartmentsCount !== undefined
@@ -50,7 +54,7 @@ const ComplexCard = ({
         >
             <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden bg-gray-100 dark:bg-gray-700">
                 <img
-                    src={image}
+                    {...image}
                     alt={complex.name}
                     className="h-full w-full object-cover"
                     loading="lazy"

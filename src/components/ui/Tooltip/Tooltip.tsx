@@ -15,6 +15,7 @@ import {
     useFocus,
     useDismiss,
     useRole,
+    useClick,
     useInteractions,
     FloatingPortal,
 } from '@floating-ui/react'
@@ -69,10 +70,15 @@ const Tooltip = (props: TooltipProps) => {
     const focus = useFocus(context)
     const dismiss = useDismiss(context)
     const role = useRole(context, { role: 'tooltip' })
+    const click = useClick(context, {
+        ignoreMouse: true,
+        keyboardHandlers: false,
+    })
 
     const { getReferenceProps, getFloatingProps } = useInteractions([
         hover,
         focus,
+        click,
         dismiss,
         role,
     ])

@@ -43,6 +43,12 @@ import {
     resolveSpecialOffers,
 } from '../../specialOfferUtils'
 import { getPremisePricePerSqm } from '../../utils'
+import {
+    getMediaOriginalSrc,
+    getResponsiveImageAttrs,
+    normalizeMediaImage,
+    type MediaImage,
+} from '@/utils/mediaImage'
 
 type CheckboardPropertyDrawerProps = {
     isOpen: boolean
@@ -65,33 +71,15 @@ const InfoRow = ({ label, value }: { label: string; value: ReactNode }) => (
     </div>
 )
 
-const getImageUrls = (property: FlatCheckboardProperty | null) => {
+const getLayoutImages = (
+    property: FlatCheckboardProperty | null,
+): MediaImage[] => {
     if (!property) return []
 
-    const urls = property.plans
-        .map((plan) => {
-            if (typeof plan === 'string') return plan
-            if (!plan || typeof plan !== 'object') return null
-
-            const maybeUrl = [
-                'url',
-                'src',
-                'image',
-                'image_url',
-                'original_url',
-                'path',
-            ].find((key) => {
-                const value = (plan as Record<string, unknown>)[key]
-                return typeof value === 'string' && value.length > 0
-            })
-
-            return maybeUrl
-                ? ((plan as Record<string, string>)[maybeUrl] ?? null)
-                : null
-        })
-        .filter((value): value is string => Boolean(value))
-
-    return urls
+    return property.plans.flatMap((plan) => {
+        const image = normalizeMediaImage(plan)
+        return image && getMediaOriginalSrc(image) ? [image] : []
+    })
 }
 
 const LayoutImagePlaceholder = () => (
@@ -276,16 +264,21 @@ const CheckboardPropertyDrawer = ({
         }
     }, [property, propertyDetails])
 
-    const imageUrls = useMemo(() => {
-        if (propertyDetails?.layoutImage) {
-            return [propertyDetails.layoutImage]
+    const layoutImages = useMemo(() => {
+        const detailsImage = normalizeMediaImage(propertyDetails?.layoutImage)
+        if (detailsImage && getMediaOriginalSrc(detailsImage)) {
+            return [detailsImage]
         }
 
-        return getImageUrls(property)
+        return getLayoutImages(property)
     }, [property, propertyDetails?.layoutImage])
 
-    const hasImages = imageUrls.length > 0
-    const slides = imageUrls.map((src) => ({ src }))
+    const floorPlan = propertyDetails
+    const floorPlanSrc = getMediaOriginalSrc(floorPlan?.floorPlanImage)
+    const hasImages = layoutImages.length > 0
+    const slides = layoutImages.map((image) => ({
+        src: getMediaOriginalSrc(image),
+    }))
 
     useEffect(() => {
         if (!isOpen) {
@@ -496,13 +489,13 @@ const CheckboardPropertyDrawer = ({
                             <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-white">
                                 {hasImages ? (
                                     <Carousel
-                                        opts={{ loop: imageUrls.length > 1 }}
+                                        opts={{ loop: layoutImages.length > 1 }}
                                         className="relative"
                                     >
                                         <Carousel.Content>
-                                            {imageUrls.map((src, index) => (
+                                            {layoutImages.map((image, index) => (
                                                 <Carousel.Item
-                                                    key={`${src}-${index}`}
+                                                    key={`${getMediaOriginalSrc(image)}-${index}`}
                                                 >
                                                     <button
                                                         type="button"
@@ -514,7 +507,10 @@ const CheckboardPropertyDrawer = ({
                                                         }
                                                     >
                                                         <img
-                                                            src={src}
+                                                            {...getResponsiveImageAttrs(
+                                                                image,
+                                                                '(min-width: 768px) 420px, 100vw',
+                                                            )}
                                                             alt={`Изображение помещения №${display.number}`}
                                                             className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
                                                             loading="lazy"
@@ -527,7 +523,7 @@ const CheckboardPropertyDrawer = ({
                                                 </Carousel.Item>
                                             ))}
                                         </Carousel.Content>
-                                        {imageUrls.length > 1 ? (
+                                        {layoutImages.length > 1 ? (
                                             <>
                                                 <Carousel.Previous className="absolute left-2 top-1/2 z-10 -translate-y-1/2" />
                                                 <Carousel.Next className="absolute right-2 top-1/2 z-10 -translate-y-1/2" />
@@ -557,7 +553,7 @@ const CheckboardPropertyDrawer = ({
                             </button>
                             {showFloorPlan ? (
                                 <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-white">
-                                    {propertyDetails?.floorPlanImage ? (
+                                    {floorPlan && floorPlanSrc ? (
                                         <button
                                             type="button"
                                             className="group relative flex h-[240px] w-full cursor-zoom-in items-center justify-center sm:h-[280px]"
@@ -566,13 +562,11 @@ const CheckboardPropertyDrawer = ({
                                             }
                                         >
                                             <div
-                                                key={propertyDetails.id}
+                                                key={floorPlan.id}
                                                 className="relative flex h-full w-full items-center justify-center"
                                             >
                                                 <img
-                                                    src={
-                                                        propertyDetails.floorPlanImage
-                                                    }
+                                                    src={floorPlanSrc}
                                                     alt={`План этажа, помещение №${display.number}`}
                                                     className="max-h-full w-full rounded-xl object-contain transition-opacity group-hover:opacity-90"
                                                     loading="lazy"
@@ -586,10 +580,10 @@ const CheckboardPropertyDrawer = ({
                                                     }}
                                                 />
                                                 {floorPlanSize &&
-                                                propertyDetails.floorPath ? (
+                                                floorPlan.floorPath ? (
                                                     <FloorPlanPathOverlay
                                                         path={
-                                                            propertyDetails.floorPath
+                                                            floorPlan.floorPath
                                                         }
                                                         width={
                                                             floorPlanSize.width
@@ -795,12 +789,12 @@ const CheckboardPropertyDrawer = ({
                 />
             ) : null}
 
-            {propertyDetails?.floorPlanImage ? (
+            {floorPlan && floorPlanSrc ? (
                 <ImageGallery
                     index={floorPlanPreviewIndex}
                     slides={[
                         {
-                            src: propertyDetails.floorPlanImage,
+                            src: floorPlanSrc,
                             alt: `План этажа, помещение №${display?.number ?? ''}`,
                             ...(floorPlanSize
                                 ? {
@@ -812,14 +806,14 @@ const CheckboardPropertyDrawer = ({
                     ]}
                     render={{
                         slide: (props) => {
-                            if (!propertyDetails.floorPath) {
+                            if (!floorPlan.floorPath) {
                                 return undefined
                             }
 
                             return (
                                 <FloorPlanGallerySlide
                                     {...props}
-                                    floorPath={propertyDetails.floorPath}
+                                    floorPath={floorPlan.floorPath}
                                     color={FLOOR_PLAN_HIGHLIGHT_COLOR}
                                 />
                             )

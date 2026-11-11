@@ -10,7 +10,7 @@ function useInfiniteScroll(options?: Options) {
     const { offset = '0px', shouldStop = false, onLoadMore } = options ?? {}
 
     const [isLoading, setIsLoading] = useState(false)
-    const observerRef = useRef<IntersectionObserver>(null)
+    const observerRef = useRef<IntersectionObserver | null>(null)
     const targetRef = useRef(document.createElement('div'))
 
     const containerRef: LegacyRef<HTMLElement> = (container) => {

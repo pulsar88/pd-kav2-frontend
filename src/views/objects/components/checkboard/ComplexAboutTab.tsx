@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { TbCalendar, TbMapPin, TbZoomIn } from 'react-icons/tb'
 import ImageGallery from '@/components/shared/ImageGallery'
 import { DEFAULT_COMPLEX_IMAGE } from '@/views/objects/constants'
+import {
+    getMediaOriginalSrc,
+    getResponsiveImageAttrs,
+} from '@/utils/mediaImage'
 import type { Complex } from '../../types'
 import { formatCompletionDate, isUndefinedValue, parseComplexPromoText } from '../../utils'
 
@@ -29,7 +33,12 @@ const ComplexAboutTab = ({
     }
 
     const name = complex?.name || fallbackName || dash
-    const image = complex?.image || DEFAULT_COMPLEX_IMAGE
+    const image = getResponsiveImageAttrs(
+        complex?.image || DEFAULT_COMPLEX_IMAGE,
+        '(min-width: 1024px) 420px, 100vw',
+    )
+    const previewSrc =
+        getMediaOriginalSrc(complex?.image) || DEFAULT_COMPLEX_IMAGE
     const address = complex?.address?.trim() || dash
     const completionDate =
         complex?.completionDate && !isUndefinedValue(complex.completionDate)
@@ -50,7 +59,7 @@ const ComplexAboutTab = ({
                             onClick={() => setPreviewIndex(0)}
                         >
                             <img
-                                src={image}
+                                {...image}
                                 alt={name}
                                 className="h-full w-full object-cover transition-opacity group-hover:opacity-90"
                                 loading="lazy"
@@ -129,7 +138,7 @@ const ComplexAboutTab = ({
 
             <ImageGallery
                 index={previewIndex}
-                slides={[{ src: image, alt: name }]}
+                slides={[{ src: previewSrc, alt: name }]}
                 onClose={() => setPreviewIndex(-1)}
             />
         </>

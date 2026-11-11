@@ -1,9 +1,7 @@
 import Container from '@/components/shared/Container'
 import ProfileForm from './components/ProfileForm'
-import ChangePassword from './components/ChangePassword'
 import NotificationPreferences from './components/NotificationPreferences'
 import PwaInstallCard from './components/PwaInstallCard'
-import PrimaryColor from './components/PrimaryColor'
 
 const Profile = () => {
     return (
@@ -16,11 +14,8 @@ const Profile = () => {
                 </p>
             </div>
             <div className="flex flex-col gap-6">
-                <ProfileForm />
-                <ChangePassword />
+                <ProfileForm aside={<PwaInstallCard />} />
                 <NotificationPreferences />
-                <PwaInstallCard />
-                <PrimaryColor />
             </div>
         </Container>
     )

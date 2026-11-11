@@ -113,6 +113,9 @@ export type FixationApiExtendRequest = {
     id?: number | string
     comment?: string | null
     reject_reason?: string | null
+    add_days?: number
+    extend_days?: number
+    days?: number
     status?: string | { value?: string; name?: string; code?: string }
     created_at?: string
     updated_at?: string

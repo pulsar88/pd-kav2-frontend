@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { MutableRefObject } from 'react'
 
 export type CarouselOrientation = 'horizontal' | 'vertical'
 
@@ -31,7 +32,7 @@ export interface CarouselContextProps {
     setItemCount: (count: number) => void
     scrollInfo: ScrollInfo
     setScrollInfo: (info: ScrollInfo) => void
-    containerRef: React.RefObject<HTMLDivElement | null>
+    containerRef: MutableRefObject<HTMLDivElement | null>
     isDragging: boolean
     setIsDragging: (dragging: boolean) => void
     setDragOffset: (offset: number) => void

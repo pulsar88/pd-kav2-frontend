@@ -8,7 +8,12 @@ import DropdownContext from './context/dropdownContext'
 import MenuItem from '../MenuItem'
 import { TbChevronRight, TbChevronLeft } from 'react-icons/tb'
 import type { CommonProps } from '../@types/common'
-import type { SyntheticEvent, RefObject, ElementType, Ref } from 'react'
+import type {
+    SyntheticEvent,
+    MutableRefObject,
+    ElementType,
+    Ref,
+} from 'react'
 
 export interface DropdownSubItemSharedProps {
     onClick?: (e: SyntheticEvent) => void
@@ -43,7 +48,7 @@ const DropdownSubMenu = (props: DropdownSubItemProps) => {
 
     const menuitemRef = useUncertainRef<HTMLElement>(
         ref,
-    ) as RefObject<HTMLElement | null>
+    ) as MutableRefObject<HTMLElement | null>
     const menuitemId = useUniqueId('menu-item-')
 
     const active =

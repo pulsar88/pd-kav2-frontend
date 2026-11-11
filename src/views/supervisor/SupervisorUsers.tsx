@@ -16,6 +16,7 @@ import {
     apiToggleUserBlock,
 } from '@/services/UsersService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { getMediaSrc, getMediaSrcSet } from '@/utils/mediaImage'
 import {
     ADMIN,
     SUPERVISOR,
@@ -191,16 +192,15 @@ const SupervisorUsers = () => {
                 cell: ({ row }) => {
                     const user = row.original
                     const blocked = isUserBlocked(user)
-                    const avatarSrc =
-                        user.profile_picture?.src ||
-                        user.profile_picture?.url_path ||
-                        ''
+                    const avatarSrc = getMediaSrc(user.profile_picture)
+                    const avatarSrcSet = getMediaSrcSet(user.profile_picture)
                     return (
                         <div className="flex min-w-0 items-center gap-3">
                             <Avatar
                                 size={40}
                                 shape="circle"
                                 src={avatarSrc || undefined}
+                                srcSet={avatarSrcSet || undefined}
                                 icon={<HiOutlineUser />}
                                 className="shrink-0 bg-gray-100 text-gray-400 dark:bg-gray-700"
                             />

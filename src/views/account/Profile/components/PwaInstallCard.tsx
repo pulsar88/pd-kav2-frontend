@@ -44,14 +44,14 @@ const PwaInstallCard = () => {
             }}
         >
             {canInstall ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 min-[1441px]:flex-row min-[1441px]:items-center min-[1441px]:justify-between">
                     <p className="text-sm text-gray-600 dark:text-gray-300">
                         Браузер готов установить приложение. Это займёт пару
                         секунд и не требует магазина приложений.
                     </p>
                     <Button
                         variant="solid"
-                        className="w-full shrink-0 sm:w-auto"
+                        className="shrink-0 self-end min-[1441px]:self-auto"
                         loading={isInstalling}
                         disabled={isInstalling}
                         onClick={() => {

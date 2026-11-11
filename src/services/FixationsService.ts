@@ -656,6 +656,8 @@ export async function apiGetFixationExtendRequests(params?: {
     search?: string
     date_from?: string
     date_to?: string
+    agency_id?: number
+    agent_id?: number
     with?: string
 }): Promise<{ list: FixationExtendRequest[]; total: number }> {
     const search = params?.search?.trim()
@@ -668,6 +670,10 @@ export async function apiGetFixationExtendRequests(params?: {
         ...(search ? { search } : {}),
         ...(params?.date_from ? { date_from: params.date_from } : {}),
         ...(params?.date_to ? { date_to: params.date_to } : {}),
+        ...(params?.agency_id != null ? { agency_id: params.agency_id } : {}),
+        ...(params?.agent_id != null ? { agent_id: params.agent_id } : {}),
+        sort_by: 'created_at',
+        order: 'desc',
     })
 
     const response = await ApiService.fetchDataWithAxios<
@@ -697,21 +703,17 @@ export async function apiGetFixationExtendRequests(params?: {
             rawList.length
     }
 
-    // Сортировка: новые запросы сверху, если нет серверной сортировки
     const sortedList = [...rawList].sort((a, b) => {
-        const timeA =
-            a.created_at || a.fixation?.created_at
-                ? new Date(
-                      a.created_at || a.fixation?.created_at || 0,
-                  ).getTime()
-                : 0
-        const timeB =
-            b.created_at || b.fixation?.created_at
-                ? new Date(
-                      b.created_at || b.fixation?.created_at || 0,
-                  ).getTime()
-                : 0
-        return timeB - timeA
+        const timeA = Date.parse(a.created_at || '') || 0
+        const timeB = Date.parse(b.created_at || '') || 0
+        if (timeA !== timeB) return timeB - timeA
+
+        const idA = Number(a.id)
+        const idB = Number(b.id)
+        if (Number.isFinite(idA) && Number.isFinite(idB) && idA !== idB) {
+            return idB - idA
+        }
+        return String(b.id).localeCompare(String(a.id))
     })
 
     return {

@@ -1,17 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { Link } from 'react-router'
 import { PiCheckCircle } from 'react-icons/pi'
+import { TbBell } from 'react-icons/tb'
 import Timeline from '@/components/ui/Timeline'
 import Badge from '@/components/ui/Badge'
 import Spinner from '@/components/ui/Spinner'
 import UserLogAvatar from './UserLogAvatar'
+import UserLogActionButton from './UserLogActionButton'
 import NotificationLogSkeleton from './NotificationLogSkeleton'
 import {
     formatUserLogReadTime,
     formatUserLogTime,
     getUserLogBadgeInnerClass,
     groupUserLogsByDate,
-    resolveLogActionHref,
 } from '../utils'
 import { getUserLogTypeName } from '@/utils/notificationDictionary'
 import type { UserLog } from '@/@types/notification'
@@ -59,11 +59,9 @@ const Log = ({
         return (
             <div className="flex items-center justify-center py-16">
                 <div className="text-center">
-                    <img
-                        className="mx-auto mb-2 max-w-[150px]"
-                        src="/img/others/no-notification.png"
-                        alt="no-notification"
-                    />
+                    <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 text-3xl text-gray-400 dark:bg-gray-700 dark:text-gray-500">
+                        <TbBell />
+                    </div>
                     <h6 className="font-semibold">Нет уведомлений</h6>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         Новые уведомления появятся здесь
@@ -86,10 +84,6 @@ const Log = ({
                     </div>
                     <Timeline>
                         {group.items.map((log, index) => {
-                            const action = log.action
-                                ? resolveLogActionHref(log.action.url)
-                                : null
-
                             return (
                                 <Timeline.Item
                                     key={log.id}
@@ -118,32 +112,12 @@ const Log = ({
                                         </p>
                                         {log.action ? (
                                             <div>
-                                                {action?.external ? (
-                                                    <a
-                                                        href={log.action.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="text-sm font-medium text-primary hover:underline"
-                                                        onClick={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                    >
-                                                        {log.action.text}
-                                                    </a>
-                                                ) : (
-                                                    <Link
-                                                        to={
-                                                            action?.href ||
-                                                            log.action.url
-                                                        }
-                                                        className="text-sm font-medium text-primary hover:underline"
-                                                        onClick={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                    >
-                                                        {log.action.text}
-                                                    </Link>
-                                                )}
+                                                <UserLogActionButton
+                                                    action={log.action}
+                                                    onRead={() =>
+                                                        onMarkAsRead(log.id)
+                                                    }
+                                                />
                                             </div>
                                         ) : null}
                                         <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">

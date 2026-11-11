@@ -6,6 +6,7 @@ import type {
     RealtyPropertyTypeCode,
 } from './types'
 import { normalizeRealtyPropertyTypeCode } from './realtyPropertyQuery'
+import { getMediaOriginalSrc } from '@/utils/mediaImage'
 
 export const realtyPropertyTypeLabel: Record<RealtyPropertyTypeCode, string> = {
     property: 'Квартира',
@@ -150,17 +151,16 @@ export const getPremisePreviewSlides = (
     premise: Pick<Premise, 'layoutImage' | 'floorPlanImage' | 'floorPath'>,
 ): PremisePreviewSlide[] => {
     const slides: PremisePreviewSlide[] = []
+    const layoutSrc = getMediaOriginalSrc(premise.layoutImage)
+    const floorPlanSrc = getMediaOriginalSrc(premise.floorPlanImage)
 
-    if (premise.layoutImage) {
-        slides.push({ src: premise.layoutImage, title: 'Планировка' })
+    if (layoutSrc) {
+        slides.push({ src: layoutSrc, title: 'Планировка' })
     }
 
-    if (
-        premise.floorPlanImage &&
-        premise.floorPlanImage !== premise.layoutImage
-    ) {
+    if (floorPlanSrc && floorPlanSrc !== layoutSrc) {
         slides.push({
-            src: premise.floorPlanImage,
+            src: floorPlanSrc,
             title: 'План этажа',
             floorPath: premise.floorPath,
         })

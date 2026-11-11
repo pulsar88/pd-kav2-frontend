@@ -19,6 +19,7 @@ import {
 import type { AgencyRequestStatus, JoinAgencyRequest } from '@/@types/agency'
 import { formatRuPhone } from '@/views/fixations/utils'
 import { getUserRoleLabel } from '@/constants/roles.constant'
+import { getMediaSrc, getMediaSrcSet } from '@/utils/mediaImage'
 import {
     TbBuilding,
     TbCheck,
@@ -261,8 +262,12 @@ const AgencyRequests = () => {
                                                     'text-gray-600 dark:text-gray-300',
                                             }
 
-                                            const avatarSrc =
-                                                item.agent?.profile_picture?.src
+                                            const avatarSrc = getMediaSrc(
+                                                item.agent?.profile_picture,
+                                            )
+                                            const avatarSrcSet = getMediaSrcSet(
+                                                item.agent?.profile_picture,
+                                            )
                                             const supervisor =
                                                 resolveSupervisor(item)
                                             const reviewer = item.reviewer
@@ -280,6 +285,9 @@ const AgencyRequests = () => {
                                                                 {...(avatarSrc
                                                                     ? {
                                                                           src: avatarSrc,
+                                                                          srcSet:
+                                                                              avatarSrcSet ||
+                                                                              undefined,
                                                                       }
                                                                     : {
                                                                           icon: (

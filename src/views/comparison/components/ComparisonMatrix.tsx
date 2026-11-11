@@ -18,6 +18,10 @@ import {
     getPremisePricePerSqm,
     getPremiseTypeLabel,
 } from '@/views/objects/utils'
+import {
+    getMediaOriginalSrc,
+    getResponsiveImageAttrs,
+} from '@/utils/mediaImage'
 import type { Premise } from '@/views/objects/types'
 import {
     TbBuildingSkyscraper,
@@ -247,7 +251,7 @@ const ComparisonMatrix = ({
     }, [onlyDifferences, premises])
 
     const openLayoutPreview = (premise: Premise) => {
-        const cover = getPremiseCoverImage(premise)
+        const cover = getMediaOriginalSrc(getPremiseCoverImage(premise))
         if (!cover) return
         setPreviewFloorPath(null)
         setPreviewFloorPlanSize(null)
@@ -256,10 +260,11 @@ const ComparisonMatrix = ({
     }
 
     const openFloorPreview = (premise: Premise) => {
-        if (!premise.floorPlanImage) return
+        const floorPlanSrc = getMediaOriginalSrc(premise.floorPlanImage)
+        if (!floorPlanSrc) return
         setPreviewFloorPath(premise.floorPath || null)
         setPreviewFloorPlanSize(null)
-        setPreviewSlides([{ src: premise.floorPlanImage }])
+        setPreviewSlides([{ src: floorPlanSrc }])
         setPreviewIndex(0)
 
         // Предзагрузка плана, чтобы получить натуральные размеры картинки:
@@ -275,7 +280,7 @@ const ComparisonMatrix = ({
                     })
                 }
             }
-            img.src = premise.floorPlanImage
+            img.src = floorPlanSrc
         }
     }
 
@@ -390,7 +395,10 @@ const ComparisonMatrix = ({
 
                             {/* Premise Columns */}
                             {premises.map((premise) => {
-                                const mode = premise.floorPlanImage
+                                const floorPlanSrc = getMediaOriginalSrc(
+                                    premise.floorPlanImage,
+                                )
+                                const mode = floorPlanSrc
                                     ? imageModes[premise.id] || 'layout'
                                     : 'layout'
                                 const cover = getPremiseCoverImage(premise)
@@ -517,9 +525,9 @@ const ComparisonMatrix = ({
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    disabled={!premise.floorPlanImage}
+                                                    disabled={!floorPlanSrc}
                                                     title={
-                                                        premise.floorPlanImage
+                                                        floorPlanSrc
                                                             ? undefined
                                                             : 'План этажа недоступен'
                                                     }
@@ -528,7 +536,7 @@ const ComparisonMatrix = ({
                                                         mode === 'floor'
                                                             ? 'bg-white text-gray-900 shadow-xs dark:bg-gray-700 dark:text-white'
                                                             : 'text-gray-500 hover:text-gray-900 dark:text-gray-400',
-                                                        !premise.floorPlanImage &&
+                                                        !floorPlanSrc &&
                                                             'cursor-not-allowed opacity-45 hover:text-gray-500 dark:hover:text-gray-400',
                                                     )}
                                                     onClick={() =>
@@ -546,10 +554,9 @@ const ComparisonMatrix = ({
                                             </div>
 
                                             {/* Image container */}
-                                            {mode === 'floor' &&
-                                            premise.floorPlanImage ? (
+                                            {mode === 'floor' && floorPlanSrc ? (
                                                 <FloorPlanThumb
-                                                    src={premise.floorPlanImage}
+                                                    src={floorPlanSrc}
                                                     path={premise.floorPath}
                                                     alt={`План этажа, №${premise.number}`}
                                                     className="h-28 sm:h-36 p-1.5"
@@ -567,7 +574,10 @@ const ComparisonMatrix = ({
                                                     }
                                                 >
                                                     <img
-                                                        src={cover}
+                                                        {...getResponsiveImageAttrs(
+                                                            cover,
+                                                            '160px',
+                                                        )}
                                                         alt={`Планировка №${premise.number}`}
                                                         className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
                                                     />

@@ -32,7 +32,7 @@ const Carousel = (props: CarouselProps) => {
 
     const { loop = false, startIndex = 0 } = opts
 
-    const containerRef = useRef<HTMLDivElement>(null)
+    const containerRef = useRef<HTMLDivElement | null>(null)
     const [selectedIndex, setSelectedIndex] = useState(startIndex)
     const [itemCount, setItemCount] = useState(0)
     const [scrollInfo, setScrollInfo] = useState<ScrollInfo>({

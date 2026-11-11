@@ -27,16 +27,18 @@ export const useFavoriteAccountsStore = create<FavoriteAccountsState>()(
             accounts: [],
             addFavoriteAccount: (user, token) => {
                 if (!user.userId || !token) return
+
+                const accountUserId = user.userId
                 set((state) => {
                     const filtered = state.accounts.filter(
                         (item) => item.userId !== user.userId,
                     )
                     const newAccount: FavoriteAccount = {
-                        userId: user.userId,
+                        userId: accountUserId,
                         userName: user.userName || 'Без имени',
-                        phone: user.phone,
-                        email: user.email,
-                        avatar: user.avatar,
+                        phone: user.phone ?? undefined,
+                        email: user.email ?? undefined,
+                        avatar: user.avatar ?? undefined,
                         agencyName: user.agencyName || user.agency?.name,
                         role: user.authority?.[0],
                         token,

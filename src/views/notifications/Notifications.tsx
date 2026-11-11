@@ -19,7 +19,6 @@ import {
 
 import {
     registerUserLogsBroadcastHandlers,
-    emitUserLogsSynced,
 } from '@/services/broadcast/userLogsBroadcastBus'
 
 import { isUserLogRead, markUserLogsAsReadLocal } from './utils'
@@ -74,11 +73,8 @@ const Notifications = () => {
             try {
                 const response = await apiGetUserLogs({
                     page: pageNumber,
-
-                    set_read: true,
-
+                    set_read: false,
                     types: typeIds.length > 0 ? typeIds : undefined,
-
                     notificationTypes: dictionaryTypes,
                 })
 
@@ -87,10 +83,6 @@ const Notifications = () => {
                 )
 
                 setMeta(response.meta)
-
-                if (pageNumber === 1 && !append) {
-                    emitUserLogsSynced()
-                }
             } finally {
                 setIsLoading(false)
             }
@@ -190,7 +182,7 @@ const Notifications = () => {
     return (
         <AdaptiveCard>
             <div className="max-w-[800px] mx-auto">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div className="flex flex-row sm:items-center justify-between gap-4 mb-6">
                     <h3>Уведомления</h3>
 
                     {filterItems.length > 0 ? (

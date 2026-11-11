@@ -5,12 +5,12 @@ import Switcher from '@/components/ui/Switcher'
 import Spinner from '@/components/ui/Spinner'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
+import { TbBell } from 'react-icons/tb'
 import {
     apiGetNotificationDictionaries,
     apiGetNotificationPreferences,
     apiUpdateNotificationPreferences,
 } from '@/services/NotificationService'
-import { TbBell } from 'react-icons/tb'
 import {
     arePreferenceStatesEqual,
     buildPreferenceState,
@@ -134,12 +134,12 @@ const NotificationPreferences = () => {
 
     return (
         <Card
-            className="h-full flex flex-col"
+            className="@container flex flex-col"
             bodyClass="flex-1"
             header={{
                 content: (
                     <div className="flex items-start gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-subtle text-primary text-xl shrink-0">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-xl text-primary">
                             <TbBell />
                         </span>
                         <div>
@@ -148,21 +148,6 @@ const NotificationPreferences = () => {
                                 Выберите, как и куда получать уведомления
                             </p>
                         </div>
-                    </div>
-                ),
-                bordered: true,
-            }}
-            footer={{
-                content: (
-                    <div className="flex justify-end">
-                        <Button
-                            variant="solid"
-                            loading={isSaving}
-                            disabled={!isDirty || isLoading}
-                            onClick={handleSave}
-                        >
-                            Сохранить настройки
-                        </Button>
                     </div>
                 ),
                 bordered: true,
@@ -177,7 +162,7 @@ const NotificationPreferences = () => {
                     Настройки уведомлений недоступны
                 </p>
             ) : (
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 @xl:grid-cols-2 @5xl:grid-cols-3">
                     {types.map((type) => {
                         const description =
                             formatNotificationTypeDescription(type)
@@ -217,7 +202,7 @@ const NotificationPreferences = () => {
                                                 key={key}
                                                 className="flex items-center justify-between gap-3 text-sm heading-text"
                                             >
-                                                <span className="whitespace-nowrap">
+                                                <span className="min-w-0">
                                                     {channel.title}
                                                 </span>
                                                 <Switcher
@@ -244,6 +229,16 @@ const NotificationPreferences = () => {
                     })}
                 </div>
             )}
+            <div className="mt-4 flex justify-end border-t border-gray-200 pt-4 dark:border-gray-700">
+                <Button
+                    variant="solid"
+                    loading={isSaving}
+                    disabled={!isDirty || isLoading}
+                    onClick={handleSave}
+                >
+                    Сохранить настройки
+                </Button>
+            </div>
         </Card>
     )
 }

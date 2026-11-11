@@ -21,6 +21,7 @@ import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { stripHtml } from '@/views/special-offers/utils'
+import { getResponsiveImageAttrs } from '@/utils/mediaImage'
 import type {
     ObjectsSearchFilters,
     Premise,
@@ -211,6 +212,7 @@ const PremiseResultItem = ({
 }: PremiseResultItemProps) => {
     const navigate = useNavigate()
     const [open, setOpen] = useState(false)
+    const toggleOpen = () => setOpen((value) => !value)
     const isFavorite = useFavoritesStore((state) =>
         state.favoriteIds.includes(premise.id),
     )
@@ -338,9 +340,6 @@ const PremiseResultItem = ({
                                                 type="button"
                                                 className="inline-flex shrink-0 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-200"
                                                 aria-label="Описание акции"
-                                                onClick={(event) =>
-                                                    event.stopPropagation()
-                                                }
                                             >
                                                 <TbHelpCircle className="text-base" />
                                             </button>
@@ -640,7 +639,10 @@ const PremiseResultItem = ({
                             onClick={onPreviewLayout}
                         >
                             <img
-                                src={coverImage}
+                                {...getResponsiveImageAttrs(
+                                    coverImage,
+                                    '(min-width: 640px) 80px, 100vw',
+                                )}
                                 alt={`${coverImageLabel} ${premise.number}`}
                                 className="h-full w-full object-contain p-2 sm:p-1"
                                 loading="lazy"
@@ -682,15 +684,11 @@ const PremiseResultItem = ({
                 <div className="flex w-full min-w-0 flex-1 items-start gap-2 sm:items-center">
                     <button
                         type="button"
-                        className="relative flex min-w-0 flex-1 items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-0 sm:py-0"
-                        onClick={() => setOpen((value) => !value)}
+                        className="relative flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-0 sm:py-0"
+                        aria-expanded={open}
+                        onClick={toggleOpen}
                     >
-                    <div
-                        className={classNames(
-                            'flex min-w-0 flex-1 flex-col items-start',
-                            open && 'pr-10 sm:pr-0',
-                        )}
-                    >
+                    <div className="flex min-w-0 flex-1 flex-col items-start">
                         {badgesRow}
                         <p
                             className={classNames(
@@ -727,15 +725,6 @@ const PremiseResultItem = ({
                             {priceBlock}
                         </div>
                     ) : null}
-                    <HiChevronDown
-                        className={classNames(
-                            'shrink-0 text-xl text-gray-400 transition-transform duration-200',
-                            open
-                                ? 'absolute bottom-3 right-3 sm:static sm:self-center'
-                                : 'ml-auto self-end sm:ml-0 sm:self-center',
-                            open && 'rotate-180',
-                        )}
-                    />
                     </button>
                     <div
                         className={classNames(
@@ -745,6 +734,19 @@ const PremiseResultItem = ({
                         {compareButton}
                         {favoriteButton}
                     </div>
+                    <button
+                        type="button"
+                        className="hidden shrink-0 items-center justify-center p-1 text-gray-400 transition-colors hover:text-gray-600 sm:inline-flex dark:hover:text-gray-200"
+                        aria-expanded={open}
+                        onClick={toggleOpen}
+                    >
+                        <HiChevronDown
+                            className={classNames(
+                                'text-xl transition-transform duration-200',
+                                open && 'rotate-180',
+                            )}
+                        />
+                    </button>
                 </div>
 
                 <div
@@ -788,7 +790,10 @@ const PremiseResultItem = ({
                                             onClick={onPreviewLayout}
                                         >
                                             <img
-                                                src={coverImage}
+                                                {...getResponsiveImageAttrs(
+                                                    coverImage,
+                                                    '(min-width: 1024px) 50vw, 100vw',
+                                                )}
                                                 alt={`${coverImageLabel} помещения №${premise.number}`}
                                                 className="max-h-[420px] max-w-full object-contain"
                                             />
@@ -867,6 +872,19 @@ const PremiseResultItem = ({
                     </motion.div>
                 ) : null}
             </AnimatePresence>
+            <button
+                type="button"
+                className="flex w-full items-center justify-center gap-1.5 border-t border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 sm:hidden dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800/60"
+                aria-expanded={open}
+                onClick={toggleOpen}
+            >
+                <HiChevronDown
+                    className={classNames(
+                        'text-lg text-gray-400 transition-transform duration-200',
+                        open && 'rotate-180',
+                    )}
+                />
+            </button>
             {pendingRemoval && onCancelPendingRemoval ? (
                 <PendingRemovalBanner
                     startedAt={pendingRemoval.startedAt}

@@ -13,6 +13,7 @@ export interface AvatarProps extends CommonProps {
     shape?: Exclude<TypeAttributes.Shape, 'none'> | 'square'
     src?: string
     srcSet?: string
+    sizes?: string
 }
 
 const Avatar = (props: AvatarProps) => {
@@ -25,6 +26,7 @@ const Avatar = (props: AvatarProps) => {
         size = 'md',
         src,
         srcSet,
+        sizes,
         ...rest
     } = props
 
@@ -80,6 +82,18 @@ const Avatar = (props: AvatarProps) => {
                 className={`avatar-img avatar-${shape}`}
                 src={src}
                 srcSet={srcSet}
+                sizes={
+                    sizes ??
+                    (srcSet
+                        ? typeof size === 'number'
+                            ? `${size}px`
+                            : size === 'sm'
+                              ? '32px'
+                              : size === 'lg'
+                                ? '48px'
+                                : '40px'
+                        : undefined)
+                }
                 alt={alt}
                 loading="lazy"
             />

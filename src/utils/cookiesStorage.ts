@@ -1,9 +1,9 @@
 import Cookies from 'js-cookie'
 
 type StateStorage = {
-    getItem: (name: string) => string | null | Promise<string | null>
-    setItem: (name: string, value: string) => void | Promise<void>
-    removeItem: (name: string) => void | Promise<void>
+    getItem: (name: string) => string | null
+    setItem: (name: string, value: string, expires?: number | Date) => void
+    removeItem: (name: string) => void
 }
 
 const cookiesStorage: StateStorage = {

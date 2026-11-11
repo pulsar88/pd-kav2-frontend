@@ -5,6 +5,8 @@ import {
     TbBriefcase,
     TbBuilding,
     TbHelp,
+    TbId,
+    TbMailOpened,
     TbPhone,
     TbSettings,
     TbUser,
@@ -26,6 +28,7 @@ import { mapUserToProfileForm } from '@/views/account/Profile/utils'
 import {
     apiGetNotificationDictionaries,
     apiGetUserLogs,
+    apiMarkUserLogsAsRead,
 } from '@/services/NotificationService'
 import {
     apiGetFixationsStatusCounts,
@@ -47,8 +50,10 @@ import type { FixationStatus } from '@/views/fixations/types'
 import {
     formatUserLogTime,
     isUserLogRead,
+    markUserLogsAsReadLocal,
     resolveLogActionHref,
 } from '@/views/notifications/utils'
+import { registerUserLogsBroadcastHandlers } from '@/services/broadcast/userLogsBroadcastBus'
 import { getUserLogTypeName } from '@/utils/notificationDictionary'
 import UserLogAvatar from '@/views/notifications/components/UserLogAvatar'
 import type { UserLog } from '@/@types/notification'
@@ -60,6 +65,32 @@ import DashboardAnalyticsFilters, {
 type FixationsTransitionStats = Awaited<
     ReturnType<typeof apiGetFixationsTransitionStats>
 >
+
+const LATEST_NOTIFICATIONS_COUNT = 3
+
+const mergeLatestNotifications = (current: UserLog[], incoming: UserLog[]) => {
+    const byId = new Map<number, UserLog>()
+
+    for (const log of current) {
+        byId.set(log.id, log)
+    }
+
+    for (const log of incoming) {
+        byId.set(log.id, log)
+    }
+
+    return [...byId.values()]
+        .sort((left, right) => {
+            const byDate = right.created_at.localeCompare(left.created_at)
+
+            if (byDate !== 0) {
+                return byDate
+            }
+
+            return right.id - left.id
+        })
+        .slice(0, LATEST_NOTIFICATIONS_COUNT)
+}
 
 const Home = () => {
     const navigate = useNavigate()
@@ -91,6 +122,11 @@ const Home = () => {
         : selectedAgencyId
     const [notifications, setNotifications] = useState<UserLog[]>([])
     const [isNotificationsLoading, setIsNotificationsLoading] = useState(true)
+    const [markingNotificationIds, setMarkingNotificationIds] = useState<
+        number[]
+    >([])
+    const [isMarkingAllNotifications, setIsMarkingAllNotifications] =
+        useState(false)
     const [statusCounts, setStatusCounts] =
         useState<FixationsStatusCounts | null>(null)
     const [isStatusesLoading, setIsStatusesLoading] = useState(false)
@@ -270,14 +306,16 @@ const Home = () => {
             .then((dictionaries) =>
                 apiGetUserLogs({
                     page: 1,
-                    per_page: 3,
+                    per_page: LATEST_NOTIFICATIONS_COUNT,
                     set_read: false,
                     notificationTypes: dictionaries.notification_types,
                 }),
             )
             .then((response) => {
                 if (!cancelled) {
-                    setNotifications(response.data)
+                    setNotifications((current) =>
+                        mergeLatestNotifications(current, response.data),
+                    )
                 }
             })
             .catch(() => {
@@ -291,6 +329,63 @@ const Home = () => {
             cancelled = true
         }
     }, [])
+
+    useEffect(() => {
+        return registerUserLogsBroadcastHandlers({
+            onLogCreated: (log) => {
+                setNotifications((current) =>
+                    mergeLatestNotifications(current, [log]),
+                )
+            },
+            onLogsReaded: (ids) => {
+                setNotifications((current) =>
+                    markUserLogsAsReadLocal(current, ids),
+                )
+            },
+        })
+    }, [])
+
+    const unreadNotificationIds = useMemo(
+        () =>
+            notifications
+                .filter((log) => !isUserLogRead(log))
+                .map((log) => log.id),
+        [notifications],
+    )
+
+    const handleMarkNotificationRead = async (id: number) => {
+        if (
+            markingNotificationIds.includes(id) ||
+            isMarkingAllNotifications
+        ) {
+            return
+        }
+
+        setMarkingNotificationIds((current) => [...current, id])
+        try {
+            await apiMarkUserLogsAsRead({ ids: [id] })
+        } finally {
+            setMarkingNotificationIds((current) =>
+                current.filter((item) => item !== id),
+            )
+        }
+    }
+
+    const handleMarkAllNotificationsRead = async () => {
+        if (
+            unreadNotificationIds.length === 0 ||
+            isMarkingAllNotifications
+        ) {
+            return
+        }
+
+        setIsMarkingAllNotifications(true)
+        try {
+            await apiMarkUserLogsAsRead({ ids: unreadNotificationIds })
+        } finally {
+            setIsMarkingAllNotifications(false)
+        }
+    }
 
     const statusSummary = useMemo(() => {
         const counts = statusCounts ?? createEmptyFixationsStatusCounts()
@@ -520,52 +615,42 @@ const Home = () => {
     }, [transitionChartDesiredWidth, activeTimelineStatuses.length])
 
     const phoneDisplay = profile.phone || '—'
-    const hideAgencyAndLevel = analyticsScope.isSupervisor
+    const agencyDisplay = profile.agency || '—'
+    const roleDisplay = profile.role && profile.role !== '—' ? profile.role : '—'
+    const hideLevel = analyticsScope.isSupervisor
 
     return (
         <Container>
             <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-4">
-                    <AdaptiveCard>
+                <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4 xl:items-stretch">
+                    <AdaptiveCard className="relative xl:h-full">
                         <div className="flex flex-col gap-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex min-w-0 items-center gap-3">
-                                    <Avatar
-                                        size={56}
-                                        shape="circle"
-                                        src={profile.img || undefined}
-                                        icon={<TbUser />}
-                                        className="bg-primary/15 text-primary"
-                                    />
-                                    <div className="min-w-0">
-                                        <h3 className="truncate text-lg leading-tight">
-                                            {profile.fullName || 'Профиль'}
-                                        </h3>
-                                        {profile.role ? (
-                                            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                                                {profile.role}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    icon={<TbSettings />}
-                                    className="shrink-0"
-                                    onClick={() => navigate('/account/profile')}
+                            <div className="flex items-center gap-3 pr-7">
+                                <Avatar
+                                    size={48}
+                                    shape="circle"
+                                    src={profile.img || undefined}
+                                    icon={<TbUser />}
+                                    className="shrink-0 bg-primary/15 text-primary"
+                                />
+                                <h3
+                                    className="min-w-0 flex-1 break-words text-base leading-snug line-clamp-2"
+                                    title={profile.fullName || 'Профиль'}
                                 >
-                                    <span className="hidden sm:inline">
-                                        Настройки
-                                    </span>
-                                </Button>
+                                    {profile.fullName || 'Профиль'}
+                                </h3>
                             </div>
 
-                            <div
-                                className={classNames(
-                                    'grid grid-cols-1 gap-2',
-                                    !hideAgencyAndLevel && 'sm:grid-cols-3',
-                                )}
-                            >
+                            <Button
+                                size="sm"
+                                icon={<TbSettings />}
+                                className="absolute right-4 top-4"
+                                title="Настройки"
+                                aria-label="Настройки"
+                                onClick={() => navigate('/account/profile')}
+                            />
+
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-1">
                                 <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
                                     <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                         <TbPhone className="text-sm" />
@@ -575,18 +660,26 @@ const Home = () => {
                                         {phoneDisplay}
                                     </p>
                                 </div>
-                                {!hideAgencyAndLevel ? (
-                                    <>
-                                        <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
-                                            <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                                <TbBuilding className="text-sm" />
-                                                Агентство
-                                            </p>
-                                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {profile.agency || '—'}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
+                                <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
+                                    <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        <TbBuilding className="text-sm" />
+                                        Агентство
+                                    </p>
+                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        {agencyDisplay}
+                                    </p>
+                                </div>
+                                <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
+                                    <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        <TbId className="text-sm" />
+                                        Роль
+                                    </p>
+                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                        {roleDisplay}
+                                    </p>
+                                </div>
+                                {!hideLevel ? (
+                                    <div className="rounded-xl bg-gray-50 px-3 py-2.5 dark:bg-gray-700/40">
                                             <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                                 <TbBriefcase className="text-sm" />
                                                 Уровень
@@ -607,14 +700,13 @@ const Home = () => {
                                                 {profile.accessLevel?.name ||
                                                     '—'}
                                             </p>
-                                        </div>
-                                    </>
+                                    </div>
                                 ) : null}
                             </div>
                         </div>
                     </AdaptiveCard>
 
-                    <AdaptiveCard>
+                    <AdaptiveCard className="min-w-0 xl:col-span-3 xl:h-full">
                         <div className="flex flex-col gap-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
@@ -628,15 +720,29 @@ const Home = () => {
                                         Последние 3 уведомления
                                     </p>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    className="hidden shrink-0 sm:inline-flex"
-                                    onClick={() =>
-                                        navigate('/account/notifications')
-                                    }
-                                >
-                                    Все уведомления
-                                </Button>
+                                <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                                    <Button
+                                        size="sm"
+                                        loading={isMarkingAllNotifications}
+                                        disabled={
+                                            unreadNotificationIds.length ===
+                                                0 || isMarkingAllNotifications
+                                        }
+                                        onClick={() => {
+                                            void handleMarkAllNotificationsRead()
+                                        }}
+                                    >
+                                        Прочитать все
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            navigate('/account/notifications')
+                                        }
+                                    >
+                                        Все уведомления
+                                    </Button>
+                                </div>
                             </div>
 
                             {isNotificationsLoading ? (
@@ -653,7 +759,7 @@ const Home = () => {
                                     </p>
                                 </div>
                             ) : (
-                                <ul className="divide-y divide-gray-100 dark:divide-gray-700/60">
+                                <ul className="flex flex-col gap-1">
                                     {notifications.map((log) => {
                                         const action = log.action
                                             ? resolveLogActionHref(
@@ -664,10 +770,21 @@ const Home = () => {
 
                                         return (
                                             <li key={log.id}>
-                                                <button
-                                                    type="button"
-                                                    className="flex w-full items-start gap-3 py-3 text-left transition-colors hover:bg-gray-50/80 dark:hover:bg-gray-700/30"
+                                                <div
+                                                    role="link"
+                                                    tabIndex={0}
+                                                    className={classNames(
+                                                        'flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors',
+                                                        unread
+                                                            ? 'bg-primary/10 hover:bg-primary/15 dark:bg-primary/15 dark:hover:bg-primary/20'
+                                                            : 'hover:bg-gray-50/80 dark:hover:bg-gray-700/30',
+                                                    )}
                                                     onClick={() => {
+                                                        if (unread) {
+                                                            void handleMarkNotificationRead(
+                                                                log.id,
+                                                            )
+                                                        }
                                                         if (action?.href) {
                                                             if (
                                                                 action.external
@@ -687,6 +804,20 @@ const Home = () => {
                                                         navigate(
                                                             '/account/notifications',
                                                         )
+                                                    }}
+                                                    onKeyDown={(event) => {
+                                                        if (
+                                                            event.target !==
+                                                                event.currentTarget ||
+                                                            (event.key !==
+                                                                'Enter' &&
+                                                                event.key !==
+                                                                    ' ')
+                                                        ) {
+                                                            return
+                                                        }
+                                                        event.preventDefault()
+                                                        event.currentTarget.click()
                                                     }}
                                                 >
                                                     <UserLogAvatar
@@ -717,28 +848,64 @@ const Home = () => {
                                                         </p>
                                                     </div>
                                                     {unread ? (
-                                                        <span
-                                                            className="mt-2 h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-                                                            aria-hidden
+                                                        <Button
+                                                            size="xs"
+                                                            shape="circle"
+                                                            variant="plain"
+                                                            className="shrink-0"
+                                                            icon={
+                                                                <TbMailOpened className="text-lg" />
+                                                            }
+                                                            title="Отметить прочитанным"
+                                                            aria-label="Отметить прочитанным"
+                                                            loading={markingNotificationIds.includes(
+                                                                log.id,
+                                                            )}
+                                                            disabled={
+                                                                isMarkingAllNotifications
+                                                            }
+                                                            onClick={(
+                                                                event,
+                                                            ) => {
+                                                                event.stopPropagation()
+                                                                void handleMarkNotificationRead(
+                                                                    log.id,
+                                                                )
+                                                            }}
                                                         />
                                                     ) : null}
-                                                </button>
+                                                </div>
                                             </li>
                                         )
                                     })}
                                 </ul>
                             )}
 
-                            <Button
-                                size="sm"
-                                block
-                                className="sm:hidden"
-                                onClick={() =>
-                                    navigate('/account/notifications')
-                                }
-                            >
-                                Все уведомления
-                            </Button>
+                            <div className="flex flex-col gap-2 sm:hidden">
+                                <Button
+                                    size="sm"
+                                    block
+                                    loading={isMarkingAllNotifications}
+                                    disabled={
+                                        unreadNotificationIds.length === 0 ||
+                                        isMarkingAllNotifications
+                                    }
+                                    onClick={() => {
+                                        void handleMarkAllNotificationsRead()
+                                    }}
+                                >
+                                    Прочитать все
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    block
+                                    onClick={() =>
+                                        navigate('/account/notifications')
+                                    }
+                                >
+                                    Все уведомления
+                                </Button>
+                            </div>
                         </div>
                     </AdaptiveCard>
                 </div>

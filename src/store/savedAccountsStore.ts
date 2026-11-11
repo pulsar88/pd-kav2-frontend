@@ -27,6 +27,8 @@ export const useSavedAccountsStore = create<SavedAccountsState>()(
             accounts: [],
             syncCurrentAccount: (user, token) => {
                 if (!user.userId || !token) return
+
+                const accountUserId = user.userId
                 const authority = user.authority ?? []
                 const isEligible =
                     authority.includes(SUPERVISOR) ||
@@ -39,11 +41,11 @@ export const useSavedAccountsStore = create<SavedAccountsState>()(
                         (acc) => acc.userId !== user.userId,
                     )
                     const updated: SavedAccount = {
-                        userId: user.userId,
+                        userId: accountUserId,
                         userName: user.userName || 'Без имени',
-                        phone: user.phone,
-                        email: user.email,
-                        avatar: user.avatar,
+                        phone: user.phone ?? undefined,
+                        email: user.email ?? undefined,
+                        avatar: user.avatar ?? undefined,
                         agencyName: user.agencyName || user.agency?.name,
                         token,
                         lastActiveAt: Date.now(),

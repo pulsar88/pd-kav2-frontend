@@ -20,6 +20,7 @@ import {
     apiToggleUserBlock,
 } from '@/services/UsersService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import { getMediaSrc, getMediaSrcSet } from '@/utils/mediaImage'
 import {
     AGENCY_SUPERVISOR,
     getUserRoleLabel,
@@ -244,10 +245,8 @@ const SupervisorAgencyDetail = () => {
                     const agent = row.original
                     const blocked = isAgentBlocked(agent)
                     const isSupervisor = agency?.supervisor?.id === agent.id
-                    const avatarSrc =
-                        agent.profile_picture?.src ||
-                        agent.profile_picture?.url_path ||
-                        ''
+                    const avatarSrc = getMediaSrc(agent.profile_picture)
+                    const avatarSrcSet = getMediaSrcSet(agent.profile_picture)
 
                     return (
                         <div className="flex min-w-0 items-center gap-3">
@@ -255,6 +254,7 @@ const SupervisorAgencyDetail = () => {
                                 size={40}
                                 shape="circle"
                                 src={avatarSrc || undefined}
+                                srcSet={avatarSrcSet || undefined}
                                 icon={<HiOutlineUser />}
                                 className="shrink-0 bg-gray-100 text-gray-400 dark:bg-gray-700"
                             />
@@ -578,8 +578,16 @@ const SupervisorAgencyDetail = () => {
                                                 size={44}
                                                 shape="circle"
                                                 src={
-                                                    agency.supervisor.profile_picture
-                                                        ?.src || undefined
+                                                    getMediaSrc(
+                                                        agency.supervisor
+                                                            .profile_picture,
+                                                    ) || undefined
+                                                }
+                                                srcSet={
+                                                    getMediaSrcSet(
+                                                        agency.supervisor
+                                                            .profile_picture,
+                                                    ) || undefined
                                                 }
                                                 icon={<HiOutlineUser />}
                                                 className="shrink-0 bg-primary/10 text-primary"

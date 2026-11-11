@@ -26,16 +26,18 @@ export const useMultiAccountStore = create<MultiAccountState>()(
             accounts: [],
             saveAccount: (user, token) => {
                 if (!user.userId || !token) return
+
+                const accountUserId = user.userId
                 set((state) => {
                     const filtered = state.accounts.filter(
                         (acc) => acc.userId !== user.userId,
                     )
                     const updated: SavedAccount = {
-                        userId: user.userId,
+                        userId: accountUserId,
                         userName: user.userName || 'Без имени',
-                        phone: user.phone,
-                        email: user.email,
-                        avatar: user.avatar,
+                        phone: user.phone ?? undefined,
+                        email: user.email ?? undefined,
+                        avatar: user.avatar ?? undefined,
                         agencyName: user.agencyName || user.agency?.name,
                         token,
                         lastActiveAt: Date.now(),

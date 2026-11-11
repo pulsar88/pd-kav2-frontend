@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { useSessionUser } from '@/store/authStore'
 import { SUPERVISOR } from '@/constants/roles.constant'
 import Button from '@/components/ui/Button'
+import Input from '@/components/ui/Input'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import Spinner from '@/components/ui/Spinner'
@@ -14,6 +15,8 @@ import {
     apiGetFixationGigalogs,
     apiApproveFixation,
     apiRejectFixation,
+    apiApproveFixationExtendRequest,
+    apiRejectFixationExtendRequest,
     type FixationGigalogItem,
 } from '@/services/FixationsService'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -445,6 +448,10 @@ const FixationDetails = () => {
     const [isGigalogsLoading, setIsGigalogsLoading] = useState(false)
     const [isGigalogsLoadingMore, setIsGigalogsLoadingMore] = useState(false)
     const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
+    const [actionSubject, setActionSubject] = useState<'fixation' | 'extend'>(
+        'fixation',
+    )
+    const [extendRejectReason, setExtendRejectReason] = useState('')
     const [isActionSubmitting, setIsActionSubmitting] = useState(false)
     const [gigalogsPage, setGigalogsPage] = useState(1)
     const [gigalogsHasMore, setGigalogsHasMore] = useState(false)
@@ -564,11 +571,49 @@ const FixationDetails = () => {
         fetchGigalogs,
     ])
 
+    const closeActionDialog = () => {
+        if (isActionSubmitting) return
+        setActionType(null)
+        setExtendRejectReason('')
+    }
+
+    const openActionDialog = (
+        type: 'approve' | 'reject',
+        subject: 'fixation' | 'extend',
+    ) => {
+        setExtendRejectReason('')
+        setActionSubject(subject)
+        setActionType(type)
+    }
+
     const handleConfirmAction = async () => {
         if (!id || !actionType) return
+        const isExtend = actionSubject === 'extend'
+        const requestId = data?.pendingExtendRequest?.id
+        if (isExtend && !requestId) return
+
         setIsActionSubmitting(true)
         try {
-            if (actionType === 'approve') {
+            if (isExtend && requestId) {
+                if (actionType === 'approve') {
+                    await apiApproveFixationExtendRequest(requestId)
+                    toast.push(
+                        <Notification title="Успешно" type="success">
+                            Продление фиксации одобрено
+                        </Notification>,
+                    )
+                } else {
+                    await apiRejectFixationExtendRequest(
+                        requestId,
+                        extendRejectReason,
+                    )
+                    toast.push(
+                        <Notification title="Успешно" type="success">
+                            Продление фиксации отклонено
+                        </Notification>,
+                    )
+                }
+            } else if (actionType === 'approve') {
                 await apiApproveFixation(id)
                 toast.push(
                     <Notification title="Успешно" type="success">
@@ -584,17 +629,24 @@ const FixationDetails = () => {
                 )
             }
             setActionType(null)
+            setExtendRejectReason('')
             const updated = await apiGetFixation(id)
             if (updated) setData(updated)
             void fetchGigalogs(1)
         } catch (err: unknown) {
+            const extendError =
+                actionType === 'approve'
+                    ? 'Не удалось одобрить продление'
+                    : 'Не удалось отклонить продление'
+            const fixationError =
+                actionType === 'approve'
+                    ? 'Не удалось одобрить фиксацию'
+                    : 'Не удалось отклонить фиксацию'
             toast.push(
                 <Notification title="Ошибка" type="danger">
                     {getApiErrorMessage(
                         err,
-                        actionType === 'approve'
-                            ? 'Не удалось одобрить фиксацию'
-                            : 'Не удалось отклонить фиксацию',
+                        isExtend ? extendError : fixationError,
                     )}
                 </Notification>,
             )
@@ -603,9 +655,16 @@ const FixationDetails = () => {
         }
     }
 
+    const isClinchDecision = data?.status === 'clinch'
     const canModerate =
         isSupervisor &&
         (data?.status === 'moderation' || data?.status === 'clinch')
+    const pendingExtendRequest = isSupervisor
+        ? data?.pendingExtendRequest
+        : undefined
+    const fixationDecisionTitle = isClinchDecision
+        ? 'Спорная фиксация'
+        : 'Фиксация на модерации'
 
     const status = data ? getFixationStatusDisplay(data) : null
 
@@ -636,7 +695,7 @@ const FixationDetails = () => {
                     <div className="grid items-start gap-4 xl:grid-cols-5 w-full min-w-0">
                         <div className="flex flex-col gap-4 xl:col-span-3 w-full min-w-0">
                             <AdaptiveCard className="w-full min-w-0 overflow-hidden">
-                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <div className="mb-3">
                                     <Button
                                         type="button"
                                         size="sm"
@@ -645,30 +704,6 @@ const FixationDetails = () => {
                                     >
                                         К списку фиксаций
                                     </Button>
-                                    {canModerate ? (
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="solid"
-                                                className="bg-emerald-600 hover:bg-emerald-700"
-                                                icon={<TbCheck />}
-                                                onClick={() => setActionType('approve')}
-                                            >
-                                                Одобрить
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="default"
-                                                className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
-                                                icon={<TbX />}
-                                                onClick={() => setActionType('reject')}
-                                            >
-                                                Отклонить
-                                            </Button>
-                                        </div>
-                                    ) : null}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <h2 className="mb-0 text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -682,6 +717,94 @@ const FixationDetails = () => {
                                         </span>
                                     ) : null}
                                 </div>
+                                {canModerate || pendingExtendRequest ? (
+                                    <div className="mt-4 flex flex-col gap-3">
+                                        {canModerate ? (
+                                            <div
+                                                className={
+                                                    isClinchDecision
+                                                        ? 'flex flex-col gap-3 rounded-xl border border-fuchsia-200 bg-fuchsia-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10'
+                                                        : 'flex flex-col gap-3 rounded-xl border border-purple-200 bg-purple-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-purple-500/30 dark:bg-purple-500/10'
+                                                }
+                                            >
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                    {fixationDecisionTitle}
+                                                </div>
+                                                <div className="flex shrink-0 flex-wrap gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="solid"
+                                                        className="bg-emerald-600 hover:bg-emerald-700"
+                                                        icon={<TbCheck />}
+                                                        onClick={() =>
+                                                            openActionDialog(
+                                                                'approve',
+                                                                'fixation',
+                                                            )
+                                                        }
+                                                    >
+                                                        Одобрить
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="default"
+                                                        className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
+                                                        icon={<TbX />}
+                                                        onClick={() =>
+                                                            openActionDialog(
+                                                                'reject',
+                                                                'fixation',
+                                                            )
+                                                        }
+                                                    >
+                                                        Отклонить
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                        {pendingExtendRequest ? (
+                                            <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10">
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                    Запрос на продление фиксации
+                                                </div>
+                                                <div className="flex shrink-0 flex-wrap gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="solid"
+                                                        className="bg-amber-600 hover:bg-amber-700"
+                                                        icon={<TbClockPlus />}
+                                                        onClick={() =>
+                                                            openActionDialog(
+                                                                'approve',
+                                                                'extend',
+                                                            )
+                                                        }
+                                                    >
+                                                        Одобрить продление
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="default"
+                                                        className="text-rose-600 hover:text-rose-700 hover:border-rose-300"
+                                                        icon={<TbX />}
+                                                        onClick={() =>
+                                                            openActionDialog(
+                                                                'reject',
+                                                                'extend',
+                                                            )
+                                                        }
+                                                    >
+                                                        Отклонить продление
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
                                 {isSupervisor && (data.clientExternalId || data.dealExternalId) ? (
                                     <div className="mt-3 flex flex-wrap justify-end gap-2">
                                         {data.clientExternalId ? (
@@ -1042,22 +1165,91 @@ const FixationDetails = () => {
                 )}
             </Loading>
             <ConfirmDialog
-                isOpen={Boolean(actionType)}
+                isOpen={Boolean(
+                    actionType &&
+                        (actionSubject === 'extend'
+                            ? pendingExtendRequest
+                            : true),
+                )}
                 type={actionType === 'approve' ? 'info' : 'danger'}
-                title={actionType === 'approve' ? 'Одобрить фиксацию' : 'Отклонить фиксацию'}
-                confirmButtonColor={actionType === 'approve' ? 'emerald-600' : 'red-600'}
+                title={
+                    actionSubject === 'extend'
+                        ? actionType === 'approve'
+                            ? 'Одобрить продление фиксации'
+                            : 'Отклонить продление фиксации'
+                        : actionType === 'approve'
+                          ? isClinchDecision
+                              ? 'Подтвердить спорную фиксацию'
+                              : 'Одобрить фиксацию'
+                          : isClinchDecision
+                            ? 'Отклонить спорную фиксацию'
+                            : 'Отклонить фиксацию'
+                }
                 confirmText={actionType === 'approve' ? 'Одобрить' : 'Отклонить'}
                 cancelText="Отмена"
-                isLoading={isActionSubmitting}
-                onClose={() => !isActionSubmitting && setActionType(null)}
-                onCancel={() => !isActionSubmitting && setActionType(null)}
+                confirmButtonProps={{
+                    loading: isActionSubmitting,
+                    disabled: isActionSubmitting,
+                    className:
+                        actionSubject === 'extend' && actionType === 'approve'
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                            : actionType === 'approve'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              : 'bg-rose-600 hover:bg-rose-700 text-white',
+                }}
+                onClose={closeActionDialog}
+                onCancel={closeActionDialog}
                 onConfirm={handleConfirmAction}
             >
-                <p>
-                    {actionType === 'approve'
-                        ? `Вы уверены, что хотите одобрить фиксацию #${data?.id}?`
-                        : `Вы уверены, что хотите отклонить фиксацию #${data?.id}?`}
-                </p>
+                {actionSubject === 'extend' ? (
+                    <div className="space-y-3">
+                        <p>
+                            {actionType === 'approve'
+                                ? `Вы уверены, что хотите одобрить продление фиксации #${data?.id}`
+                                : `Вы уверены, что хотите отклонить продление фиксации #${data?.id}`}
+                            {pendingExtendRequest?.days
+                                ? ` на ${pendingExtendRequest.days} дн.?`
+                                : '?'}
+                        </p>
+                        {pendingExtendRequest?.comment ? (
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-600 dark:bg-gray-800">
+                                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    Комментарий к запросу
+                                </div>
+                                <p className="text-sm leading-relaxed text-gray-900 dark:text-gray-100">
+                                    {pendingExtendRequest.comment}
+                                </p>
+                            </div>
+                        ) : null}
+                        {actionType === 'reject' ? (
+                            <div>
+                                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    Причина отклонения
+                                </label>
+                                <Input
+                                    textArea
+                                    rows={3}
+                                    value={extendRejectReason}
+                                    placeholder="Укажите причину отклонения"
+                                    disabled={isActionSubmitting}
+                                    onChange={(event) =>
+                                        setExtendRejectReason(event.target.value)
+                                    }
+                                />
+                            </div>
+                        ) : null}
+                    </div>
+                ) : (
+                    <p>
+                        {actionType === 'approve'
+                            ? isClinchDecision
+                                ? `Вы уверены, что хотите подтвердить спорную фиксацию #${data?.id}?`
+                                : `Вы уверены, что хотите одобрить фиксацию #${data?.id}?`
+                            : isClinchDecision
+                              ? `Вы уверены, что хотите отклонить спорную фиксацию #${data?.id}?`
+                              : `Вы уверены, что хотите отклонить фиксацию #${data?.id}?`}
+                    </p>
+                )}
             </ConfirmDialog>
         </Container>
     )

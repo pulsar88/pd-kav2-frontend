@@ -191,6 +191,27 @@ const isPendingExtendRequest = (request: {
     return true
 }
 
+const resolvePendingExtendRequest = (item: FixationApiItem) => {
+    const requests = item.extend_requests ?? item.extendRequests
+    if (!Array.isArray(requests)) return undefined
+
+    const pending = requests.filter(
+        (request) => request.id != null && isPendingExtendRequest(request),
+    )
+    if (pending.length === 0) return undefined
+
+    const latest = [...pending].sort(
+        (left, right) => Number(right.id) - Number(left.id),
+    )[0]
+    const days = latest.add_days ?? latest.extend_days ?? latest.days
+
+    return {
+        id: String(latest.id),
+        comment: latest.comment?.trim() || undefined,
+        days: typeof days === 'number' && days > 0 ? days : undefined,
+    }
+}
+
 const resolveHasExtendRequest = (item: FixationApiItem): boolean => {
     const raw = item as Record<string, unknown>
     if (
@@ -241,7 +262,8 @@ export const mapFixationApiItemToFixation = (
     const note = item.comment?.trim() || undefined
     const budget = formatBudget(item.budget)
     const meetingDate = item.meeting_date?.trim() || undefined
-    const hasExtend = resolveHasExtendRequest(item)
+    const pendingExtendRequest = resolvePendingExtendRequest(item)
+    const hasExtend = resolveHasExtendRequest(item) || Boolean(pendingExtendRequest)
     const extendRejectReason = resolveExtendRejectReason(item)
 
     return {
@@ -286,5 +308,6 @@ export const mapFixationApiItemToFixation = (
         has_extend_request: hasExtend,
         hasExtendRequest: hasExtend,
         extendRejectReason,
+        pendingExtendRequest,
     }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import DataTable from '@/components/shared/DataTable'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -10,6 +10,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import type { DatePickerRangeValue } from '@/components/ui/DatePicker'
 import Dropdown from '@/components/ui/Dropdown'
 import Input from '@/components/ui/Input'
+import Select from '@/components/ui/Select'
 import Tooltip from '@/components/ui/Tooltip'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
@@ -20,7 +21,9 @@ import {
     apiRejectFixationExtendRequest,
     type FixationExtendRequest,
 } from '@/services/FixationsService'
+import { apiGetAgencies, apiGetAgency } from '@/services/AgencyService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
+import type { AgencyAgent } from '@/@types/agency'
 import { formatStatsApiDate } from '@/views/fixations/fixationStatsMapper'
 import {
     formatFixationDate,
@@ -174,6 +177,8 @@ export const getRequestStatus = (item: FixationExtendRequest): string => {
     return 'pending'
 }
 
+type FilterOption = { value: number; label: string }
+
 const statusConfig: Record<
     string,
     { label: string; bgClass: string; textClass: string }
@@ -211,6 +216,20 @@ const ExtendRequestsTab = () => {
         null,
         null,
     ])
+    const [agencyId, setAgencyId] = useState<number | undefined>()
+    const [agentId, setAgentId] = useState<number | undefined>()
+    const [agencyOptions, setAgencyOptions] = useState<FilterOption[]>([])
+    const [selectedAgencyOption, setSelectedAgencyOption] =
+        useState<FilterOption | null>(null)
+    const [agencyPage, setAgencyPage] = useState(1)
+    const [hasMoreAgencies, setHasMoreAgencies] = useState(true)
+    const [isLoadingMoreAgencies, setIsLoadingMoreAgencies] = useState(false)
+    const [debouncedAgencySearch, setDebouncedAgencySearch] = useState('')
+    const [searchReloadKey, setSearchReloadKey] = useState(0)
+    const agencySearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    )
+    const [agentOptions, setAgentOptions] = useState<FilterOption[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [actionLoading, setActionLoading] = useState(false)
     const [columnVisibility, setColumnVisibility] =
@@ -241,6 +260,75 @@ const ExtendRequestsTab = () => {
         saveColumnVisibility(columnVisibility)
     }, [columnVisibility])
 
+    useEffect(() => {
+        return () => {
+            if (agencySearchTimerRef.current) {
+                clearTimeout(agencySearchTimerRef.current)
+            }
+        }
+    }, [])
+
+    useEffect(() => {
+        if (agencyId != null && !selectedAgencyOption) {
+            void apiGetAgency(agencyId).then((agency) => {
+                if (agency) {
+                    const option = { value: agency.id, label: agency.name }
+                    setSelectedAgencyOption(option)
+                    setAgencyOptions((prev) =>
+                        prev.some((item) => item.value === option.value)
+                            ? prev
+                            : [option, ...prev],
+                    )
+                }
+            })
+        }
+    }, [agencyId, selectedAgencyOption])
+
+    useEffect(() => {
+        setAgencyPage(1)
+        setHasMoreAgencies(true)
+        void apiGetAgencies({
+            page: 1,
+            per_page: 20,
+            search: debouncedAgencySearch || undefined,
+        }).then((result) => {
+            const list = result.data.map((agency) => ({
+                value: agency.id,
+                label: agency.name,
+            }))
+            setAgencyOptions(() => {
+                if (
+                    selectedAgencyOption &&
+                    !list.some(
+                        (item) => item.value === selectedAgencyOption.value,
+                    )
+                ) {
+                    return [selectedAgencyOption, ...list]
+                }
+                return list
+            })
+            setHasMoreAgencies((result.meta?.last_page ?? 1) > 1)
+        })
+    }, [debouncedAgencySearch, selectedAgencyOption, searchReloadKey])
+
+    useEffect(() => {
+        if (agencyId == null) {
+            setAgentOptions([])
+            setAgentId(undefined)
+            return
+        }
+
+        void apiGetAgency(agencyId, { with: 'agents' }).then((agency) => {
+            const agents = agency?.agents ?? []
+            setAgentOptions(
+                agents.map((agent: AgencyAgent) => ({
+                    value: Number(agent.id),
+                    label: agent.name,
+                })),
+            )
+        })
+    }, [agencyId])
+
     const handleColumnVisibilityChange = (
         columnId: ExtendColumnId,
         visible: boolean,
@@ -266,6 +354,54 @@ const ExtendRequestsTab = () => {
         setPageIndex(1)
     }
 
+    const handleAgencySearchChange = (value: string) => {
+        const trimmed = value.trim()
+        setAgencyPage(1)
+        if (agencySearchTimerRef.current) {
+            clearTimeout(agencySearchTimerRef.current)
+            agencySearchTimerRef.current = null
+        }
+        if (!trimmed) {
+            setDebouncedAgencySearch('')
+            setSearchReloadKey((prev) => prev + 1)
+            return
+        }
+        agencySearchTimerRef.current = setTimeout(() => {
+            agencySearchTimerRef.current = null
+            setDebouncedAgencySearch(trimmed)
+        }, 400)
+    }
+
+    const loadMoreAgencies = () => {
+        if (isLoadingMoreAgencies || !hasMoreAgencies) return
+        const nextPage = agencyPage + 1
+        setIsLoadingMoreAgencies(true)
+        void apiGetAgencies({
+            page: nextPage,
+            per_page: 20,
+            search: debouncedAgencySearch || undefined,
+        })
+            .then((result) => {
+                setAgencyOptions((current) => [
+                    ...current,
+                    ...result.data
+                        .filter(
+                            (agency) =>
+                                !current.some((item) => item.value === agency.id),
+                        )
+                        .map((agency) => ({
+                            value: agency.id,
+                            label: agency.name,
+                        })),
+                ])
+                setAgencyPage(nextPage)
+                setHasMoreAgencies(
+                    (result.meta?.last_page ?? nextPage) > nextPage,
+                )
+            })
+            .finally(() => setIsLoadingMoreAgencies(false))
+    }
+
     const loadRequests = useCallback(async () => {
         setIsLoading(true)
         try {
@@ -275,6 +411,8 @@ const ExtendRequestsTab = () => {
                 search: search || undefined,
                 date_from: dateFrom,
                 date_to: dateTo,
+                agency_id: agencyId,
+                agent_id: agentId,
             })
             setRequests(response.list || [])
             setTotal(response.total ?? 0)
@@ -289,7 +427,7 @@ const ExtendRequestsTab = () => {
         } finally {
             setIsLoading(false)
         }
-    }, [pageIndex, pageSize, search, dateFrom, dateTo])
+    }, [pageIndex, pageSize, search, dateFrom, dateTo, agencyId, agentId])
 
     useEffect(() => {
         void loadRequests()
@@ -660,6 +798,56 @@ const ExtendRequestsTab = () => {
                         separator="—"
                         maxDate={new Date()}
                         onChange={handleDateRangeChange}
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-[19.5rem]">
+                    <Select<FilterOption, false>
+                        isClearable
+                        isSearchable
+                        placeholder="Все агентства"
+                        options={agencyOptions}
+                        value={
+                            agencyOptions.find(
+                                (item) => item.value === agencyId,
+                            ) ?? null
+                        }
+                        filterOption={() => true}
+                        isLoading={isLoadingMoreAgencies}
+                        onChange={(option) => {
+                            setSelectedAgencyOption(option ?? null)
+                            setAgencyId(option?.value)
+                            setAgentId(undefined)
+                            setPageIndex(1)
+                        }}
+                        onInputChange={(value, actionMeta) => {
+                            if (actionMeta.action === 'input-change') {
+                                handleAgencySearchChange(value)
+                            } else if (
+                                actionMeta.action === 'menu-close' ||
+                                actionMeta.action === 'input-blur'
+                            ) {
+                                handleAgencySearchChange('')
+                            }
+                            return value
+                        }}
+                        onMenuScrollToBottom={loadMoreAgencies}
+                    />
+                </div>
+                <div className="w-full shrink-0 lg:w-[19.5rem]">
+                    <Select<FilterOption, false>
+                        isClearable
+                        isSearchable
+                        placeholder="Все агенты"
+                        options={agentOptions}
+                        value={
+                            agentOptions.find((item) => item.value === agentId) ??
+                            null
+                        }
+                        isDisabled={!agencyId}
+                        onChange={(option) => {
+                            setAgentId(option?.value)
+                            setPageIndex(1)
+                        }}
                     />
                 </div>
                 <div className="flex shrink-0 gap-2 lg:ml-auto">

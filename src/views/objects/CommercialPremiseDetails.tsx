@@ -1,18 +1,33 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { TbBuildingSkyscraper, TbHeart, TbScale, TbPlus, TbHeartFilled, TbHelpCircle } from 'react-icons/tb'
+import { isImageSlide } from 'yet-another-react-lightbox'
+import { TbBuildingSkyscraper, TbHeart, TbScale, TbPlus, TbHeartFilled } from 'react-icons/tb'
+import ImageGallery from '@/components/shared/ImageGallery'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
 import Button from '@/components/ui/Button'
 import { apiGetRealtyProperty } from '@/services/ObjectsService'
-import LayoutPreviewDialog from './components/LayoutPreviewDialog'
+import RewardHelpButton from './components/RewardHelpButton'
+import {
+    FLOOR_PLAN_HIGHLIGHT_COLOR,
+    FloorPlanGallerySlide,
+    loadImageSize,
+} from './components/FloorPlanOverlay'
 import SpecialOfferBadges from './components/SpecialOfferBadges'
 import type { Premise } from './types'
-import { formatArea, formatPrice, getPremiseCoverImage } from './utils'
-import { Tooltip } from '@/components/ui'
-
+import {
+    formatArea,
+    formatPrice,
+    getPremiseCoverImage,
+    getPremisePreviewSlides,
+    type PremisePreviewSlide,
+} from './utils'
+import {
+    getMediaOriginalSrc,
+    getResponsiveImageAttrs,
+} from '@/utils/mediaImage'
 type DetailRowProps = {
     label: string
     value?: string | number | null
@@ -35,8 +50,8 @@ const CommercialPremiseDetails = () => {
     const navigate = useNavigate()
     const [premise, setPremise] = useState<Premise | null>(null)
     const [isLoading, setIsLoading] = useState(Boolean(id))
-    const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-    const [isFloorPreviewOpen, setIsFloorPreviewOpen] = useState(false)
+    const [previewIndex, setPreviewIndex] = useState(-1)
+    const [previewSlides, setPreviewSlides] = useState<PremisePreviewSlide[]>([])
     const favoriteIds = useFavoritesStore((state) => state.favoriteIds)
     const comparisonIds = useComparisonStore((state) => state.comparisonIds)
 
@@ -94,10 +109,37 @@ const CommercialPremiseDetails = () => {
         )
     }
 
-    const layoutImage = premise.layoutImage
-    const floorPlanImage = premise.floorPlanImage
+    const layoutImage = getMediaOriginalSrc(premise.layoutImage)
     const coverImage = getPremiseCoverImage(premise)
     const title = `План коммерческого помещения №${premise.number}`
+
+    const openPreview = async () => {
+        const slides = getPremisePreviewSlides(premise)
+        if (slides.length === 0) return
+
+        const floorSlide = slides.find((slide) => Boolean(slide.floorPath))
+        if (floorSlide) {
+            const size = await loadImageSize(floorSlide.src)
+            if (size) {
+                setPreviewSlides(
+                    slides.map((slide) =>
+                        slide.src === floorSlide.src
+                            ? {
+                                  ...slide,
+                                  width: size.width,
+                                  height: size.height,
+                              }
+                            : slide,
+                    ),
+                )
+                setPreviewIndex(0)
+                return
+            }
+        }
+
+        setPreviewSlides(slides)
+        setPreviewIndex(0)
+    }
 
     return (
         <Container>
@@ -134,16 +176,7 @@ const CommercialPremiseDetails = () => {
                                 max={3}
                                 interactiveDetails
                             />
-                            <Tooltip title="Подробнее о вознаграждении в разделе помощи">
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center justify-center rounded-full bg-white/90 p-1.5 text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-200 dark:hover:bg-gray-700"
-                                    onClick={() => navigate('/help/58-rabota-s-kommercheskimi-pomescheniyami')}
-                                    aria-label="Подробнее о вознаграждении"
-                                >
-                                    <TbHelpCircle className="text-lg" />
-                                </button>
-                            </Tooltip>
+                            <RewardHelpButton />
                         </div>
                     </div>
 
@@ -153,35 +186,37 @@ const CommercialPremiseDetails = () => {
                                 <button
                                     type="button"
                                     className="flex min-h-[360px] w-full cursor-zoom-in items-center justify-center rounded-xl bg-white p-3 dark:bg-white"
-                                    onClick={() => setIsPreviewOpen(true)}
+                                    onClick={() => void openPreview()}
                                 >
                                     <img
-                                        src={layoutImage}
+                                        {...getResponsiveImageAttrs(
+                                            premise.layoutImage,
+                                            '(min-width: 1024px) 420px, 100vw',
+                                        )}
                                         alt={title}
                                         className="max-h-[560px] max-w-[92%] object-contain"
                                     />
                                 </button>
                             ) : coverImage ? (
-                                <img
-                                    src={coverImage}
-                                    alt="Коммерческое помещение"
-                                    className="max-h-[560px] max-w-[92%] object-contain"
-                                />
+                                <button
+                                    type="button"
+                                    className="flex min-h-[360px] w-full cursor-zoom-in items-center justify-center rounded-xl bg-white p-3 dark:bg-white"
+                                    onClick={() => void openPreview()}
+                                >
+                                    <img
+                                        {...getResponsiveImageAttrs(
+                                            coverImage,
+                                            '(min-width: 1024px) 420px, 100vw',
+                                        )}
+                                        alt="Коммерческое помещение"
+                                        className="max-h-[560px] max-w-[92%] object-contain"
+                                    />
+                                </button>
                             ) : (
                                 <div className="flex min-h-[320px] items-center justify-center text-sm text-gray-500 dark:text-gray-400">
                                     Планировка отсутствует
                                 </div>
                             )}
-
-                            {floorPlanImage && layoutImage ? (
-                                <button
-                                    type="button"
-                                    className="mt-3 w-full rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
-                                    onClick={() => setIsFloorPreviewOpen(true)}
-                                >
-                                    Посмотреть план этажа
-                                </button>
-                            ) : null}
                         </div>
 
                         <div className="order-1 grid content-start grid-cols-1 gap-3 text-base sm:grid-cols-2 lg:grid-cols-1">
@@ -272,17 +307,29 @@ const CommercialPremiseDetails = () => {
                 </div>
             </AdaptiveCard>
 
-            <LayoutPreviewDialog
-                isOpen={isPreviewOpen}
-                imageSrc={layoutImage}
-                title={title}
-                onClose={() => setIsPreviewOpen(false)}
-            />
-            <LayoutPreviewDialog
-                isOpen={isFloorPreviewOpen}
-                imageSrc={floorPlanImage}
-                title={`План этажа — ${premise.complexName || ''}`}
-                onClose={() => setIsFloorPreviewOpen(false)}
+            <ImageGallery
+                index={previewIndex}
+                slides={previewSlides}
+                render={{
+                    slide: (props) => {
+                        if (
+                            !isImageSlide(props.slide) ||
+                            !('floorPath' in props.slide) ||
+                            !props.slide.floorPath
+                        ) {
+                            return undefined
+                        }
+
+                        return (
+                            <FloorPlanGallerySlide
+                                {...props}
+                                floorPath={String(props.slide.floorPath)}
+                                color={FLOOR_PLAN_HIGHLIGHT_COLOR}
+                            />
+                        )
+                    },
+                }}
+                onClose={() => setPreviewIndex(-1)}
             />
         </Container>
     )

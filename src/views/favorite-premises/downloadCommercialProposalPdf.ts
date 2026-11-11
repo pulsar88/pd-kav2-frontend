@@ -1,6 +1,7 @@
 import pdfMake from 'pdfmake/build/pdfmake'
 import pdfFonts from 'pdfmake/build/vfs_fonts'
 import type { Complex, Premise } from '@/views/objects/types'
+import { getMediaOriginalSrc } from '@/utils/mediaImage'
 import {
     formatArea,
     formatPrice,
@@ -38,13 +39,14 @@ const resolveHouseStatusLabel = (premise: Premise) => {
     return premise.buildingState || ''
 }
 
-const resolveLayoutImageUrl = (premise: Premise) => premise.layoutImage ?? null
+const resolveLayoutImageUrl = (premise: Premise) =>
+    getMediaOriginalSrc(premise.layoutImage) || null
 
 const resolveFloorPlanImageUrl = (premise: Premise) =>
-    premise.floorPlanImage ?? null
+    getMediaOriginalSrc(premise.floorPlanImage) || null
 
 const resolveComplexImageUrl = (premise: Premise, complex?: Complex | null) =>
-    complex?.image ?? premise.complexImage ?? null
+    getMediaOriginalSrc(complex?.image ?? premise.complexImage) || null
 
 const kv = (label: string, value: string) => ({
     columns: [

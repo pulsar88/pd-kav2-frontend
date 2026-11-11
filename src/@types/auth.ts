@@ -148,7 +148,11 @@ export type ProfilePicture = {
     size: number
     src: string
     upload_date: string
-    responsive: unknown[]
+    responsive?: {
+        width: number
+        height: number
+        name: string
+    }[]
     base_url: string
     responsive_path: string
     url_path: string

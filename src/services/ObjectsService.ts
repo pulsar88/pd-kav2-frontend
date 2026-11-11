@@ -22,6 +22,10 @@ import {
 } from '@/views/objects/specialOfferUtils'
 import type { PremiseSortKey } from '@/views/objects/utils'
 import { toPremiseSortParams } from '@/views/objects/utils'
+import {
+    normalizeMediaImage,
+    type MediaImage,
+} from '@/utils/mediaImage'
 import type { CheckboardBuilding } from '@/views/objects/checkboard.types'
 import {
     mapChessToCheckboardBuilding,
@@ -38,7 +42,7 @@ type RealtyObjectApi = {
     development_end?: string
     address?: string
     external_id?: number
-    image?: RealtyPropertyImageApi | string | null
+    image?: MediaImage | string | null
     project?: RealtyProjectApi | null
 }
 
@@ -54,16 +58,11 @@ type RealtyPropertyTypeApi = {
     name: string
 }
 
-type RealtyPropertyImageApi = {
-    src?: string
-    url?: string
-}
-
 type RealtyPropertyPresetApi = {
     id?: number
     name?: string
     external_id?: number
-    image?: RealtyPropertyImageApi | string | null
+    image?: MediaImage | string | null
 }
 
 type RealtyObjectBriefApi = {
@@ -77,13 +76,13 @@ type RealtyObjectBriefApi = {
     development_start?: string
     development_end?: string
     max_floor?: number
-    image?: RealtyPropertyImageApi | string | null
+    image?: MediaImage | string | null
 }
 
 type RealtyFloorPlanApi = {
     id?: number
     object_id?: number
-    image?: RealtyPropertyImageApi | string | null
+    image?: MediaImage | string | null
 }
 
 type RealtyFloorApi = {
@@ -145,7 +144,7 @@ export const REALTY_PROPERTY_WITH =
     'preset.image,object,realtyFloor.plan.image,project,object.image,status,specialOffers'
 
 export const REALTY_PROPERTY_LIST_WITH =
-    'preset.image,object,project,status,specialOffers'
+    'preset.image,object,realtyFloor.plan.image,project,status,specialOffers'
 
 const REALTY_OBJECT_WITH = 'image,project'
 
@@ -183,35 +182,11 @@ const mapTypeCodeToPremiseType = (code: string): PremiseType => {
 const normalizeTypeCode = (code: string): RealtyPropertyTypeCode | string =>
     normalizeRealtyPropertyTypeCode(code) ?? code.toLowerCase()
 
-const resolvePresetImageUrl = (
-    preset?: RealtyPropertyPresetApi | null,
-): string | undefined => {
-    if (!preset?.image) {
-        return undefined
-    }
+const resolvePresetImage = (preset?: RealtyPropertyPresetApi | null) =>
+    normalizeMediaImage(preset?.image)
 
-    if (typeof preset.image === 'string') {
-        return preset.image
-    }
-
-    return preset.image.src || preset.image.url
-}
-
-const resolveFloorPlanImageUrl = (
-    floor?: RealtyFloorApi | null,
-): string | undefined => {
-    const image = floor?.plan?.image
-
-    if (!image) {
-        return undefined
-    }
-
-    if (typeof image === 'string') {
-        return image
-    }
-
-    return image.src || image.url
-}
+const resolveFloorPlanImage = (floor?: RealtyFloorApi | null) =>
+    normalizeMediaImage(floor?.plan?.image)
 
 const resolvePremiseLayoutName = (item: RealtyPropertyApi) =>
     item.preset?.name ? `Планировка ${item.preset.name}` : undefined
@@ -245,14 +220,10 @@ const unwrapRealtyPropertyResponse = (
     return null
 }
 
-type RealtyPropertySummaryImageApi = {
-    src?: string
-}
-
 type RealtyPropertySummaryApi = {
     id: number
     name: string
-    image?: RealtyPropertySummaryImageApi | null
+    image?: MediaImage | string | null
     address?: string | null
     completion_date?: string | null
     delivery_date?: string | null
@@ -321,25 +292,11 @@ const unwrapRealtyProjectsResponse = (
     return response.data ?? []
 }
 
-const resolveRealtyObjectImageUrl = (
-    image?: RealtyPropertyImageApi | string | null,
-): string | undefined => {
-    if (!image) {
-        return undefined
-    }
-
-    if (typeof image === 'string') {
-        return image
-    }
-
-    return image.src || image.url
-}
-
 const mapRealtyObjectToComplex = (item: RealtyObjectApi): Complex => ({
     id: String(item.id),
     name: item.name,
     externalId: item.external_id,
-    image: resolveRealtyObjectImageUrl(item.image),
+    image: normalizeMediaImage(item.image),
     address: item.address?.trim() || undefined,
     completionDate: item.development_end?.trim() || undefined,
     promoText: item.project?.promo_text?.trim() || undefined,
@@ -351,7 +308,7 @@ const mapRealtyPropertySummaryToComplex = (
 ): Complex => ({
     id: String(item.id),
     name: item.name,
-    image: item.image?.src,
+    image: normalizeMediaImage(item.image),
     address: item.address?.trim() || undefined,
     apartmentsCount: item.count,
     priceFrom: item.min_price,
@@ -393,7 +350,7 @@ const mapRealtyObjectFields = (realtyObject?: RealtyObjectBriefApi | null) => ({
     developmentStart: realtyObject?.development_start?.trim() || undefined,
     deliveryDate: realtyObject?.development_end?.trim() || undefined,
     floorsInBuilding: realtyObject?.max_floor,
-    complexImage: resolveRealtyObjectImageUrl(realtyObject?.image),
+    complexImage: normalizeMediaImage(realtyObject?.image),
 })
 
 export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => {
@@ -434,8 +391,8 @@ export const mapRealtyPropertyToPremise = (item: RealtyPropertyApi): Premise => 
         specialOffers: hasOffers ? specialOffers : undefined,
         layout: resolvePremiseLayoutLabel(item),
         layoutName: resolvePremiseLayoutName(item),
-        layoutImage: resolvePresetImageUrl(item.preset),
-        floorPlanImage: resolveFloorPlanImageUrl(item.realty_floor),
+        layoutImage: resolvePresetImage(item.preset),
+        floorPlanImage: resolveFloorPlanImage(item.realty_floor),
         floorPath: item.floor_path?.trim() || undefined,
         promoText: item.project?.promo_text?.trim() || undefined,
         statusId: item.status?.id,

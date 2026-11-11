@@ -25,7 +25,7 @@ const CarouselContent = (props: CarouselContentProps) => {
         selectedIndex,
         scrollTo,
     } = useCarousel()
-    const innerRef = useRef<HTMLDivElement>(null)
+    const innerRef = useRef<HTMLDivElement | null>(null)
 
     const dragStartPosRef = useRef(0)
     const dragStartTimeRef = useRef(0)
@@ -270,7 +270,8 @@ const CarouselContent = (props: CarouselContentProps) => {
                     if (typeof ref === 'function') {
                         ref(node)
                     } else if (ref && 'current' in ref) {
-                        ref.current = node
+                        ;(ref as { current: HTMLDivElement | null }).current =
+                            node
                     }
                 }}
                 className={contentClass}

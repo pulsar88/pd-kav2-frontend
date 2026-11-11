@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { TbBuildingSkyscraper, TbZoomIn, TbHeart, TbHeartFilled, TbScale, TbHelpCircle } from 'react-icons/tb'
-import Tooltip from '@/components/ui/Tooltip'
+import { TbBuildingSkyscraper, TbZoomIn, TbHeart, TbHeartFilled, TbScale } from 'react-icons/tb'
+import { isImageSlide } from 'yet-another-react-lightbox'
+import ImageGallery from '@/components/shared/ImageGallery'
 import Button from '@/components/ui/Button'
 import { useFavoritesStore } from '@/store/favoritesStore'
 import { useComparisonStore } from '@/store/comparisonStore'
@@ -10,17 +11,28 @@ import Container from '@/components/shared/Container'
 import Pagination from '@/components/ui/Pagination'
 import ObjectsSearchForm from './components/ObjectsSearchForm'
 import SpecialOfferBadges from './components/SpecialOfferBadges'
-import LayoutPreviewDialog from './components/LayoutPreviewDialog'
+import RewardHelpButton from './components/RewardHelpButton'
+import {
+    FLOOR_PLAN_HIGHLIGHT_COLOR,
+    FloorPlanGallerySlide,
+    loadImageSize,
+} from './components/FloorPlanOverlay'
 import {
     apiGetRealtyProperties,
     type GetRealtyPropertiesResponse,
 } from '@/services/ObjectsService'
 import type { ObjectsSearchFilters, Premise } from './types'
 import {
+    getMediaOriginalSrc,
+    getResponsiveImageAttrs,
+} from '@/utils/mediaImage'
+import {
     formatArea,
     formatPrice,
     getPremiseCoverImage,
+    getPremisePreviewSlides,
     getPremiseTypeLabel,
+    type PremisePreviewSlide,
 } from './utils'
 
 const PAGE_SIZE = 20
@@ -38,39 +50,64 @@ type CommercialCardProps = {
 
 const CommercialCard = ({ item }: CommercialCardProps) => {
     const navigate = useNavigate()
-    const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+    const [previewIndex, setPreviewIndex] = useState(-1)
+    const [previewSlides, setPreviewSlides] = useState<PremisePreviewSlide[]>([])
     const favoriteIds = useFavoritesStore((state) => state.favoriteIds)
     const comparisonIds = useComparisonStore((state) => state.comparisonIds)
 
     const coverImage = getPremiseCoverImage(item)
-    const planImage = item.layoutImage || item.floorPlanImage
+    const planImage = getMediaOriginalSrc(
+        item.layoutImage || item.floorPlanImage,
+    )
     const hasOffers = Boolean(item.specialOffers?.length)
 
     const openDetails = () => {
         navigate(`/commercial-premises/${item.id}`)
     }
 
+    const openPreview = async () => {
+        const slides = getPremisePreviewSlides(item)
+        if (slides.length === 0) return
+
+        const floorSlide = slides.find((slide) => Boolean(slide.floorPath))
+        if (floorSlide) {
+            const size = await loadImageSize(floorSlide.src)
+            if (size) {
+                setPreviewSlides(
+                    slides.map((slide) =>
+                        slide.src === floorSlide.src
+                            ? {
+                                  ...slide,
+                                  width: size.width,
+                                  height: size.height,
+                              }
+                            : slide,
+                    ),
+                )
+                setPreviewIndex(0)
+                return
+            }
+        }
+
+        setPreviewSlides(slides)
+        setPreviewIndex(0)
+    }
+
     return (
         <article className="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition hover:border-gray-400 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-900">
-            <Tooltip title="Подробнее о вознаграждении в разделе помощи">
-                <button
-                    type="button"
-                    className="absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-full bg-white/90 p-1.5 text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-200 dark:hover:bg-gray-700"
-                    onClick={() => navigate('/help/58-rabota-s-kommercheskimi-pomescheniyami')}
-                    aria-label="Подробнее о вознаграждении"
-                >
-                    <TbHelpCircle className="text-lg" />
-                </button>
-            </Tooltip>
+            <RewardHelpButton wrapperClass="absolute right-3 top-3 z-10" />
             <button
                 type="button"
                 className="block w-full text-left"
-                onClick={() => (planImage ? setIsPreviewOpen(true) : openDetails())}
+                onClick={() => (planImage ? void openPreview() : openDetails())}
             >
                 <div className="group/plan relative flex h-52 items-center justify-center overflow-hidden bg-gray-100 p-3 dark:bg-white">
                     {coverImage ? (
                         <img
-                            src={coverImage}
+                            {...getResponsiveImageAttrs(
+                                coverImage,
+                                '(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw',
+                            )}
                             className="h-full w-full object-contain"
                             alt=""
                         />
@@ -86,13 +123,13 @@ const CommercialCard = ({ item }: CommercialCardProps) => {
                             className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-lg bg-white/90 px-2.5 py-1.5 text-xs font-semibold text-gray-700 opacity-0 shadow-sm transition group-hover/plan:opacity-100 dark:bg-gray-800/90 dark:text-gray-100"
                             onClick={(event) => {
                                 event.stopPropagation()
-                                setIsPreviewOpen(true)
+                                void openPreview()
                             }}
                             onKeyDown={(event) => {
                                 if (event.key === 'Enter' || event.key === ' ') {
                                     event.preventDefault()
                                     event.stopPropagation()
-                                    setIsPreviewOpen(true)
+                                    void openPreview()
                                 }
                             }}
                         >
@@ -148,7 +185,7 @@ const CommercialCard = ({ item }: CommercialCardProps) => {
                     </p>
                     <p className="mt-2 font-semibold text-gray-900 dark:text-gray-100">
                         {item.price != null
-                            ? `${formatPrice(item.price)} ₽`
+                            ? formatPrice(item.price)
                             : 'Цена не указана'}
                     </p>
                 </button>
@@ -175,11 +212,29 @@ const CommercialCard = ({ item }: CommercialCardProps) => {
                 </Button>
             </div>
 
-            <LayoutPreviewDialog
-                isOpen={isPreviewOpen}
-                imageSrc={planImage}
-                title={`План коммерческого помещения №${item.number}`}
-                onClose={() => setIsPreviewOpen(false)}
+            <ImageGallery
+                index={previewIndex}
+                slides={previewSlides}
+                render={{
+                    slide: (props) => {
+                        if (
+                            !isImageSlide(props.slide) ||
+                            !('floorPath' in props.slide) ||
+                            !props.slide.floorPath
+                        ) {
+                            return undefined
+                        }
+
+                        return (
+                            <FloorPlanGallerySlide
+                                {...props}
+                                floorPath={String(props.slide.floorPath)}
+                                color={FLOOR_PLAN_HIGHLIGHT_COLOR}
+                            />
+                        )
+                    },
+                }}
+                onClose={() => setPreviewIndex(-1)}
             />
         </article>
     )

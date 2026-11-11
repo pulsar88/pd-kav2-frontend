@@ -4,6 +4,7 @@ import {
     unwrapApiData,
     type ApiDataEnvelope,
 } from './auth/authUtils'
+import { getMediaFittedSrc } from '@/utils/mediaImage'
 import type {
     AuthMessageResponse,
     AuthRegisteredResponse,
@@ -27,7 +28,7 @@ import type {
 
 export const resolveProfilePictureUrl = (
     profilePicture: CurrentUserResponse['profile_picture'],
-) => profilePicture?.src ?? ''
+) => getMediaFittedSrc(profilePicture, 192)
 
 export const mapCurrentUserToUser = (
     data: CurrentUserResponse,

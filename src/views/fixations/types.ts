@@ -99,6 +99,11 @@ export type Fixation = {
     has_extend_request?: boolean
     hasExtendRequest?: boolean
     extendRejectReason?: string
+    pendingExtendRequest?: {
+        id: string
+        comment?: string
+        days?: number
+    }
 }
 
 export type GetFixationsResponse = {

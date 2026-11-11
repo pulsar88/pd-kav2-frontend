@@ -11,7 +11,7 @@ import { useFloatingTree } from '@floating-ui/react'
 import type { CommonProps } from '../@types/common'
 import type {
     SyntheticEvent,
-    RefObject,
+    MutableRefObject,
     ElementType,
     ReactElement,
     MouseEvent,
@@ -57,7 +57,7 @@ const DropdownItem = (props: DropdownItemProps) => {
 
     const menuitemRef = useUncertainRef<HTMLElement>(
         ref,
-    ) as RefObject<HTMLElement | null>
+    ) as MutableRefObject<HTMLElement | null>
 
     const menuitemId = useUniqueId('menu-item-')
 
