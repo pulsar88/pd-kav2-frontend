@@ -27,9 +27,15 @@ import { useSessionUser } from '@/store/authStore'
 import { formatRuPhone } from '@/views/fixations/utils'
 import type { AdminUserListItem } from '@/@types/users'
 import ChangeUserAgencyDialog from './components/ChangeUserAgencyDialog'
+import ChangeUserAccessLevelDialog from './components/ChangeUserAccessLevelDialog'
+import {
+    getAccessLevelExpiryClassName,
+    getAccessLevelExpiryLabel,
+} from './components/accessLevelUtils'
 import { HiOutlineUser } from 'react-icons/hi'
 import {
     TbBuilding,
+    TbCrown,
     TbLock,
     TbLockOpen,
     TbSearch,
@@ -76,6 +82,8 @@ const SupervisorUsers = () => {
     const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(
         null,
     )
+    const [accessLevelTarget, setAccessLevelTarget] =
+        useState<AdminUserListItem | null>(null)
     const [supervisorTarget, setSupervisorTarget] =
         useState<AdminUserListItem | null>(null)
     const [blockTarget, setBlockTarget] = useState<AdminUserListItem | null>(
@@ -250,21 +258,41 @@ const SupervisorUsers = () => {
                 },
             },
             {
-                header: 'Роль / уровень',
+                header: 'Роль',
                 id: 'role',
+                cell: ({ row }) => (
+                    <Tag className="w-fit border-0 bg-primary-subtle text-primary">
+                        {getUserRoleLabel(row.original.roles?.[0])}
+                    </Tag>
+                ),
+            },
+            {
+                header: 'Уровень доступа',
+                id: 'access_level',
                 cell: ({ row }) => {
-                    const role = getUserRoleLabel(row.original.roles?.[0])
                     const level = row.original.access_level?.name
+                    const expiresAt = row.original.access_level_expires_at
+
+                    if (!level) {
+                        return (
+                            <span className="text-sm text-gray-400">
+                                Не задан
+                            </span>
+                        )
+                    }
+
                     return (
-                        <div className="flex min-w-0 flex-col gap-1">
-                            <Tag className="w-fit border-0 bg-primary-subtle text-primary">
-                                {role}
-                            </Tag>
-                            {level ? (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {level}
-                                </span>
-                            ) : null}
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                            <span className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {level}
+                            </span>
+                            <span
+                                className={`whitespace-nowrap text-xs ${getAccessLevelExpiryClassName(
+                                    expiresAt,
+                                )}`}
+                            >
+                                {getAccessLevelExpiryLabel(expiresAt)}
+                            </span>
                         </div>
                     )
                 },
@@ -303,6 +331,19 @@ const SupervisorUsers = () => {
                                         icon={<TbUserCheck />}
                                         aria-label="Назначить руководителем агентства"
                                         onClick={() => setSupervisorTarget(user)}
+                                    />
+                                </Tooltip>
+                            ) : null}
+
+                            {isGlobalSupervisor ? (
+                                <Tooltip title="Сменить уровень доступа">
+                                    <Button
+                                        size="xs"
+                                        variant="solid"
+                                        shape="circle"
+                                        icon={<TbCrown />}
+                                        aria-label="Сменить уровень доступа"
+                                        onClick={() => setAccessLevelTarget(user)}
                                     />
                                 </Tooltip>
                             ) : null}
@@ -401,6 +442,16 @@ const SupervisorUsers = () => {
                 onClose={() => setSelectedUser(null)}
                 onSuccess={() => {
                     setSelectedUser(null)
+                    void loadUsers()
+                }}
+            />
+
+            <ChangeUserAccessLevelDialog
+                isOpen={Boolean(accessLevelTarget)}
+                user={accessLevelTarget}
+                onClose={() => setAccessLevelTarget(null)}
+                onSuccess={() => {
+                    setAccessLevelTarget(null)
                     void loadUsers()
                 }}
             />

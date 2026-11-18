@@ -2,7 +2,9 @@ import ApiService from './ApiService'
 import endpointConfig from '@/configs/endpoint.config'
 import { toAxiosParams } from '@/views/objects/realtyPropertyQuery'
 import type {
+    AccessLevelOption,
     AdminUserListItem,
+    ChangeUserAccessLevelPayload,
     ChangeUserAgencyPayload,
     GetUsersParams,
     GetUsersResponse,
@@ -67,6 +69,43 @@ export async function apiChangeUserAgency(
         method: 'post',
         data: payload,
     })
+    return unwrapApiData(response)
+}
+
+export async function apiGetAccessLevels(): Promise<AccessLevelOption[]> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<AccessLevelOption[]> | AccessLevelOption[]
+    >({
+        url: endpointConfig.usersAccessLevels,
+        method: 'get',
+    })
+
+    const data = unwrapApiData(response)
+    if (!Array.isArray(data)) return []
+
+    return data
+        .filter((item) => item && item.value != null)
+        .map((item) => ({
+            value: Number(item.value),
+            code: String(item.code ?? ''),
+            name: String(item.name ?? item.code ?? ''),
+        }))
+}
+
+export async function apiChangeUserAccessLevel(
+    userId: string | number,
+    payload: ChangeUserAccessLevelPayload,
+): Promise<AdminUserListItem | void> {
+    const response = await ApiService.fetchDataWithAxios<
+        ApiDataEnvelope<AdminUserListItem> | AdminUserListItem | null | undefined
+    >({
+        url: endpointConfig.userAccessLevel(userId),
+        method: 'post',
+        data: payload,
+    })
+
+    if (response == null) return
+
     return unwrapApiData(response)
 }
 

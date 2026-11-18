@@ -20,6 +20,9 @@ const endpointConfig = {
         `/v2/users/${userId}/change_agency`,
     userMakeSupervisor: (userId: string | number) =>
         `/v2/users/${userId}/supervisor`,
+    usersAccessLevels: '/v2/users/access_levels',
+    userAccessLevel: (userId: string | number) =>
+        `/v2/users/${userId}/access_level`,
     userLogs: '/v2/user/logs',
     userLogsRead: '/v2/user/logs/read',
     logsUnreadCount: '/v2/user/logs/unread-count',

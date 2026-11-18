@@ -36,3 +36,14 @@ export type GetUsersResponse = {
 export type ChangeUserAgencyPayload = {
     agency_id: number
 }
+
+export type AccessLevelOption = {
+    value: number
+    code: string
+    name: string
+}
+
+export type ChangeUserAccessLevelPayload = {
+    access_level: number
+    expires_at?: string
+}
