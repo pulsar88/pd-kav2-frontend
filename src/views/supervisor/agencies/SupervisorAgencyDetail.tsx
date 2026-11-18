@@ -16,17 +16,15 @@ import {
     apiToggleAgencyActivate,
 } from '@/services/AgencyService'
 import {
+    apiGetUsers,
     apiMakeUserAgencySupervisor,
     apiToggleUserBlock,
 } from '@/services/UsersService'
 import { getApiErrorMessage } from '@/services/auth/authUtils'
 import { getMediaSrc, getMediaSrcSet } from '@/utils/mediaImage'
-import {
-    AGENCY_SUPERVISOR,
-    getUserRoleLabel,
-} from '@/constants/roles.constant'
+import { getUserRoleLabel } from '@/constants/roles.constant'
 import { formatRuPhone } from '@/views/fixations/utils'
-import type { AgencyItem, AgencyAgent } from '@/@types/agency'
+import type { AgencyItem } from '@/@types/agency'
 import type { AdminUserListItem } from '@/@types/users'
 import ChangeUserAgencyDialog from '../components/ChangeUserAgencyDialog'
 import { HiOutlineUser } from 'react-icons/hi'
@@ -48,15 +46,23 @@ import {
 } from 'react-icons/tb'
 import { Tooltip } from '@/components/ui'
 
+const AGENTS_PAGE_SIZE = 20
+
+/** Строка таблицы агентов: пользователь агентства (+ id в CRM, если его отдаёт API) */
+type AgencyMember = AdminUserListItem & {
+    external_id?: number | string | null
+}
+
+type BlockableUser = {
+    blocked?: number | boolean
+    is_blocked?: number
+}
+
 const isAgencyActive = (agency: AgencyItem): boolean =>
     Boolean(agency.active === 1 || agency.active === true)
 
-const isAgentBlocked = (agent: AgencyAgent): boolean =>
-    Boolean(
-        (agent as any).blocked === 1 ||
-            (agent as any).blocked === true ||
-            (agent as any).is_blocked === 1,
-    )
+const isAgentBlocked = (user: BlockableUser): boolean =>
+    Boolean(user.blocked === 1 || user.blocked === true || user.is_blocked === 1)
 
 const SupervisorAgencyDetail = () => {
     const { id } = useParams<{ id: string }>()
@@ -70,6 +76,13 @@ const SupervisorAgencyDetail = () => {
     const [agency, setAgency] = useState<AgencyItem | null>(null)
     const [isLoading, setIsLoading] = useState(true)
 
+    // Агенты агентства грузятся отдельным запросом (фильтр по agency_id)
+    // с серверной пагинацией
+    const [agents, setAgents] = useState<AgencyMember[]>([])
+    const [agentsTotal, setAgentsTotal] = useState(0)
+    const [agentsPage, setAgentsPage] = useState(1)
+    const [isAgentsLoading, setIsAgentsLoading] = useState(true)
+
     // Действия с агентством
     const [isTogglingAgencyActive, setIsTogglingAgencyActive] = useState(false)
     const [isAgencyConfirmOpen, setIsAgencyConfirmOpen] = useState(false)
@@ -78,38 +91,96 @@ const SupervisorAgencyDetail = () => {
     const [selectedUserForAgencyChange, setSelectedUserForAgencyChange] =
         useState<AdminUserListItem | null>(null)
     const [supervisorTarget, setSupervisorTarget] =
-        useState<AgencyAgent | null>(null)
-    const [blockTarget, setBlockTarget] = useState<AgencyAgent | null>(null)
+        useState<AgencyMember | null>(null)
+    const [blockTarget, setBlockTarget] = useState<AgencyMember | null>(null)
 
     const [isMakingSupervisor, setIsMakingSupervisor] = useState(false)
     const [isTogglingBlock, setIsTogglingBlock] = useState(false)
 
-    const loadAgencyDetails = useCallback(async () => {
+    const loadAgencyDetails = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!id) return
+            if (!options?.silent) setIsLoading(true)
+            try {
+                // Агентов здесь больше не запрашиваем — они грузятся
+                // отдельным запросом с фильтром по agency_id
+                const data = await apiGetAgency(id, {
+                    with: 'supervisor,supervisor.profilePicture',
+                })
+                setAgency(data)
+            } catch (err: unknown) {
+                toast.push(
+                    <Notification type="danger">
+                        {getApiErrorMessage(
+                            err,
+                            'Не удалось загрузить данные агентства',
+                        )}
+                    </Notification>,
+                    { placement: 'top-center' },
+                )
+            } finally {
+                if (!options?.silent) setIsLoading(false)
+            }
+        },
+        [id],
+    )
+
+    const loadAgents = useCallback(async () => {
         if (!id) return
-        setIsLoading(true)
+        setIsAgentsLoading(true)
         try {
-            const data = await apiGetAgency(id, {
-                with: 'supervisor,agents,agents.profilePicture',
+            const response = await apiGetUsers({
+                page: agentsPage,
+                per_page: AGENTS_PAGE_SIZE,
+                agency_id: id,
+                with: 'agency,profilePicture',
             })
-            setAgency(data)
+            const list = response.data ?? []
+            const total = response.meta?.total ?? list.length
+
+            // После действий (смена агентства, блокировка и т.п.) текущая
+            // страница могла опустеть — откатываемся на последнюю непустую
+            if (list.length === 0 && total > 0 && agentsPage > 1) {
+                const lastPage = Math.max(
+                    1,
+                    Math.ceil(total / AGENTS_PAGE_SIZE),
+                )
+                setAgentsPage(Math.min(agentsPage - 1, lastPage))
+                return
+            }
+
+            setAgents(list)
+            setAgentsTotal(total)
         } catch (err: unknown) {
+            setAgents([])
+            setAgentsTotal(0)
             toast.push(
                 <Notification type="danger">
                     {getApiErrorMessage(
                         err,
-                        'Не удалось загрузить данные агентства',
+                        'Не удалось загрузить список агентов',
                     )}
                 </Notification>,
                 { placement: 'top-center' },
             )
         } finally {
-            setIsLoading(false)
+            setIsAgentsLoading(false)
         }
-    }, [id])
+    }, [id, agentsPage])
 
     useEffect(() => {
         void loadAgencyDetails()
     }, [loadAgencyDetails])
+
+    useEffect(() => {
+        void loadAgents()
+    }, [loadAgents])
+
+    /** Перезагрузить карточку агентства и текущую страницу агентов */
+    const refreshData = useCallback(() => {
+        void loadAgencyDetails({ silent: true })
+        void loadAgents()
+    }, [loadAgencyDetails, loadAgents])
 
     const handleToggleAgencyActive = async () => {
         if (!agency) return
@@ -125,7 +196,7 @@ const SupervisorAgencyDetail = () => {
                 { placement: 'top-center' },
             )
             setIsAgencyConfirmOpen(false)
-            void loadAgencyDetails()
+            refreshData()
         } catch (err: unknown) {
             toast.push(
                 <Notification type="danger">
@@ -157,7 +228,7 @@ const SupervisorAgencyDetail = () => {
                 { placement: 'top-center' },
             )
             setSupervisorTarget(null)
-            void loadAgencyDetails()
+            refreshData()
         } catch (err: unknown) {
             toast.push(
                 <Notification type="danger">
@@ -188,7 +259,7 @@ const SupervisorAgencyDetail = () => {
                 { placement: 'top-center' },
             )
             setBlockTarget(null)
-            void loadAgencyDetails()
+            refreshData()
         } catch (err: unknown) {
             toast.push(
                 <Notification type="danger">
@@ -206,36 +277,7 @@ const SupervisorAgencyDetail = () => {
         }
     }
 
-    // Собираем всех пользователей агентства (агентов + руководителя)
-    const combinedAgents = useMemo(() => {
-        if (!agency) return []
-        const list: AgencyAgent[] = [...(agency.agents || [])]
-
-        if (agency.supervisor) {
-            const supervisorExists = list.some(
-                (a) => a.id === agency.supervisor?.id,
-            )
-            if (!supervisorExists) {
-                list.unshift({
-                    id: agency.supervisor.id,
-                    name: agency.supervisor.name,
-                    email: agency.supervisor.email,
-                    phone: agency.supervisor.phone,
-                    country_code: agency.supervisor.country_code,
-                    roles: agency.supervisor.roles || [AGENCY_SUPERVISOR],
-                    access_level: agency.supervisor.access_level,
-                    access_level_expires_at:
-                        agency.supervisor.access_level_expires_at,
-                    bonuses: agency.supervisor.bonuses,
-                    profile_picture: agency.supervisor.profile_picture,
-                    blocked: agency.supervisor.blocked,
-                } as any)
-            }
-        }
-        return list
-    }, [agency])
-
-    const agentColumns: ColumnDef<AgencyAgent>[] = useMemo(
+    const agentColumns: ColumnDef<AgencyMember>[] = useMemo(
         () => [
             {
                 header: 'Пользователь',
@@ -326,11 +368,8 @@ const SupervisorAgencyDetail = () => {
                     const isCurrentSupervisor =
                         agency?.supervisor?.id === agent.id
 
-                    const adminUserItem: AdminUserListItem = {
-                        id: agent.id,
-                        name: agent.name,
-                        email: agent.email ?? null,
-                        phone: agent.phone,
+                    const adminUserItem: AgencyMember = {
+                        ...agent,
                         agency: agency
                             ? {
                                   id: agency.id,
@@ -338,7 +377,7 @@ const SupervisorAgencyDetail = () => {
                                   fix_days: agency.fix_days ?? 0,
                                   is_aggregator: agency.is_aggregator,
                               }
-                            : null,
+                            : agent.agency ?? null,
                     }
 
                     return (
@@ -663,7 +702,7 @@ const SupervisorAgencyDetail = () => {
                                                 }
                                             >
                                                 {isAgentBlocked(
-                                                    agency.supervisor as any,
+                                                    agency.supervisor,
                                                 )
                                                     ? 'Разблокировать'
                                                     : 'Заблокировать'}
@@ -709,7 +748,7 @@ const SupervisorAgencyDetail = () => {
                                         </div>
                                         <div>
                                             <p className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                                                {combinedAgents.length}
+                                                {agentsTotal}
                                             </p>
                                             <p className="text-xs text-gray-400">
                                                 В штате агентства
@@ -735,15 +774,21 @@ const SupervisorAgencyDetail = () => {
                                 </p>
                             </div>
                             <Tag className="border-0 bg-primary/10 text-primary font-bold">
-                                {combinedAgents.length} агентов
+                                {agentsTotal} агентов
                             </Tag>
                         </div>
 
                         <DataTable
                             columns={agentColumns}
-                            data={combinedAgents}
-                            loading={false}
-                            noData={combinedAgents.length === 0}
+                            data={agents}
+                            loading={isAgentsLoading}
+                            noData={!isAgentsLoading && agents.length === 0}
+                            pagingData={{
+                                total: agentsTotal,
+                                pageIndex: agentsPage,
+                                pageSize: AGENTS_PAGE_SIZE,
+                            }}
+                            onPaginationChange={(page) => setAgentsPage(page)}
                         />
                     </div>
                 </AdaptiveCard>
@@ -756,7 +801,7 @@ const SupervisorAgencyDetail = () => {
                 onClose={() => setSelectedUserForAgencyChange(null)}
                 onSuccess={() => {
                     setSelectedUserForAgencyChange(null)
-                    void loadAgencyDetails()
+                    refreshData()
                 }}
             />
 
