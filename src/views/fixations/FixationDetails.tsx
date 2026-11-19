@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useSessionUser } from '@/store/authStore'
 import { SUPERVISOR } from '@/constants/roles.constant'
 import Button from '@/components/ui/Button'
@@ -7,6 +7,7 @@ import Input from '@/components/ui/Input'
 import Notification from '@/components/ui/Notification'
 import toast from '@/components/ui/toast'
 import Spinner from '@/components/ui/Spinner'
+import Tooltip from '@/components/ui/Tooltip'
 import AdaptiveCard from '@/components/shared/AdaptiveCard'
 import Container from '@/components/shared/Container'
 import Loading from '@/components/shared/Loading'
@@ -29,6 +30,7 @@ import {
     TbClock,
     TbClockPlus,
     TbEdit,
+    TbHelpCircle,
     TbPlus,
     TbRefresh,
     TbX,
@@ -42,6 +44,11 @@ import {
     getFixationExpiryAccentClass,
     getFixationStatusDisplay,
 } from './utils'
+
+const STATUS_HELP_PATH = '/help/59-informatsiya-po-statusam-fiksatsiy'
+
+const canHoverTooltip = () =>
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 const CopyValue = ({ text, children }: { text: string; children: ReactNode }) => {
     const handleCopy = async () => {
@@ -709,13 +716,46 @@ const FixationDetails = () => {
                                     <h2 className="mb-0 text-2xl font-bold text-gray-900 dark:text-gray-100">
                                         Фиксация #{data.id}
                                     </h2>
-                                    {status ? (
-                                        <span
-                                            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${status.className}`}
+                                    <span className="inline-flex shrink-0 items-center gap-1.5">
+                                        {status ? (
+                                            <span
+                                                className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${status.className}`}
+                                            >
+                                                {status.label}
+                                            </span>
+                                        ) : null}
+                                        <Tooltip
+                                            title={
+                                                <span className="block">
+                                                    Подробнее о статусах
+                                                    фиксаций в разделе помощи.{' '}
+                                                    <Link
+                                                        to={STATUS_HELP_PATH}
+                                                        className="font-semibold underline"
+                                                        onClick={(event) =>
+                                                            event.stopPropagation()
+                                                        }
+                                                    >
+                                                        Открыть
+                                                    </Link>
+                                                </span>
+                                            }
                                         >
-                                            {status.label}
-                                        </span>
-                                    ) : null}
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center justify-center rounded-full bg-white/90 p-1.5 text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                aria-label="Справка о статусах фиксаций"
+                                                onClick={() => {
+                                                    if (!canHoverTooltip()) {
+                                                        return
+                                                    }
+                                                    navigate(STATUS_HELP_PATH)
+                                                }}
+                                            >
+                                                <TbHelpCircle className="text-lg" />
+                                            </button>
+                                        </Tooltip>
+                                    </span>
                                 </div>
                                 {canModerate || pendingExtendRequest ? (
                                     <div className="mt-4 flex flex-col gap-3">
